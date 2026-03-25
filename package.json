@@ -1,0 +1,8 @@
+{
+  "name": "trinette",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
