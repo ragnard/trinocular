@@ -5,7 +5,7 @@
 
   export interface Field {
     name: string;
-    data_type: DataType;
+    dataType: DataType;
     nullable: boolean;
   }
 
@@ -28,6 +28,7 @@
   const DEFAULT_BUFFER_ROWS = 5;
   const DEFAULT_COLUMN_WIDTH = 150;
   const MIN_COLUMN_WIDTH = 50;
+  const DEFAULT_SPACER_MIN_WIDTH = 100;
   const ROW_NUMBER_WIDTH = 60;
 
   import type { Snippet } from "svelte";
@@ -37,6 +38,7 @@
     rowHeight?: number;
     bufferRows?: number;
     columnWidth?: number;
+    spacerMinWidth?: number;
     header?: Snippet<[Field]>;
   }
 
@@ -45,6 +47,7 @@
     rowHeight = DEFAULT_ROW_HEIGHT,
     bufferRows = DEFAULT_BUFFER_ROWS,
     columnWidth = DEFAULT_COLUMN_WIDTH,
+    spacerMinWidth = DEFAULT_SPACER_MIN_WIDTH,
     header
   }: Props = $props();
 
@@ -56,8 +59,8 @@
 
   let totalRows = $derived(data?.data?.length ?? 0);
   let fieldCount = $derived(data?.schema?.fields?.length ?? 0);
-  let colCount = $derived(fieldCount + 1);
-  let tableWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
+  let colCount = $derived(fieldCount + 2);
+  let columnsWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
 
   let startIndex = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows));
   let endIndex = $derived(
@@ -108,7 +111,7 @@
     if (Number.isNaN(rowIndex)) return;
 
     const cellIndex = Array.from(tr.children).indexOf(td) - 1;
-    if (cellIndex < 0) return;
+    if (cellIndex < 0 || cellIndex >= fieldCount) return;
 
     const coord: CellCoord = { row: rowIndex, col: cellIndex };
 
@@ -255,12 +258,13 @@
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
   >
-    <table style:width="{tableWidth}px">
+    <table style:width="100%" style:min-width="{columnsWidth + spacerMinWidth}px">
       <colgroup>
         <col style:width="{ROW_NUMBER_WIDTH}px" />
         {#each columnWidths as w}
           <col style:width="{w}px" />
         {/each}
+        <col class="spacer-col" />
       </colgroup>
       <thead>
         <tr style:height="{rowHeight}px">
@@ -279,6 +283,7 @@
               ></div>
             </th>
           {/each}
+          <th class="spacer"></th>
         </tr>
       </thead>
       <tbody>
@@ -296,6 +301,7 @@
               {@const flags = cellFlags(absRow, colIdx)}
               <td class:selected={flags.selected} class:active={flags.isActive}>{cell ?? ""}</td>
             {/each}
+            <td class="spacer"></td>
           </tr>
         {/each}
 
@@ -381,6 +387,12 @@
     outline: 2px solid #0e65eb;
     outline-offset: -2px;
     background: rgba(14, 101, 235, 0.06);
+  }
+
+  th.spacer,
+  td.spacer {
+    padding: 0;
+    pointer-events: none;
   }
 
   .resize-handle {

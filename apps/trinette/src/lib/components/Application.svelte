@@ -2,6 +2,7 @@
   import type { Workspace } from "$lib/State.svelte";
   import Editor from "$lib/monaco/Editor.svelte";
   import { StaticMetadataProvider } from "monaco-language-trino";
+  import * as monaco from "monaco-editor";
 
   import Trino, { type QueryResult } from "$lib/trino";
   import { SplitPane } from "./split-pane";
@@ -9,10 +10,31 @@
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
 
-  const query = "SELECT * from tpch.sf1.customer limit 50;\n\n\n";
+  let statementStartLine = $state(1);
 
-  async function handleExecuteSql(sql: string) {
+  const editorMarkers: monaco.editor.IMarkerData[] = $derived.by(() => {
+    const error = workspace.query?.error;
+    if (!error?.errorLocation) return [];
+    return [{
+      startLineNumber: error.errorLocation.lineNumber + statementStartLine - 1,
+      startColumn: error.errorLocation.columnNumber,
+      endLineNumber: error.errorLocation.lineNumber + statementStartLine - 1,
+      endColumn: error.errorLocation.columnNumber + 1,
+      message: error.message,
+      severity: monaco.MarkerSeverity.Error,
+    }];
+  });
+
+  const query = `SELECT * from tpch.sf1.customer limit 50;
+
+SELECT row(array[row('foo', i), row('bar', i+2)], array[1, 2, 3, 4, 5]) as complex
+from table(sequence(1, 100)) as t(i);
+
+  `;
+
+  async function handleExecuteSql(sql: string, startLine: number) {
     console.log("Execute SQL:", sql);
+    statementStartLine = startLine;
 
     const trino: Trino = Trino.create({
       server: "http://localhost:5173/api/trino/test"
@@ -36,6 +58,7 @@
           <Editor
             value={query}
             metadataProvider={new StaticMetadataProvider()}
+            markers={editorMarkers}
             onexecutesql={handleExecuteSql}
           />
         </div>

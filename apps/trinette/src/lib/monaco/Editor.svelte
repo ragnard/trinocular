@@ -8,12 +8,20 @@
     value?: string;
     options?: monaco.editor.IStandaloneEditorConstructionOptions;
     metadataProvider?: MetadataProvider;
-    onexecutesql?: (sql: string) => void;
+    markers?: monaco.editor.IMarkerData[];
+    onexecutesql?: (sql: string, startLine: number) => void;
   }
 
-  let { value = "", options = {}, metadataProvider, onexecutesql }: Props = $props();
+  let { value = "", options = {}, metadataProvider, markers = [], onexecutesql }: Props = $props();
 
   let container: HTMLDivElement;
+  let editorModel: monaco.editor.ITextModel | undefined = $state();
+
+  $effect(() => {
+    if (editorModel) {
+      monaco.editor.setModelMarkers(editorModel, "external", markers);
+    }
+  });
 
   self.MonacoEnvironment = {
     getWorker: () => new editorWorker()
@@ -40,6 +48,7 @@
   onMount(() => {
     const disposable = register(monaco, { metadataProvider });
     const model = monaco.editor.createModel(value, "trino-sql");
+    editorModel = model;
     const editor = monaco.editor.create(container, {
       model,
       language: "trino-sql",
@@ -60,7 +69,7 @@
 
       const selection = editor.getSelection();
       if (selection && !selection.isEmpty()) {
-        onexecutesql(model.getValueInRange(selection));
+        onexecutesql(model.getValueInRange(selection), selection.startLineNumber);
         return;
       }
 
@@ -73,12 +82,19 @@
       const current = statements.find(
         (s) => cursorOffset >= s.startOffset && cursorOffset <= s.endOffset
       );
-      onexecutesql(current ? current.text : text);
+
+      if (current) {
+        const startLine = model.getPositionAt(current.startOffset).lineNumber;
+        onexecutesql(current.text, startLine);
+      } else {
+        onexecutesql(text, 1);
+      }
     });
 
     return () => {
       editor.dispose();
       model.dispose();
+      editorModel = undefined;
       disposable.dispose();
     };
   });

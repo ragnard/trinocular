@@ -113,11 +113,17 @@ export type QueryFailureInfo = {
   stack: string[];
 };
 
+export type ErrorLocation = {
+  lineNumber: number;
+  columnNumber: number;
+};
+
 export type QueryError = {
   message: string;
   errorCode: number;
   errorName: string;
   errorType: string;
+  errorLocation?: ErrorLocation;
   failureInfo: QueryFailureInfo;
 };
 

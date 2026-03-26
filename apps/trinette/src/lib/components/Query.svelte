@@ -17,7 +17,7 @@
       schema: {
         fields: columns.map((col) => ({
           name: col.name,
-          data_type: col.type as any,
+          dataType: col.type as any,
           nullable: true,
         })),
       },
@@ -33,13 +33,14 @@
 <div class="bleh">
   <pre>{query.queryState}</pre>
   <pre>{JSON.stringify(query.latestStats?.progressPercentage, null, 2)}</pre>
-
-  {#if data}
+  {#if query.error}
+    <span>Error:  {query.error.message} ({query.error.errorCode})</span>
+  {:else if data }
     <Table data={data}>
       {#snippet header(field)}
         <div class="header">
           <div class="name" title="{field.name}">{field.name}</div>
-          <div class="type" title="{field.data_type}">{field.data_type}</div>
+          <div class="type" title="{field.dataType}">{field.dataType}</div>
         </div>
       {/snippet}
     </Table>
