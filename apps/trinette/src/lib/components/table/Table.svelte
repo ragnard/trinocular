@@ -21,6 +21,11 @@
     schema: Schema;
     data: any[][];
   }
+
+  export interface Selection {
+    fields: Field[];
+    rows: any[][];
+  }
 </script>
 
 <script lang="ts">
@@ -41,6 +46,7 @@
     spacerMinWidth?: number;
     header?: Snippet<[Field]>;
     empty?: Snippet;
+    selection?: Selection | null;
   }
 
   let {
@@ -50,7 +56,8 @@
     columnWidth = DEFAULT_COLUMN_WIDTH,
     spacerMinWidth = DEFAULT_SPACER_MIN_WIDTH,
     header,
-    empty
+    empty,
+    selection = $bindable(null)
   }: Props = $props();
 
   let scrollContainer: HTMLDivElement = $state() as HTMLDivElement;
@@ -297,6 +304,20 @@
     active = null;
     rowSelection = false;
     columnWidths = Array(data?.schema?.fields?.length ?? 0).fill(columnWidth);
+  });
+
+  // Sync selection prop from internal selection state
+  $effect(() => {
+    const rect = selectionRect;
+    if (!rect || !data) {
+      selection = null;
+      return;
+    }
+    const fields = data.schema.fields.slice(rect.minCol, rect.maxCol + 1);
+    const rows = data.data
+      .slice(rect.minRow, rect.maxRow + 1)
+      .map((row) => row.slice(rect.minCol, rect.maxCol + 1));
+    selection = { fields, rows };
   });
 
   $effect(() => {

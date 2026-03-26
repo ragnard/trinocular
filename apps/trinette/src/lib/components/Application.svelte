@@ -9,23 +9,28 @@
   import { SplitPane } from "./split-pane";
   import Query from "./Query.svelte";
   import Logo from "./Logo.svelte";
+  import DataViewer from "./DataViewer.svelte";
+  import type { Selection } from "./table/Table.svelte";
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
 
-  let theme: 'light' | 'dark' = $state('light');
+  let selection: Selection | null = $state(null);
+
+  let theme: "light" | "dark" = $state("light");
   let manualOverride = $state(false);
 
   onMount(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    theme = mq.matches ? 'dark' : 'light';
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    theme = mq.matches ? "dark" : "light";
 
     const handler = (e: MediaQueryListEvent) => {
       if (!manualOverride) {
-        theme = e.matches ? 'dark' : 'light';
+        theme = e.matches ? "dark" : "light";
       }
     };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    mq.addEventListener("change", handler);
+
+    return () => mq.removeEventListener("change", handler);
   });
 
   $effect(() => {
@@ -34,7 +39,7 @@
 
   function toggleTheme() {
     manualOverride = true;
-    theme = theme === 'light' ? 'dark' : 'light';
+    theme = theme === "light" ? "dark" : "light";
   }
 
   let statementStartLine = $state(1);
@@ -83,35 +88,57 @@ from table(sequence(1, 100)) as t(i);
     <div class="brand"><Logo /> Tryne</div>
     <div style="flex: 1;"></div>
     <button class="theme-toggle" onclick={toggleTheme} title="Toggle dark mode">
-      {theme === 'light' ? '🌙' : '☀️'}
+      {theme === "light" ? "🌙" : "☀️"}
     </button>
     <div class="user">$user_id</div>
   </div>
 
   <div class="workspace">
-    <SplitPane type="vertical" min="200px" pos="300px" --color="var(--border)" --thickness="20px">
+    <SplitPane
+      type="horizontal"
+      min="10%"
+      max="90%"
+      pos="75%"
+      --color="var(--border)"
+      --thickness="20px"
+    >
       {#snippet a()}
-        <div class="editor">
-          <Editor
-            value={query}
-            metadataProvider={new StaticMetadataProvider()}
-            markers={editorMarkers}
-            onexecutesql={handleExecuteSql}
-            {theme}
-          />
-        </div>
+        <SplitPane
+          type="vertical"
+          min="10%"
+          max="90%"
+          pos="33%"
+          --color="var(--border)"
+          --thickness="20px"
+        >
+          {#snippet a()}
+            <div class="editor">
+              <Editor
+                value={query}
+                metadataProvider={new StaticMetadataProvider()}
+                markers={editorMarkers}
+                onexecutesql={handleExecuteSql}
+                {theme}
+              />
+            </div>
+          {/snippet}
+
+          {#snippet b()}
+            <div class="results">
+              {#if workspace.currentQuery}
+                <Query query={workspace.currentQuery} bind:selection />
+              {:else}
+                <div class="no-query">
+                  <span>Nothing here yet...</span>
+                </div>
+              {/if}
+            </div>
+          {/snippet}
+        </SplitPane>
       {/snippet}
 
       {#snippet b()}
-        <div class="results">
-          {#if workspace.currentQuery}
-            <Query query={workspace.currentQuery} />
-          {:else}
-            <div class="no-query">
-              <span>Nothing here yet...</span>
-            </div>
-          {/if}
-        </div>
+        <DataViewer {selection} />
       {/snippet}
     </SplitPane>
   </div>
@@ -145,27 +172,26 @@ from table(sequence(1, 100)) as t(i);
     /*height: 50%;*/
   }
 
- .results {
-     display: flex;
-     border-top: 1px solid var(--border);
+  .results {
+    display: flex;
+    border-top: 1px solid var(--border);
   }
 
- .theme-toggle {
-     background: none;
-     border: 1px solid var(--border);
-     border-radius: 4px;
-     cursor: pointer;
-     font-size: 1em;
-     padding: 0.2em 0.4em;
-     margin-right: 0.5em;
+  .theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    padding: 0.2em 0.4em;
+    margin-right: 0.5em;
   }
 
- .no-query {
-     display: flex;
-     flex: 1;
-     align-items: center;
-     justify-content: center;
-     height: 100%;
+  .no-query {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
   }
-
 </style>

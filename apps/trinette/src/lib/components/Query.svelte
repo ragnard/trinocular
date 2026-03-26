@@ -1,15 +1,16 @@
 <script lang="ts">
   import type { Query } from "$lib/State.svelte";
   import Table from "./table/Table.svelte";
-  import type { TableData } from "./table/Table.svelte";
+  import type { TableData, Selection } from "./table/Table.svelte";
   import type { Columns, QueryData } from "$lib/trino";
   import Spinner from "./Spinner.svelte";
 
   interface Props {
     query: Query;
+    selection?: Selection | null;
   }
 
-  let { query }: Props = $props();
+  let { query, selection = $bindable(null) }: Props = $props();
 
   const toData = (columns: Columns, rows: QueryData[]): TableData | undefined => {
     if (!columns || !rows) return undefined;
@@ -35,7 +36,7 @@
       <span>Error: {query.error.message} ({query.error.errorCode})</span>
     </div>
   {:else if data}
-    <Table {data}>
+    <Table {data} bind:selection>
       {#snippet header(field)}
         <div class="header">
           <div class="name" title={field.name}>{field.name}</div>
@@ -56,7 +57,11 @@
     </div>
   {/if}
   <div class="status">
-    <span>Status: <a href="{query.infoUri}" target="_blank">{query.queryState}</a></span>
+    <span
+      >Status: <a href={query.infoUri} target="_blank" title="Click to view query in Trino UI"
+        >{query.queryState}</a
+      ></span
+    >
   </div>
 </div>
 
@@ -92,7 +97,7 @@
   }
 
   .header {
-    padding: 0.25em 0.15em;
+    padding: 0.4em 0.2em;
     flex-direction: column;
 
     .name {
