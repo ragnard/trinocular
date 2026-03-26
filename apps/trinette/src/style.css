@@ -1,6 +1,8 @@
 :root {
     --border: #e0e0e0;
+    --bg-0: #f0f0f0;
 }
 
 html {
+    font-family: 'Arial';
 }

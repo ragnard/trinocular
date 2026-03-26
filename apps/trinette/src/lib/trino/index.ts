@@ -420,12 +420,12 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
       url: this.queryResult.nextUri,
     });
 
-    const data = this.queryResult.data ?? [];
-    if (data.length === 0) {
-      if (this.hasNext()) {
-        return this.next();
-      }
-    }
+    // const data = this.queryResult.data ?? [];
+    // if (data.length === 0) {
+    //   if (this.hasNext()) {
+    //     return this.next();
+    //   }
+    // }
 
     return Promise.resolve({ value: this.queryResult, done: false });
   }

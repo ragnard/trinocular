@@ -40,6 +40,7 @@
     columnWidth?: number;
     spacerMinWidth?: number;
     header?: Snippet<[Field]>;
+    empty?: Snippet;
   }
 
   let {
@@ -48,7 +49,8 @@
     bufferRows = DEFAULT_BUFFER_ROWS,
     columnWidth = DEFAULT_COLUMN_WIDTH,
     spacerMinWidth = DEFAULT_SPACER_MIN_WIDTH,
-    header
+    header,
+    empty
   }: Props = $props();
 
   let scrollContainer: HTMLDivElement = $state() as HTMLDivElement;
@@ -56,6 +58,7 @@
   let containerHeight = $state(0);
   let columnWidths: number[] = $state([]);
   let resizing = $state(false);
+  let dragging = $state(false);
 
   let totalRows = $derived(data?.data?.length ?? 0);
   let fieldCount = $derived(data?.schema?.fields?.length ?? 0);
@@ -123,7 +126,39 @@
       active = coord;
     }
 
+    dragging = true;
+    document.addEventListener("mousemove", handleDragMove);
+    document.addEventListener("mouseup", handleDragEnd);
+
     scrollContainer.focus();
+  }
+
+  function resolveCell(x: number, y: number): CellCoord | null {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const td = el.closest("td");
+    if (!td || td.classList.contains("row-num") || td.classList.contains("spacer")) return null;
+    const tr = td.closest("tr");
+    if (!tr) return null;
+    const rowIndex = Number(tr.dataset.rowIndex);
+    if (Number.isNaN(rowIndex)) return null;
+    const cellIndex = Array.from(tr.children).indexOf(td) - 1;
+    if (cellIndex < 0 || cellIndex >= fieldCount) return null;
+    return { row: rowIndex, col: cellIndex };
+  }
+
+  function handleDragMove(event: MouseEvent) {
+    if (!dragging) return;
+    const coord = resolveCell(event.clientX, event.clientY);
+    if (coord) {
+      active = coord;
+    }
+  }
+
+  function handleDragEnd() {
+    dragging = false;
+    document.removeEventListener("mousemove", handleDragMove);
+    document.removeEventListener("mouseup", handleDragEnd);
   }
 
   const ARROW_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
@@ -253,6 +288,7 @@
 {#if data}
   <div
     class="table-container"
+    class:dragging
     bind:this={scrollContainer}
     tabindex="0"
     onkeydown={handleKeydown}
@@ -286,31 +322,47 @@
           <th class="spacer"></th>
         </tr>
       </thead>
-      <tbody>
-        {#if offsetY > 0}
-          <tr aria-hidden="true" style:height="{offsetY}px">
-            <td colspan={colCount}></td>
+      {#if totalRows === 0 && empty}
+        <tbody>
+          <tr>
+            <td colspan={colCount} class="empty-cell">
+              <div class="empty-state" style:top="{rowHeight}px">
+                {#if empty}
+                  {@render empty()}
+                {:else}
+                  <span>OINK</span>
+                {/if}
+              </div>
+            </td>
           </tr>
-        {/if}
+        </tbody>
+      {:else}
+        <tbody>
+          {#if offsetY > 0}
+            <tr aria-hidden="true" style:height="{offsetY}px">
+              <td colspan={colCount}></td>
+            </tr>
+          {/if}
 
-        {#each visibleRows as row, i (startIndex + i)}
-          {@const absRow = startIndex + i}
-          <tr style:height="{rowHeight}px" data-row-index={absRow}>
-            <td class="row-num">{absRow + 1}</td>
-            {#each row as cell, colIdx}
-              {@const flags = cellFlags(absRow, colIdx)}
-              <td class:selected={flags.selected} class:active={flags.isActive}>{cell ?? ""}</td>
-            {/each}
-            <td class="spacer"></td>
-          </tr>
-        {/each}
+          {#each visibleRows as row, i (startIndex + i)}
+            {@const absRow = startIndex + i}
+            <tr style:height="{rowHeight}px" data-row-index={absRow}>
+              <td class="row-num">{absRow + 1}</td>
+              {#each row as cell, colIdx}
+                {@const flags = cellFlags(absRow, colIdx)}
+                <td class:selected={flags.selected} class:active={flags.isActive}>{cell ?? ""}</td>
+              {/each}
+              <td class="spacer"></td>
+            </tr>
+          {/each}
 
-        {#if bottomSpacerHeight > 0}
-          <tr aria-hidden="true" style:height="{bottomSpacerHeight}px">
-            <td colspan={colCount}></td>
-          </tr>
-        {/if}
-      </tbody>
+          {#if bottomSpacerHeight > 0}
+            <tr aria-hidden="true" style:height="{bottomSpacerHeight}px">
+              <td colspan={colCount}></td>
+            </tr>
+          {/if}
+        </tbody>
+      {/if}
     </table>
   </div>
 
@@ -326,6 +378,7 @@
     width: 100%;
     flex: 1;
     min-height: 0;
+    position: relative;
   }
 
   table {
@@ -343,12 +396,14 @@
   th {
     position: sticky;
     top: 0;
-    background: #f5f5f5;
+    background: var(--header-bg, #f5f5f5);
     white-space: nowrap;
     text-align: left;
-    padding: 0 14px 0 8px;
+    padding: 0.25em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
+    border-right: 1px solid var(--border, #e0e0e0);
+    border-bottom: 1px solid var(--border, #e0e0e0);
   }
 
   th.row-num {
@@ -361,6 +416,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border-right: 1px solid var(--border, #e0e0e0);
+    border-bottom: 1px solid var(--border, #e0e0e0);
   }
 
   td.row-num {
@@ -377,6 +434,10 @@
 
   .table-container:focus {
     outline: none;
+  }
+
+  .table-container.dragging {
+    user-select: none;
   }
 
   td.selected {
@@ -407,6 +468,21 @@
 
   .resize-handle:hover {
     background: rgba(0, 0, 0, 0.1);
+  }
+
+  .empty-cell {
+    border: none;
+    padding: 0;
+    height: 100%;
+  }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    top: 0;
   }
 
   .resize-overlay {

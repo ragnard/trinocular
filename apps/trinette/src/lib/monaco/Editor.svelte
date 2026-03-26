@@ -45,6 +45,39 @@
     }
   });
 
+  function executeStatement(model: monaco.editor.ITextModel, editor: monaco.editor.IStandaloneCodeEditor) {
+    if (!onexecutesql) return;
+
+    const selection = editor.getSelection();
+    if (selection && !selection.isEmpty()) {
+      onexecutesql(model.getValueInRange(selection), selection.startLineNumber);
+      return;
+    }
+
+    const position = editor.getPosition();
+    if (!position) return;
+
+    const text = model.getValue();
+    const cursorOffset = model.getOffsetAt(position);
+    const statement = findStatementAtOffset(model, cursorOffset);
+
+    if (statement) {
+      onexecutesql(statement.text, statement.startLine);
+    }
+  }
+
+  function findStatementAtOffset(model: monaco.editor.ITextModel, offset: number) {
+    const statements = splitStatements(model.getValue());
+    if (statements.length === 0) return null;
+
+    const s = statements.find((s) => offset >= s.startOffset && offset <= s.endOffset);
+
+    // Cursor is past all statements (trailing whitespace after last ";") — use last statement
+    const match = s ?? statements[statements.length - 1];
+    const leadingWs = match.text.length - match.text.trimStart().length;
+    return { text: match.text.trim(), startLine: model.getPositionAt(match.startOffset + leadingWs).lineNumber };
+  }
+
   onMount(() => {
     const disposable = register(monaco, { metadataProvider });
     const model = monaco.editor.createModel(value, "trino-sql");
@@ -57,41 +90,47 @@
       minimap: { enabled: false },
       wordBasedSuggestions: "off",
       "semanticHighlighting.enabled": true,
+      codeLens: true,
       scrollBeyondLastLine: false,
       automaticLayout: true,
       ...options
     });
 
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      if (!onexecutesql) return;
-      const model = editor.getModel();
-      if (!model) return;
+    editor.addAction({
+      id: "trino.runCurrentStatement",
+      label: "Run Current Statement",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+      run: () => executeStatement(model, editor),
+    });
 
-      const selection = editor.getSelection();
-      if (selection && !selection.isEmpty()) {
-        onexecutesql(model.getValueInRange(selection), selection.startLineNumber);
-        return;
-      }
+    const runCommand = monaco.editor.registerCommand("trino.runStatement", (_accessor, text: string, startLine: number) => {
+      onexecutesql?.(text, startLine);
+    });
 
-      const position = editor.getPosition();
-      if (!position) return;
-
-      const text = model.getValue();
-      const cursorOffset = model.getOffsetAt(position);
-      const statements = splitStatements(text);
-      const current = statements.find(
-        (s) => cursorOffset >= s.startOffset && cursorOffset <= s.endOffset
-      );
-
-      if (current) {
-        const startLine = model.getPositionAt(current.startOffset).lineNumber;
-        onexecutesql(current.text, startLine);
-      } else {
-        onexecutesql(text, 1);
-      }
+    const codelensProvider = monaco.languages.registerCodeLensProvider("trino-sql", {
+      provideCodeLenses(model) {
+        const statements = splitStatements(model.getValue());
+        return {
+          lenses: statements.map((s) => {
+            const leadingWs = s.text.length - s.text.trimStart().length;
+            const startLine = model.getPositionAt(s.startOffset + leadingWs).lineNumber;
+            return {
+              range: new monaco.Range(startLine, 1, startLine, 1),
+              command: {
+                id: "trino.runStatement",
+                title: "▶ Run",
+                arguments: [s.text.trim(), startLine],
+              },
+            };
+          }),
+          dispose() {},
+        };
+      },
     });
 
     return () => {
+      codelensProvider.dispose();
+      runCommand.dispose();
       editor.dispose();
       model.dispose();
       editorModel = undefined;

@@ -7,6 +7,7 @@ import 'monaco-editor/esm/vs/editor/browser/coreCommands.js';
 import 'monaco-editor/esm/vs/editor/browser/widget/codeEditor/codeEditorWidget.js';
 
 // Editor features we actually use
+import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController.js';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching.js';
 import 'monaco-editor/esm/vs/editor/contrib/clipboard/browser/clipboard.js';
 import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment.js';
