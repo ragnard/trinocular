@@ -102,7 +102,18 @@ export type QueryStats = {
   progressPercentage: number;
 };
 
-export type Columns = { name: string; type: string }[];
+export type TypeSignature = {
+  rawType: string;
+  arguments: TypeSignatureArgument[];
+};
+
+export type TypeSignatureArgument =
+  | { kind: "NAMED_TYPE"; value: { fieldName?: { name: string }; typeSignature: TypeSignature } }
+  | { kind: "TYPE"; value: TypeSignature }
+  | { kind: "LONG"; value: number };
+
+export type Column = { name: string; type: string; typeSignature: TypeSignature };
+export type Columns = Column[];
 
 export type QueryData = any[];
 

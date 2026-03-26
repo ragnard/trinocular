@@ -3,6 +3,7 @@
   import Table from "./table/Table.svelte";
   import type { TableData, Selection } from "./table/Table.svelte";
   import type { Columns, QueryData } from "$lib/trino";
+  import { fieldFromTypeSignature } from "./table/types";
   import Spinner from "./Spinner.svelte";
 
   interface Props {
@@ -17,11 +18,7 @@
 
     return {
       schema: {
-        fields: columns.map((col) => ({
-          name: col.name,
-          dataType: col.type as any,
-          nullable: true
-        }))
+        fields: columns.map((col) => fieldFromTypeSignature(col.typeSignature, col.name, col.type))
       },
       data: rows
     };
@@ -40,7 +37,7 @@
       {#snippet header(field)}
         <div class="header">
           <div class="name" title={field.name}>{field.name}</div>
-          <div class="type" title={field.dataType}>{field.dataType}</div>
+          <div class="type">{field.dataTypeName}</div>
         </div>
       {/snippet}
       {#snippet empty()}

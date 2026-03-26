@@ -63,7 +63,10 @@
 
 SELECT custkey, count(*) from tpch.sf10.orders group by 1 order by 2 desc limit 50;
 
-SELECT row(array[row('foo', i), row('bar', i+2)], array[1, 2, 3, 4, 5]) as complex
+SELECT
+  row(array[row('foo', i), row('bar', i+2)], array[1, 2, 3, 4, 5]) as complex,
+  row(i, i*2, i*4, 'oink') as bleh,
+  array[row('alice', i), row('bob', i*2), row('cecil', i-2)] as bloh
 from table(sequence(1, 100)) as t(i);
 
   `;

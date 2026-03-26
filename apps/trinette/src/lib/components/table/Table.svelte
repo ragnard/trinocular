@@ -6,6 +6,7 @@
   export interface Field {
     name: string;
     dataType: DataType;
+    dataTypeName: string;
     nullable: boolean;
   }
 
@@ -37,6 +38,19 @@
   const ROW_NUMBER_WIDTH = 60;
 
   import type { Snippet } from "svelte";
+
+  function formatCell(value: any, dataType: DataType): string {
+    if (value === null || value === undefined) return "";
+    if (Array.isArray(dataType)) {
+      const n = Array.isArray(value) ? value.length : 0;
+      return `[${n} item${n !== 1 ? "s" : ""}]`;
+    }
+    if (typeof dataType === "object" && "fields" in dataType) {
+      const n = dataType.fields.length;
+      return `{${n} field${n !== 1 ? "s" : ""}}`;
+    }
+    return String(value);
+  }
 
   interface Props {
     data: TableData;
@@ -408,7 +422,7 @@
               <td class="row-num" class:selected={isRowNumSelected(absRow)}>{absRow + 1}</td>
               {#each row as cell, colIdx}
                 {@const flags = cellFlags(absRow, colIdx)}
-                <td class:selected={flags.selected} class:active={flags.isActive}>{cell ?? ""}</td>
+                <td class:selected={flags.selected} class:active={flags.isActive}>{formatCell(cell, data.schema.fields[colIdx].dataType)}</td>
               {/each}
               <td class="spacer"></td>
             </tr>
