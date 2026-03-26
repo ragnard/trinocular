@@ -10,9 +10,10 @@
     metadataProvider?: MetadataProvider;
     markers?: monaco.editor.IMarkerData[];
     onexecutesql?: (sql: string, startLine: number) => void;
+    theme?: 'light' | 'dark';
   }
 
-  let { value = "", options = {}, metadataProvider, markers = [], onexecutesql }: Props = $props();
+  let { value = "", options = {}, metadataProvider, markers = [], onexecutesql, theme = 'light' }: Props = $props();
 
   let container: HTMLDivElement;
   let editorModel: monaco.editor.ITextModel | undefined = $state();
@@ -21,6 +22,10 @@
     if (editorModel) {
       monaco.editor.setModelMarkers(editorModel, "external", markers);
     }
+  });
+
+  $effect(() => {
+    monaco.editor.setTheme(theme === 'dark' ? "trino-dark" : "trino-light");
   });
 
   self.MonacoEnvironment = {
@@ -40,9 +45,23 @@
       { token: "identifier", foreground: "001080" },
       { token: "delimiter", foreground: "000000" }
     ],
-    colors: {
+    colors: {}
+  });
 
-    }
+  monaco.editor.defineTheme("trino-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "keyword", foreground: "569CD6" },
+      { token: "string", foreground: "CE9178" },
+      { token: "number", foreground: "B5CEA8" },
+      { token: "comment", foreground: "6A9955" },
+      { token: "operator", foreground: "D4D4D4" },
+      { token: "type", foreground: "4EC9B0" },
+      { token: "identifier", foreground: "9CDCFE" },
+      { token: "delimiter", foreground: "D4D4D4" }
+    ],
+    colors: {}
   });
 
   function executeStatement(model: monaco.editor.ITextModel, editor: monaco.editor.IStandaloneCodeEditor) {
@@ -85,7 +104,7 @@
     const editor = monaco.editor.create(container, {
       model,
       language: "trino-sql",
-      theme: "trino-light",
+      theme: theme === 'dark' ? "trino-dark" : "trino-light",
       fontFamily: "monospace",
       minimap: { enabled: false },
       wordBasedSuggestions: "off",

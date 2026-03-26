@@ -104,7 +104,7 @@
 
     .type {
       font-size: 0.7em;
-      color: gray;
+      color: var(--text-2);
     }
   }
 

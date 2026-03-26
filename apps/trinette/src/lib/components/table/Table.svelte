@@ -81,16 +81,26 @@
 
   let anchor: CellCoord | null = $state(null);
   let active: CellCoord | null = $state(null);
+  let rowSelection = $state(false);
 
   let selectionRect = $derived.by(() => {
     if (!anchor || !active) return null;
     return {
       minRow: Math.min(anchor.row, active.row),
       maxRow: Math.max(anchor.row, active.row),
-      minCol: Math.min(anchor.col, active.col),
-      maxCol: Math.max(anchor.col, active.col)
+      minCol: rowSelection ? 0 : Math.min(anchor.col, active.col),
+      maxCol: rowSelection ? fieldCount - 1 : Math.max(anchor.col, active.col)
     };
   });
+
+  function isRowNumSelected(row: number) {
+    return (
+      rowSelection &&
+      selectionRect !== null &&
+      row >= selectionRect.minRow &&
+      row <= selectionRect.maxRow
+    );
+  }
 
   function cellFlags(row: number, col: number) {
     const selected =
@@ -105,13 +115,30 @@
 
   function handleMousedown(event: MouseEvent) {
     const td = (event.target as HTMLElement).closest("td");
-    if (!td || td.classList.contains("row-num")) return;
+    if (!td) return;
 
     const tr = td.closest("tr");
     if (!tr) return;
 
     const rowIndex = Number(tr.dataset.rowIndex);
     if (Number.isNaN(rowIndex)) return;
+
+    if (td.classList.contains("row-num")) {
+      const coord: CellCoord = { row: rowIndex, col: 0 };
+      if (event.shiftKey && anchor) {
+        event.preventDefault();
+        active = { row: rowIndex, col: active?.col ?? 0 };
+      } else {
+        anchor = coord;
+        active = coord;
+      }
+      rowSelection = true;
+      dragging = true;
+      document.addEventListener("mousemove", handleDragMove);
+      document.addEventListener("mouseup", handleDragEnd);
+      scrollContainer.focus();
+      return;
+    }
 
     const cellIndex = Array.from(tr.children).indexOf(td) - 1;
     if (cellIndex < 0 || cellIndex >= fieldCount) return;
@@ -126,6 +153,7 @@
       active = coord;
     }
 
+    rowSelection = false;
     dragging = true;
     document.addEventListener("mousemove", handleDragMove);
     document.addEventListener("mouseup", handleDragEnd);
@@ -164,7 +192,15 @@
   const ARROW_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
   function handleKeydown(event: KeyboardEvent) {
-    if (!active || !ARROW_KEYS.has(event.key)) return;
+    if (!active) return;
+
+    if (event.key === " ") {
+      event.preventDefault();
+      rowSelection = !rowSelection;
+      return;
+    }
+
+    if (!ARROW_KEYS.has(event.key)) return;
 
     event.preventDefault();
 
@@ -259,6 +295,7 @@
     data;
     anchor = null;
     active = null;
+    rowSelection = false;
     columnWidths = Array(data?.schema?.fields?.length ?? 0).fill(columnWidth);
   });
 
@@ -347,7 +384,7 @@
           {#each visibleRows as row, i (startIndex + i)}
             {@const absRow = startIndex + i}
             <tr style:height="{rowHeight}px" data-row-index={absRow}>
-              <td class="row-num">{absRow + 1}</td>
+              <td class="row-num" class:selected={isRowNumSelected(absRow)}>{absRow + 1}</td>
               {#each row as cell, colIdx}
                 {@const flags = cellFlags(absRow, colIdx)}
                 <td class:selected={flags.selected} class:active={flags.isActive}>{cell ?? ""}</td>
@@ -396,14 +433,14 @@
   th {
     position: sticky;
     top: 0;
-    background: var(--header-bg, #f5f5f5);
+    background: var(--bg-2);
     white-space: nowrap;
     text-align: left;
     padding: 0.25em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-right: 1px solid var(--border, #e0e0e0);
-    border-bottom: 1px solid var(--border, #e0e0e0);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
 
   th.row-num {
@@ -416,15 +453,15 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-right: 1px solid var(--border, #e0e0e0);
-    border-bottom: 1px solid var(--border, #e0e0e0);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
 
   td.row-num {
     position: sticky;
     left: 0;
     z-index: 1;
-    background: #f5f5f5;
+    background: var(--bg-2);
     text-align: right;
   }
 
@@ -441,13 +478,13 @@
   }
 
   td.selected {
-    background: rgba(14, 101, 235, 0.12);
+    background: var(--accent-bg);
   }
 
   td.active {
-    outline: 2px solid #0e65eb;
+    outline: 2px solid var(--accent);
     outline-offset: -2px;
-    background: rgba(14, 101, 235, 0.06);
+    background: var(--accent-bg-subtle);
   }
 
   th.spacer,

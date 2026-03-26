@@ -4,8 +4,8 @@
   .spinner {
     width: 2em;
     height: 2em;
-    border: 4px solid var(--border, #e0e0e0);
-    border-top-color: var(--accent, #c0c0c0);
+    border: 4px solid var(--border);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }

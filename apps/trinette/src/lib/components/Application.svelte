@@ -3,12 +3,39 @@
   import Editor from "$lib/monaco/Editor.svelte";
   import { StaticMetadataProvider } from "monaco-language-trino";
   import * as monaco from "monaco-editor";
+  import { onMount } from "svelte";
 
   import Trino, { type QueryResult } from "$lib/trino";
   import { SplitPane } from "./split-pane";
   import Query from "./Query.svelte";
+  import Logo from "./Logo.svelte";
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
+
+  let theme: 'light' | 'dark' = $state('light');
+  let manualOverride = $state(false);
+
+  onMount(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    theme = mq.matches ? 'dark' : 'light';
+
+    const handler = (e: MediaQueryListEvent) => {
+      if (!manualOverride) {
+        theme = e.matches ? 'dark' : 'light';
+      }
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  });
+
+  $effect(() => {
+    document.documentElement.dataset.theme = theme;
+  });
+
+  function toggleTheme() {
+    manualOverride = true;
+    theme = theme === 'light' ? 'dark' : 'light';
+  }
 
   let statementStartLine = $state(1);
 
@@ -53,7 +80,12 @@ from table(sequence(1, 100)) as t(i);
 
 <main>
   <div class="topbar">
-    <div class="brand"><span class="logo">🐷</span> Tryne</div>
+    <div class="brand"><Logo /> Tryne</div>
+    <div style="flex: 1;"></div>
+    <button class="theme-toggle" onclick={toggleTheme} title="Toggle dark mode">
+      {theme === 'light' ? '🌙' : '☀️'}
+    </button>
+    <div class="user">$user_id</div>
   </div>
 
   <div class="workspace">
@@ -65,6 +97,7 @@ from table(sequence(1, 100)) as t(i);
             metadataProvider={new StaticMetadataProvider()}
             markers={editorMarkers}
             onexecutesql={handleExecuteSql}
+            {theme}
           />
         </div>
       {/snippet}
@@ -117,36 +150,14 @@ from table(sequence(1, 100)) as t(i);
      border-top: 1px solid var(--border);
   }
 
- .logo {
-     background: white;
-     border-radius: 50%;
+ .theme-toggle {
+     background: none;
      border: 1px solid var(--border);
-     display: inline-flex;
-     align-items: center;
-     justify-content: center;
-     width: 2em;
-     height: 2em;
-     font-size: 1.0em;
-     animation: spin 37s linear infinite;
-  }
-
-  @keyframes spin {
-     /* spin at ~5s */
-     13% { transform: rotate(0deg); }
-     14% { transform: rotate(360deg); }
-     /* spin at ~12s */
-     32% { transform: rotate(360deg); }
-     33% { transform: rotate(720deg); }
-     /* spin at ~20s */
-     53% { transform: rotate(720deg); }
-     54% { transform: rotate(1080deg); }
-     /* spin at ~28s */
-     75% { transform: rotate(1080deg); }
-     76% { transform: rotate(1440deg); }
-     /* spin at ~34s */
-     91% { transform: rotate(1440deg); }
-     92% { transform: rotate(1800deg); }
-     100% { transform: rotate(1800deg); }
+     border-radius: 4px;
+     cursor: pointer;
+     font-size: 1em;
+     padding: 0.2em 0.4em;
+     margin-right: 0.5em;
   }
 
  .no-query {
