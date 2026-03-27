@@ -3,6 +3,7 @@ import { TrinoCompletionProvider } from './trinoCompletionProvider';
 import { TrinoSemanticTokensProvider } from './trinoSemanticTokensProvider';
 import { trinoLanguageConfig } from './trinoLanguageConfig';
 import { setupDiagnostics } from './trinoDiagnosticsProvider';
+import { TrinoFoldingProvider } from './trinoFoldingProvider';
 import { DocumentParseService } from './documentParseService';
 import type { MetadataProvider } from './metadataProvider';
 
@@ -44,6 +45,14 @@ export function register(
     monaco.languages.registerDocumentSemanticTokensProvider(
       languageId,
       new TrinoSemanticTokensProvider(parseService),
+    ),
+  );
+
+  // Folding provider (fold each SQL statement)
+  disposables.push(
+    monaco.languages.registerFoldingRangeProvider(
+      languageId,
+      new TrinoFoldingProvider(parseService),
     ),
   );
 

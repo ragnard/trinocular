@@ -6,6 +6,7 @@ export type { TrinoLanguageOptions } from './editor/register';
 export { TrinoCompletionProvider } from './editor/trinoCompletionProvider';
 export { TrinoSemanticTokensProvider, semanticTokensLegend } from './editor/trinoSemanticTokensProvider';
 export { setupDiagnostics } from './editor/trinoDiagnosticsProvider';
+export { TrinoFoldingProvider } from './editor/trinoFoldingProvider';
 export { trinoLanguageConfig } from './editor/trinoLanguageConfig';
 export { DocumentParseService } from './editor/documentParseService';
 export type { StatementParseResult, CollectedError } from './editor/documentParseService';

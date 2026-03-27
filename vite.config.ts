@@ -3,6 +3,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  server: {
+    fs: {
+      allow: ['packages'],
+    },
+  },
   resolve: {
     alias: [
       // Redirect bare `import 'monaco-editor'` to our slim setup,

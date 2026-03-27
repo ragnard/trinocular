@@ -10,3 +10,5 @@ export const Connection = type({
   name: "string",
   uri: "string.url",
 });
+
+export type Connection = typeof Connection.infer

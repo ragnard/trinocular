@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 
 import type { RequestEvent } from "./$types";
 
-import type { Connection } from "$lib/server/config.ts";
+import { type Connection } from "$lib/server/config";
 
 
 import { env } from "$env/dynamic/private";

@@ -53,7 +53,7 @@
   }
 
   interface Props {
-    data: TableData;
+    data?: TableData;
     rowHeight?: number;
     bufferRows?: number;
     columnWidth?: number;
@@ -362,6 +362,7 @@
     class="table-container"
     class:dragging
     bind:this={scrollContainer}
+    role="grid"
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
@@ -402,7 +403,7 @@
                 {#if empty}
                   {@render empty()}
                 {:else}
-                  <span>OINK</span>
+                  <span>No data</span>
                 {/if}
               </div>
             </td>

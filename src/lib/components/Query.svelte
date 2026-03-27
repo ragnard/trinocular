@@ -13,18 +13,18 @@
 
   let { query, selection = $bindable(null) }: Props = $props();
 
-  const toData = (columns: Columns, rows: QueryData[]): TableData | undefined => {
-    if (!columns || !rows) return undefined;
-
+  const toData = (columns?: Columns, rows?: QueryData[]): TableData | null => {
     return {
       schema: {
-        fields: columns.map((col) => fieldFromTypeSignature(col.typeSignature, col.name, col.type))
+        fields: (columns ?? []).map((col) =>
+          fieldFromTypeSignature(col.typeSignature, col.name, col.type)
+        )
       },
-      data: rows
+      data: rows ?? []
     };
   };
 
-  let data = $derived(query.schema && query.data ? toData(query.schema, query.data) : undefined);
+  let data = $derived(toData(query.schema, query.data));
 </script>
 
 <div class="query">
@@ -43,7 +43,7 @@
       {#snippet empty()}
         <div class="message">
           <Spinner />
-          <div>Running query...</div>
+          <div>{query?.queryState} ...</div>
         </div>
       {/snippet}
     </Table>
@@ -53,13 +53,6 @@
       <div>Starting query...</div>
     </div>
   {/if}
-  <div class="status">
-    <span
-      >Status: <a href={query.infoUri} target="_blank" title="Click to view query in Trino UI"
-        >{query.queryState}</a
-      ></span
-    >
-  </div>
 </div>
 
 <style>
@@ -83,14 +76,6 @@
     > * {
       max-width: 50%;
     }
-  }
-
-  .status {
-    display: flex;
-    flex-direction: row;
-    padding: 0.5em 1em;
-    border-top: 1px solid var(--border);
-    background-color: var(--bg-0);
   }
 
   .header {
