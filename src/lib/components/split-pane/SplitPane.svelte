@@ -126,6 +126,7 @@
   svelte-split-pane {
     --sp-thickness: var(--thickness, 8px);
     --sp-color: var(--color, transparent);
+    --sp-border-width: var(--border-width, 1px);
     display: grid;
     position: relative;
     width: 100%;
@@ -134,10 +135,12 @@
 
   svelte-split-pane[data-orientation="vertical"] {
     grid-template-rows: clamp(var(--min), var(--pos), var(--max)) 1fr;
+    gap: var(--sp-border-width) 0;
   }
 
   svelte-split-pane[data-orientation="horizontal"] {
     grid-template-columns: clamp(var(--min), var(--pos), var(--max)) 1fr;
+    gap: 0 var(--sp-border-width);
   }
 
   svelte-split-pane-section {
@@ -187,7 +190,7 @@
   [data-orientation="horizontal"] > svelte-split-pane-divider::after {
     left: 50%;
     top: 0;
-    width: 1px;
+    width: var(--sp-border-width);
     height: 100%;
   }
 
@@ -208,6 +211,6 @@
     top: 50%;
     left: 0;
     width: 100%;
-    height: 1px;
+    height: var(--sp-border-width);
   }
 </style>

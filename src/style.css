@@ -6,10 +6,15 @@
     --text-1: #333333;
     --text-2: gray;
     --border: #e0e0e0;
+    --border-dark: #d0d0d0;
     --accent: #0e65eb;
     --accent-bg: rgba(14, 101, 235, 0.12);
     --accent-bg-subtle: rgba(14, 101, 235, 0.06);
     color-scheme: light;
+    /* --font: 'Iosevka Aile'; */
+    /* --font-mono: 'Iosevka SS08'; */
+    --font: sans-serif;
+    --font-mono: monospace;
 }
 
 :root[data-theme="dark"] {
@@ -20,6 +25,7 @@
     --text-1: #cccccc;
     --text-2: #858585;
     --border: #3e3e42;
+    --border-dark: #2e3e42;
     --accent: #4da6ff;
     --accent-bg: rgba(77, 166, 255, 0.15);
     --accent-bg-subtle: rgba(77, 166, 255, 0.08);
@@ -27,7 +33,22 @@
 }
 
 html {
-    font-family: 'Arial';
+    font-family: var(--font);
     background-color: var(--bg-1);
     color: var(--text-0);
+}
+
+pre {
+    font-family: var(--font);
+}
+
+
+input[type="text"] {
+    /* padding: 0.25em 0.25em; */
+    /* border: 1px solid var(--border); */
+    /* background: var(--bg-1, transparent); */
+    /* color: inherit; */
+    /* font: var(--font); */
+    /* line-height: normal; */
+    /* box-sizing: border-box; */
 }

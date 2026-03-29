@@ -1,56 +1,14 @@
-<script lang="ts" module>
-  export interface Schema {
-    fields: Field[];
-  }
-
-  export interface Field {
-    name: string;
-    dataType: DataType;
-    dataTypeName: string;
-    nullable: boolean;
-  }
-
-  export interface Struct {
-    fields: Field[];
-  }
-
-  export type List = DataType[];
-
-  export type DataType = "string" | "integer" | Struct | List;
-
-  export interface TableData {
-    schema: Schema;
-    data: any[][];
-  }
-
-  export interface Selection {
-    fields: Field[];
-    rows: any[][];
-  }
-</script>
-
 <script lang="ts">
+  import type { Snippet } from "svelte";
+  import type { Field, DataType, TableData, Selection, CellRendererLookup } from "./types";
+  import { defaultCell } from "./snippets.svelte";
+
   const DEFAULT_ROW_HEIGHT = 28;
   const DEFAULT_BUFFER_ROWS = 5;
   const DEFAULT_COLUMN_WIDTH = 150;
   const MIN_COLUMN_WIDTH = 50;
   const DEFAULT_SPACER_MIN_WIDTH = 100;
   const ROW_NUMBER_WIDTH = 60;
-
-  import type { Snippet } from "svelte";
-
-  function formatCell(value: any, dataType: DataType): string {
-    if (value === null || value === undefined) return "";
-    if (Array.isArray(dataType)) {
-      const n = Array.isArray(value) ? value.length : 0;
-      return `[${n} item${n !== 1 ? "s" : ""}]`;
-    }
-    if (typeof dataType === "object" && "fields" in dataType) {
-      const n = dataType.fields.length;
-      return `{${n} field${n !== 1 ? "s" : ""}}`;
-    }
-    return String(value);
-  }
 
   interface Props {
     data?: TableData;
@@ -60,6 +18,7 @@
     spacerMinWidth?: number;
     header?: Snippet<[Field]>;
     empty?: Snippet;
+    cellRenderer?: CellRendererLookup;
     selection?: Selection | null;
   }
 
@@ -71,6 +30,7 @@
     spacerMinWidth = DEFAULT_SPACER_MIN_WIDTH,
     header,
     empty,
+    cellRenderer: cellRendererProp,
     selection = $bindable(null)
   }: Props = $props();
 
@@ -85,6 +45,10 @@
   let fieldCount = $derived(data?.schema?.fields?.length ?? 0);
   let colCount = $derived(fieldCount + 2);
   let columnsWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
+
+  const defaultCellRenderer: CellRendererLookup = () => defaultCell;
+  let cellRenderer = $derived(cellRendererProp ?? defaultCellRenderer);
+  let resolvedRenderers = $derived(data?.schema?.fields?.map((f) => cellRenderer(f)) ?? []);
 
   let startIndex = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows));
   let endIndex = $derived(
@@ -135,6 +99,8 @@
   }
 
   function handleMousedown(event: MouseEvent) {
+    if (event.button !== 0) return;
+
     const td = (event.target as HTMLElement).closest("td");
     if (!td) return;
 
@@ -174,7 +140,6 @@
       active = coord;
     }
 
-    rowSelection = false;
     dragging = true;
     document.addEventListener("mousemove", handleDragMove);
     document.addEventListener("mouseup", handleDragEnd);
@@ -214,6 +179,13 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (!active) return;
+
+    if (event.key === "Escape") {
+      anchor = null;
+      active = null;
+      rowSelection = false;
+      return;
+    }
 
     if (event.key === " ") {
       event.preventDefault();
@@ -377,7 +349,7 @@
       </colgroup>
       <thead>
         <tr style:height="{rowHeight}px">
-          <th class="row-num">#</th>
+          <th class="row-num"></th>
           {#each data.schema.fields as field, colIdx}
             <th>
               {#if header}
@@ -423,7 +395,10 @@
               <td class="row-num" class:selected={isRowNumSelected(absRow)}>{absRow + 1}</td>
               {#each row as cell, colIdx}
                 {@const flags = cellFlags(absRow, colIdx)}
-                <td class:selected={flags.selected} class:active={flags.isActive}>{formatCell(cell, data.schema.fields[colIdx].dataType)}</td>
+                {@const renderCell = resolvedRenderers[colIdx]}
+                <td class:selected={flags.selected} class:active={flags.isActive}
+                  >{@render renderCell(data.schema.fields[colIdx], cell)}</td
+                >
               {/each}
               <td class="spacer"></td>
             </tr>
@@ -461,27 +436,25 @@
   }
 
   thead {
-    position: sticky;
-    top: 0;
-    z-index: 2;
   }
 
   th {
     position: sticky;
     top: 0;
-    background: var(--bg-2);
+    z-index: 3;
+    background: var(--table-header-bg, lightgray);
     white-space: nowrap;
     text-align: left;
     padding: 0.25em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--table-cell-border, lightgray);
+    border-bottom: 1px solid var(--table-cell-border, lightgray);
   }
 
   th.row-num {
     left: 0;
-    z-index: 3;
+    z-index: 4;
   }
 
   td {
@@ -489,16 +462,19 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--table-cell-border, lightgray);
+    border-bottom: 1px solid var(--table-cell-border, lightgray);
+    background: var(--table-bg, white);
   }
 
   td.row-num {
     position: sticky;
     left: 0;
-    z-index: 1;
-    background: var(--bg-2);
+    z-index: 2;
+    background: var(--table-row-num-bg, lightgray);
+    color: var(--table-row-num-color, gray);
     text-align: right;
+    font-size: 0.75em;
   }
 
   tr[aria-hidden="true"] td {
@@ -514,13 +490,13 @@
   }
 
   td.selected {
-    background: var(--accent-bg);
+    box-shadow: inset 0 0 0 9999px var(--table-selected-bg, lightblue);
   }
 
   td.active {
-    outline: 2px solid var(--accent);
+    box-shadow: inset 0 0 0 9999px var(--table-selected-bg, lightblue);
+    outline: 2px solid var(--table-active-outline, blue);
     outline-offset: -2px;
-    background: var(--accent-bg-subtle);
   }
 
   th.spacer,

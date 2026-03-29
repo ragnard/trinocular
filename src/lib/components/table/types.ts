@@ -1,5 +1,54 @@
+import type { Snippet } from "svelte";
 import type { TypeSignature } from "$lib/trino";
-import type { Field, DataType, Struct } from "./Table.svelte";
+
+export interface Schema {
+  fields: Field[];
+}
+
+export interface Field {
+  name: string;
+  dataType: DataType;
+  dataTypeName: string;
+  nullable: boolean;
+}
+
+export interface Struct {
+  fields: Field[];
+}
+
+export type List = DataType[];
+
+export type DataType = "string" | "integer" | "binary" | Struct | List;
+
+export interface TableData {
+  schema: Schema;
+  data: any[][];
+}
+
+export interface Selection {
+  fields: Field[];
+  rows: any[][];
+}
+
+export type CellRendererLookup = (field: Field) => Snippet<[Field, any]>;
+
+export function convertRow(row: any[], fields: Field[]): any[] {
+  return row.map((value, i) => convertValue(value, fields[i].dataType));
+}
+
+function convertValue(value: any, dataType: DataType): any {
+  if (value === null || value === undefined) return value;
+  if (dataType === "binary") {
+    return Uint8Array.fromBase64(value);
+  }
+  if (Array.isArray(dataType) && Array.isArray(value)) {
+    return value.map((v) => convertValue(v, dataType[0]));
+  }
+  if (typeof dataType === "object" && "fields" in dataType && Array.isArray(value)) {
+    return value.map((v, i) => convertValue(v, dataType.fields[i].dataType));
+  }
+  return value;
+}
 
 export function fieldFromTypeSignature(sig: TypeSignature, name: string, typeName: string): Field {
   return {
@@ -70,6 +119,8 @@ function toDataType(sig: TypeSignature): DataType {
     case "real":
     case "decimal":
       return "integer";
+    case "varbinary":
+      return "binary";
     default:
       return "string";
   }

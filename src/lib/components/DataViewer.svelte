@@ -1,36 +1,139 @@
 <script lang="ts">
-  import type { Selection } from "./table/Table.svelte";
-  import ValueNode from "./ValueNode.svelte";
+  import type { Selection, DataType, Field, Struct, List } from "./table/types";
+  import type { Snippet } from "svelte";
 
   interface Props {
     selection?: Selection | null;
+    hideNulls?: boolean;
+    hideEmpty?: boolean;
+    formatValue?: Snippet<[Field, any]>;
   }
 
-  let { selection = null }: Props = $props();
+  let { selection = null, hideNulls = true, hideEmpty = true, formatValue }: Props = $props();
+
+  interface FlatEntry {
+    key: string;
+    value: any;
+    field: Field;
+    empty?: boolean;
+  }
+
+  function isStruct(dt: DataType): dt is Struct {
+    return typeof dt === "object" && !Array.isArray(dt) && "fields" in dt;
+  }
+
+  function isList(dt: DataType): dt is List {
+    return Array.isArray(dt);
+  }
+
+  function flatten(value: any, field: Field, prefix: string): FlatEntry[] {
+    const { dataType } = field;
+    if (value === null || value === undefined) {
+      return [{ key: prefix, value: null, field }];
+    }
+    if (isStruct(dataType) && Array.isArray(value)) {
+      const entries = dataType.fields.flatMap((f, i) => {
+        const key = prefix ? `${prefix}.${f.name}` : f.name;
+        return flatten(value[i], f, key);
+      });
+      if (entries.length === 0) {
+        return [{ key: prefix, value: "{}", field, empty: true }];
+      }
+      return entries;
+    }
+    if (isList(dataType) && Array.isArray(value)) {
+      if (value.length === 0) {
+        return [{ key: prefix, value: "[]", field, empty: true }];
+      }
+      const elementField: Field = {
+        name: "",
+        dataType: dataType[0],
+        dataTypeName: field.dataTypeName,
+        nullable: true
+      };
+      return value.flatMap((element, i) => {
+        const key = `${prefix}[${i + 1}]`;
+        return flatten(element, elementField, key);
+      });
+    }
+    return [{ key: prefix, value, field }];
+  }
+
+  function flattenRow(row: any[], fields: Selection["fields"]): FlatEntry[] {
+    return fields.flatMap((field, i) => flatten(row[i], field, field.name));
+  }
+
+  let filter = $state("");
+  let valueFilter = $state("");
+  let theadHeight = $state(0);
+
+  let rows = $derived(
+    selection
+      ? selection.rows.map((row) => {
+          let entries = flattenRow(row, selection.fields);
+          if (hideNulls) entries = entries.filter((e) => e.value !== null);
+          if (hideEmpty) entries = entries.filter((e) => !e.empty);
+          if (filter)
+            entries = entries.filter((e) => e.key.toLowerCase().includes(filter.toLowerCase()));
+          if (valueFilter)
+            entries = entries.filter((e) =>
+              String(e.value).toLowerCase().includes(valueFilter.toLowerCase())
+            );
+          return entries;
+        })
+      : []
+  );
 </script>
 
 <div class="data-viewer">
   {#if selection}
-    <div class="summary">
-      {selection.rows.length} row{selection.rows.length !== 1 ? "s" : ""},
-      {selection.fields.length} column{selection.fields.length !== 1 ? "s" : ""}
-    </div>
-    <div class="rows">
-      {#each selection.rows as row, ri}
-        <div class="row">
+    <table>
+      <thead bind:clientHeight={theadHeight}>
+        <tr>
+          <th>
+            <div>
+              <span>Field</span>
+              <input type="text" placeholder="Filter..." bind:value={filter} />
+            </div>
+          </th>
+          <th>
+            <div>
+              <span>Value</span>
+              <input type="text" placeholder="Filter..." bind:value={valueFilter} />
+            </div>
+          </th>
+        </tr>
+      </thead>
+      {#each rows as entries, ri}
+        <tbody>
           {#if selection.rows.length > 1}
-            <div class="row-header">Row {ri + 1}</div>
+            <tr class="row-header" style:--thead-h="{theadHeight}px">
+              <td colspan="2">Row {ri + 1}</td>
+            </tr>
           {/if}
-          {#each row as cell, ci}
-            <ValueNode
-              value={cell}
-              dataType={selection.fields[ci].dataType}
-              label={selection.fields[ci].name}
-            />
+          {#each entries as entry}
+            <tr>
+              <td class="field" title={entry.key}>{entry.key}</td>
+              <td class="value" class:null={entry.value === null}>
+                {#if formatValue}
+                  <svelte:boundary>
+                    {@render formatValue(entry.field, entry.value)}
+
+                    {#snippet failed(error, reset)}
+                      <span>Err: {error}</span>
+                    {/snippet}
+                  </svelte:boundary>
+                {:else if entry.value === null || entry.value === undefined}
+                  <span>null</span>
+                {:else}
+                  <span>{entry.value}</span>
+                {/if}
+              </td>
+            </tr>
           {/each}
-        </div>
+        </tbody>
       {/each}
-    </div>
+    </table>
   {:else}
     <div class="placeholder">Select cells to inspect</div>
   {/if}
@@ -38,35 +141,80 @@
 
 <style>
   .data-viewer {
-    padding: 0.75em;
+    /* padding: 0.75em; */
     overflow: auto;
     height: 100%;
-    font-size: 0.85em;
+    font-size: 1em;
   }
 
-  .summary {
+  .row-header td {
+    position: sticky;
+    top: var(--thead-h, 0px);
+    z-index: 1;
+    background: var(--bg-0);
     font-weight: 600;
-    margin-bottom: 0.5em;
+    font-size: 0.85em;
     color: var(--text-2);
+    border-bottom: 1px solid var(--border-dark);
   }
 
-  .rows {
+  table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    /*border: 1px solid var(--border);*/
+  }
+
+  th {
+    width: 50%;
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid var(--border-dark);
+    text-align: left;
+    background: var(--bg-0);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  th div {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 0.5em;
   }
 
-  .row {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 0.35em 0.5em;
+  th input {
+    flex: 1;
+    min-width: 0;
+    font-weight: normal;
   }
 
-  .row-header {
-    font-weight: 600;
-    font-size: 0.85em;
+  td {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+ /* tr:nth-child(even) {
+    background: var(--bg-2, transparent);
+    } */
+
+  .field {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--text-2);
-    margin-bottom: 0.25em;
+    /* font-size: 0.8em;
+       padding: 0.em 0.7em; */
+  }
+
+  .value {
+    word-break: break-all;
+  }
+
+  .null {
+    color: var(--text-2);
+    font-style: italic;
   }
 
   .placeholder {

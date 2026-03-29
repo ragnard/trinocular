@@ -10,7 +10,7 @@
   import Query from "./Query.svelte";
   import Logo from "./Logo.svelte";
   import DataViewer from "./DataViewer.svelte";
-  import type { Selection } from "./table/Table.svelte";
+  import type { Selection } from "./table/types";
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
 
@@ -69,6 +69,11 @@ SELECT
   array[row('alice', i), row('bob', i*2), row('cecil', i-2)] as bloh
 from table(sequence(1, 100)) as t(i);
 
+select * from iceberg.censys.host_ipv4 limit 50;
+
+select * from iceberg.censys.web limit 50;
+
+
   `;
 
   async function handleExecuteSql(sql: string, startLine: number) {
@@ -83,6 +88,24 @@ from table(sequence(1, 100)) as t(i);
     });
 
     workspace.executeQuery(trino, sql);
+  }
+
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+
+  function decodeBinary(bytes: Uint8Array): string {
+    try {
+      let text = decoder.decode(bytes);
+
+      if (text.startsWith('{"')) {
+        try {
+          let json = JSON.parse(text);
+          return JSON.stringify(json, null, 2);
+        } catch (error) {}
+      }
+      return text;
+    } catch (error) {
+      return "0x" + bytes.toHex();
+    }
   }
 </script>
 
@@ -102,7 +125,8 @@ from table(sequence(1, 100)) as t(i);
       min="10%"
       max="90%"
       pos="75%"
-      --color="var(--border)"
+      --color="var(--border-dark)"
+      --border-width="2px"
       --thickness="20px"
     >
       {#snippet a()}
@@ -111,7 +135,8 @@ from table(sequence(1, 100)) as t(i);
           min="10%"
           max="90%"
           pos="33%"
-          --color="var(--border)"
+          --color="var(--border-dark)"
+          --border-width="2px"
           --thickness="20px"
         >
           {#snippet a()}
@@ -141,7 +166,19 @@ from table(sequence(1, 100)) as t(i);
       {/snippet}
 
       {#snippet b()}
-        <DataViewer {selection} />
+        <div class="data-viewer">
+          <DataViewer {selection}>
+            {#snippet formatValue(field, value)}
+              {#if value === "null"}
+                <span>[null]</span>
+              {:else if field.dataType === "binary"}
+                <pre>{decodeBinary(value)}</pre>
+              {:else}
+                <span>{value}</span>
+              {/if}
+            {/snippet}
+          </DataViewer>
+        </div>
       {/snippet}
     </SplitPane>
   </div>
@@ -153,12 +190,18 @@ from table(sequence(1, 100)) as t(i);
     flex-direction: column;
     height: 100vh;
     width: 100vw;
+    background-color: var(--bg-1);
+  }
+
+  pre {
+    white-space: pre-line;
+    /* font-family: '';*/
   }
 
   .topbar {
     /* height: 32px; */
     background-color: var(--bg-0);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--border-dark);
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -172,12 +215,15 @@ from table(sequence(1, 100)) as t(i);
   }
 
   .editor {
-    /*height: 50%;*/
+    /* border-bottom: 2px solid var(--border-dark); */
   }
 
   .results {
     display: flex;
-    border-top: 1px solid var(--border);
+  }
+
+  .data-viewer {
+    /* border-left: 0px solid var(--border-dark); */
   }
 
   .theme-toggle {

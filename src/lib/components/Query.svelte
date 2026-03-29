@@ -1,9 +1,8 @@
 <script lang="ts">
   import type { Query } from "$lib/State.svelte";
-  import Table from "./table/Table.svelte";
-  import type { TableData, Selection } from "./table/Table.svelte";
+  import { Table, fieldFromTypeSignature, convertRow } from "./table";
+  import type { TableData, Selection } from "./table/types";
   import type { Columns, QueryData } from "$lib/trino";
-  import { fieldFromTypeSignature } from "./table/types";
   import Spinner from "./Spinner.svelte";
 
   interface Props {
@@ -14,13 +13,12 @@
   let { query, selection = $bindable(null) }: Props = $props();
 
   const toData = (columns?: Columns, rows?: QueryData[]): TableData | null => {
+    const fields = (columns ?? []).map((col) =>
+      fieldFromTypeSignature(col.typeSignature, col.name, col.type)
+    );
     return {
-      schema: {
-        fields: (columns ?? []).map((col) =>
-          fieldFromTypeSignature(col.typeSignature, col.name, col.type)
-        )
-      },
-      data: rows ?? []
+      schema: { fields },
+      data: (rows ?? []).map((row) => convertRow(row, fields))
     };
   };
 
@@ -33,7 +31,14 @@
       <span>Error: {query.error.message} ({query.error.errorCode})</span>
     </div>
   {:else if data}
-    <Table {data} bind:selection>
+    <Table
+      {data}
+      bind:selection
+      --table-bg="var(--bg-1)"
+      --table-header-bg="var(--bg-0)"
+      --table-row-num-bg="var(--bg-0)"
+      --table-selected-bg="var(--accent-bg)"
+    >
       {#snippet header(field)}
         <div class="header">
           <div class="name" title={field.name}>{field.name}</div>
@@ -42,8 +47,12 @@
       {/snippet}
       {#snippet empty()}
         <div class="message">
-          <Spinner />
-          <div>{query?.queryState} ...</div>
+          {#if query?.queryState == "FINISHED"}
+            <div>No data</div>
+          {:else}
+            <Spinner />
+            <div style="text-transform: capitalize;">{query?.queryState?.toLowerCase()} ...</div>
+          {/if}
         </div>
       {/snippet}
     </Table>
@@ -92,14 +101,6 @@
     .type {
       font-size: 0.7em;
       color: var(--text-2);
-    }
-  }
-
-  .query :global {
-    th {
-    }
-
-    td {
     }
   }
 </style>
