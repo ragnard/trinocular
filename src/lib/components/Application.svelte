@@ -11,6 +11,7 @@
   import Logo from "./Logo.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
+  import Menu from "./Menu.svelte";
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
 
@@ -109,6 +110,51 @@ select * from iceberg.censys.web limit 50;
   }
 </script>
 
+{#snippet menu()}
+  <div class="menu"><Menu {workspace} /></div>
+{/snippet}
+
+{#snippet dataviewer()}
+  <div class="data-viewer">
+    <DataViewer {selection}>
+      {#snippet formatValue(field, value)}
+        {#if value === "null"}
+          <span>[null]</span>
+        {:else if field.dataType === "binary"}
+          <pre>{decodeBinary(value)}</pre>
+        {:else}
+          <span>{value}</span>
+        {/if}
+      {/snippet}
+    </DataViewer>
+  </div>
+{/snippet}
+
+{#snippet editor()}
+  <div class="editor">
+    <Editor
+      value={query}
+      metadataProvider={new StaticMetadataProvider()}
+      markers={editorMarkers}
+      onexecutesql={handleExecuteSql}
+      {theme}
+    />
+  </div>
+{/snippet}
+
+{#snippet results()}
+  <div class="results">
+    {#if workspace.latestQuery}
+      <Query query={workspace.latestQuery} bind:selection />
+    {:else}
+      <div class="no-query">
+        <span>Nothing here yet...</span>
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
+
 <main>
   <div class="topbar">
     <div class="brand"><Logo /> Tryne</div>
@@ -124,61 +170,37 @@ select * from iceberg.censys.web limit 50;
       type="horizontal"
       min="10%"
       max="90%"
-      pos="75%"
+      pos="25%"
       --color="var(--border-dark)"
       --border-width="2px"
       --thickness="20px"
+      a={menu}
     >
-      {#snippet a()}
+      {#snippet b()}
         <SplitPane
-          type="vertical"
+          type="horizontal"
           min="10%"
           max="90%"
-          pos="33%"
+          pos="75%"
           --color="var(--border-dark)"
           --border-width="2px"
           --thickness="20px"
+          b={dataviewer}
         >
           {#snippet a()}
-            <div class="editor">
-              <Editor
-                value={query}
-                metadataProvider={new StaticMetadataProvider()}
-                markers={editorMarkers}
-                onexecutesql={handleExecuteSql}
-                {theme}
-              />
-            </div>
-          {/snippet}
-
-          {#snippet b()}
-            <div class="results">
-              {#if workspace.currentQuery}
-                <Query query={workspace.currentQuery} bind:selection />
-              {:else}
-                <div class="no-query">
-                  <span>Nothing here yet...</span>
-                </div>
-              {/if}
-            </div>
+            <SplitPane
+              type="vertical"
+              min="10%"
+              max="90%"
+              pos="33%"
+              --color="var(--border-dark)"
+              --border-width="2px"
+              --thickness="20px"
+              a={editor}
+              b={results}
+            ></SplitPane>
           {/snippet}
         </SplitPane>
-      {/snippet}
-
-      {#snippet b()}
-        <div class="data-viewer">
-          <DataViewer {selection}>
-            {#snippet formatValue(field, value)}
-              {#if value === "null"}
-                <span>[null]</span>
-              {:else if field.dataType === "binary"}
-                <pre>{decodeBinary(value)}</pre>
-              {:else}
-                <span>{value}</span>
-              {/if}
-            {/snippet}
-          </DataViewer>
-        </div>
       {/snippet}
     </SplitPane>
   </div>
@@ -206,6 +228,10 @@ select * from iceberg.censys.web limit 50;
     flex-direction: row;
     align-items: center;
     padding: 0.4em 0.4em;
+  }
+
+  .menu {
+    background-color: var(--bg-0);
   }
 
   .workspace {

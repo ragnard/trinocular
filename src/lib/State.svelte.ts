@@ -2,13 +2,20 @@ import Trino  from "$lib/trino";
 import type { Columns, QueryData, QueryError, QueryResult, QueryStats } from "$lib/trino";
 
 export class Workspace {
-  query: Query | null = $state.raw(null);
+  queries: Array<Query> = $state([])
 
-  currentQuery: Query | null = $derived(this.query);
+  latestQuery: Query | null = $state.raw(null); // $derived(this.queries && this.queries[this.queries.length-1]);
+  // activeQuery: Query | null = $state.raw(null);
 
   async executeQuery(client: Trino, sql: string) {
-    this.query = new Query(sql);
-    this.query.execute(client);
+    const query = new Query(client, sql);
+    this.queries.push(query);
+    this.latestQuery = query;
+    query.execute();
+  }
+
+  setLatestQuery(query: Query) {
+    this.latestQuery = query;
   }
 
 }
@@ -16,6 +23,7 @@ export class Workspace {
 export type State = "RUNNING" | "FINISHED" | "ERROR";
 
 export class Query {
+  client: Trino
   id: string = $state("");
   sql: string = $state("");
   results: QueryResult[] = $state([]);
@@ -37,17 +45,23 @@ export class Query {
     }
   });
 
-  constructor(sql: string = "") {
+  constructor(client: Trino, sql: string = "") {
+    this.client = client;
     this.id = crypto.randomUUID();
     this.sql = sql;
   }
 
-  async execute(client: Trino) {
-    const res = await client.query(this.sql);
+  async execute() {
+    const res = await this.client.query(this.sql);
 
     for await (const chunk of res) {
       this.results.push(chunk);
     }
+  }
+
+  async cancel() {
+    // TODO
+    // this.client.cancel(this.queryId))
   }
 
 }

@@ -113,7 +113,12 @@
           {/if}
           {#each entries as entry}
             <tr>
-              <td class="field" title={entry.key}>{entry.key}</td>
+              <td class="field" title={entry.key}>
+                {entry.key}
+                <div class="cell-actions">
+                  <button title="Copy field name" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(entry.key); }}>📋</button>
+                </div>
+              </td>
               <td class="value" class:null={entry.value === null}>
                 {#if formatValue}
                   <svelte:boundary>
@@ -128,6 +133,15 @@
                 {:else}
                   <span>{entry.value}</span>
                 {/if}
+                <div class="cell-actions">
+                  <button title="Copy value" onclick={(e) => {
+                    e.stopPropagation();
+                    const text = entry.value == null ? "null"
+                      : typeof entry.value === "object" ? JSON.stringify(entry.value)
+                      : String(entry.value);
+                    navigator.clipboard.writeText(text);
+                  }}>📋</button>
+                </div>
               </td>
             </tr>
           {/each}
@@ -145,6 +159,7 @@
     overflow: auto;
     height: 100%;
     font-size: 1em;
+    padding-right: 1px;
   }
 
   table {
@@ -198,6 +213,52 @@
     font-size: 0.85em;
     color: var(--text-2);
     border-bottom: 1px solid var(--border-dark);
+  }
+
+  .field,
+  .value {
+    position: relative;
+  }
+
+  tr:not(.row-header) > td.field:hover,
+  tr:not(.row-header) > td.value:hover {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .cell-actions {
+    display: none;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 3;
+    gap: 2px;
+    background: color-mix(in srgb, var(--bg-0) 85%, transparent);
+    padding: 1px;
+    border-radius: 3px;
+  }
+
+  td.field:hover .cell-actions,
+  td.value:hover .cell-actions {
+    display: flex;
+  }
+
+  .cell-actions button {
+    all: unset;
+    cursor: pointer;
+    font-size: 0.75em;
+    line-height: 1;
+    padding: 3px 3px;
+    border-radius: 3px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    opacity: 0.8;
+  }
+
+  .cell-actions button:hover {
+    opacity: 1;
+    background: var(--accent-bg);
+    border-color: var(--accent);
   }
 
   .field {
