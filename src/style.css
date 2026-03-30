@@ -15,6 +15,7 @@
     /* --font-mono: 'Iosevka SS08'; */
     --font: sans-serif;
     --font-mono: monospace;
+    --font-sm: 0.85em;
 }
 
 :root[data-theme="dark"] {

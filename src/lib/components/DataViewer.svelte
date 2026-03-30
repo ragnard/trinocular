@@ -147,17 +147,6 @@
     font-size: 1em;
   }
 
-  .row-header td {
-    position: sticky;
-    top: var(--thead-h, 0px);
-    z-index: 1;
-    background: var(--bg-0);
-    font-weight: 600;
-    font-size: 0.85em;
-    color: var(--text-2);
-    border-bottom: 1px solid var(--border-dark);
-  }
-
   table {
     width: 100%;
     table-layout: fixed;
@@ -175,6 +164,7 @@
     position: sticky;
     top: 0;
     z-index: 2;
+    font-size: var(--font-sm);
   }
 
   th div {
@@ -195,17 +185,29 @@
     vertical-align: top;
   }
 
- /* tr:nth-child(even) {
+  /* tr:nth-child(even) {
     background: var(--bg-2, transparent);
     } */
+
+  .row-header td {
+    position: sticky;
+    top: var(--thead-h, 0px);
+    z-index: 1;
+    background: var(--bg-0);
+    font-weight: 600;
+    font-size: 0.85em;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border-dark);
+  }
 
   .field {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-2);
+    border-right: 1px solid var(--border);
     /* font-size: 0.8em;
-       padding: 0.em 0.7em; */
+      padding: 0.em 0.7em; */
   }
 
   .value {
