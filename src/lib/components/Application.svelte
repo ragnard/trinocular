@@ -8,7 +8,6 @@
   import Trino, { type QueryResult } from "$lib/trino";
   import { SplitPane } from "./split-pane";
   import Query from "./Query.svelte";
-  import Logo from "./Logo.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
   import Menu from "./Menu.svelte";
@@ -46,7 +45,7 @@
   let statementStartLine = $state(1);
 
   const editorMarkers: monaco.editor.IMarkerData[] = $derived.by(() => {
-    const error = workspace.query?.error;
+    const error = workspace.activeQuery?.error;
     if (!error?.errorLocation) return [];
     return [
       {
@@ -111,7 +110,7 @@ select * from iceberg.censys.web limit 50;
 </script>
 
 {#snippet menu()}
-  <div class="menu"><Menu {workspace} /></div>
+  <div class="menu"><Menu {workspace} {theme} onToggleTheme={toggleTheme} /></div>
 {/snippet}
 
 {#snippet dataviewer()}
@@ -144,8 +143,8 @@ select * from iceberg.censys.web limit 50;
 
 {#snippet results()}
   <div class="results">
-    {#if workspace.latestQuery}
-      <Query query={workspace.latestQuery} bind:selection />
+    {#if workspace.activeQuery}
+      <Query query={workspace.activeQuery} bind:selection />
     {:else}
       <div class="no-query">
         <span>Nothing here yet...</span>
@@ -154,17 +153,7 @@ select * from iceberg.censys.web limit 50;
   </div>
 {/snippet}
 
-
 <main>
-  <div class="topbar">
-    <div class="brand"><Logo /> Tryne</div>
-    <div style="flex: 1;"></div>
-    <button class="theme-toggle" onclick={toggleTheme} title="Toggle dark mode">
-      {theme === "light" ? "🌙" : "☀️"}
-    </button>
-    <div class="user">$user_id</div>
-  </div>
-
   <div class="workspace">
     <SplitPane
       type="horizontal"
@@ -220,16 +209,6 @@ select * from iceberg.censys.web limit 50;
     /* font-family: '';*/
   }
 
-  .topbar {
-    /* height: 32px; */
-    background-color: var(--bg-0);
-    border-bottom: 2px solid var(--border-dark);
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    padding: 0.4em 0.4em;
-  }
-
   .menu {
     background-color: var(--bg-0);
   }
@@ -250,16 +229,6 @@ select * from iceberg.censys.web limit 50;
 
   .data-viewer {
     /* border-left: 0px solid var(--border-dark); */
-  }
-
-  .theme-toggle {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
-    padding: 0.2em 0.4em;
-    margin-right: 0.5em;
   }
 
   .no-query {

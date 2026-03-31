@@ -34,8 +34,7 @@ function updateResponseBody(response: Record<any, any>, target: Connection) {
 }
 
 async function proxy(event: RequestEvent, target: Connection) {
-  // event.locals.logger.debug("proxying request", target);
-  console.log("proxying request", target);
+  event.locals.logger.debug({target}, "proxying request");
   const request = event.request;
 
   const url = toTargetUrl(request, target);
