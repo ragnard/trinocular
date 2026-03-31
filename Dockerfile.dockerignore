@@ -1,0 +1,10 @@
+.git
+.github
+.svelte-kit
+build
+design
+hack
+node_modules
+trino
+Dockerfile
+Dockerfile.dockerignore

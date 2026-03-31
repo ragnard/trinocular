@@ -1,7 +1,7 @@
 import { type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
-import { Config, getConfig } from "$lib/server/config.ts";
+import { Config, getConfig } from "$lib/server/config";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
@@ -28,8 +28,6 @@ const authnHandler = async (config: Config) => {
         scope: authn.scope,
         userIdClaim: authn.userIdClaim
       });
-    default:
-      throw new Error("unimplemented authentication kind: " + authn.kind);
   }
 };
 

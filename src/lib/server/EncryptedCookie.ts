@@ -1,18 +1,17 @@
-import { webcrypto } from "crypto";
 import type { RequestEvent } from "@sveltejs/kit";
 
 export class EncryptedCookie {
   #name: string;
-  #key: webcrypto.CryptoKey;
+  #key: CryptoKey;
   static #encoder: TextEncoder = new TextEncoder();
   static #decoder: TextDecoder = new TextDecoder();
 
-  constructor(name: string, key: webcrypto.CryptoKey) {
+  constructor(name: string, key: CryptoKey) {
     this.#name = name;
     this.#key = key;
   }
 
-  static async createKey(secret: string): Promise<webcrypto.CryptoKey> {
+  static async createKey(secret: string): Promise<CryptoKey> {
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
       EncryptedCookie.#encoder.encode(secret),

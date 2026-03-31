@@ -104,7 +104,7 @@ select * from iceberg.censys.web limit 50;
       }
       return text;
     } catch (error) {
-      return "0x" + bytes.toHex();
+      return "0x" + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
     }
   }
 </script>

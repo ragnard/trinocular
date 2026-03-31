@@ -39,7 +39,7 @@ export function convertRow(row: any[], fields: Field[]): any[] {
 function convertValue(value: any, dataType: DataType): any {
   if (value === null || value === undefined) return value;
   if (dataType === "binary") {
-    return Uint8Array.fromBase64(value);
+    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
   }
   if (Array.isArray(dataType) && Array.isArray(value)) {
     return value.map((v) => convertValue(v, dataType[0]));
