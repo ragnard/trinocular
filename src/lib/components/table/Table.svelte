@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { Field, DataType, TableData, Selection, CellRendererLookup } from "./types";
+  import type {
+    Field,
+    DataType,
+    Schema,
+    Selection,
+    CellRendererLookup,
+    ValueConverter
+  } from "./types";
   import { defaultCell } from "./snippets.svelte";
 
   const DEFAULT_ROW_HEIGHT = 28;
@@ -10,8 +17,11 @@
   const DEFAULT_SPACER_MIN_WIDTH = 100;
   const ROW_NUMBER_WIDTH = 60;
 
+  const identity: ValueConverter = (value) => value;
+
   interface Props {
-    data?: TableData;
+    schema?: Schema;
+    rows?: any[][];
     rowHeight?: number;
     bufferRows?: number;
     columnWidth?: number;
@@ -19,11 +29,13 @@
     header?: Snippet<[Field]>;
     empty?: Snippet;
     cellRenderer?: CellRendererLookup;
+    valueConverter?: ValueConverter;
     selection?: Selection | null;
   }
 
   let {
-    data,
+    schema,
+    rows,
     rowHeight = DEFAULT_ROW_HEIGHT,
     bufferRows = DEFAULT_BUFFER_ROWS,
     columnWidth = DEFAULT_COLUMN_WIDTH,
@@ -31,6 +43,7 @@
     header,
     empty,
     cellRenderer: cellRendererProp,
+    valueConverter = identity,
     selection = $bindable(null)
   }: Props = $props();
 
@@ -41,20 +54,20 @@
   let resizing = $state(false);
   let dragging = $state(false);
 
-  let totalRows = $derived(data?.data?.length ?? 0);
-  let fieldCount = $derived(data?.schema?.fields?.length ?? 0);
+  let totalRows = $derived(rows?.length ?? 0);
+  let fieldCount = $derived(schema?.fields?.length ?? 0);
   let colCount = $derived(fieldCount + 2);
   let columnsWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
 
   const defaultCellRenderer: CellRendererLookup = () => defaultCell;
   let cellRenderer = $derived(cellRendererProp ?? defaultCellRenderer);
-  let resolvedRenderers = $derived(data?.schema?.fields?.map((f) => cellRenderer(f)) ?? []);
+  let resolvedRenderers = $derived(schema?.fields?.map((f) => cellRenderer(f)) ?? []);
 
   let startIndex = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows));
   let endIndex = $derived(
     Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / rowHeight) + bufferRows)
   );
-  let visibleRows = $derived(data?.data?.slice(startIndex, endIndex) ?? []);
+  let visibleRows = $derived(rows?.slice(startIndex, endIndex) ?? []);
   let offsetY = $derived(startIndex * rowHeight);
   let bottomSpacerHeight = $derived((totalRows - endIndex) * rowHeight);
 
@@ -283,27 +296,31 @@
     handle.addEventListener("pointerup", onPointerup);
   }
 
-  // Reset selection and column widths when data changes
+  // Reset selection and column widths when schema changes (i.e., new query)
   $effect(() => {
-    data;
+    schema;
     anchor = null;
     active = null;
     rowSelection = false;
-    columnWidths = Array(data?.schema?.fields?.length ?? 0).fill(columnWidth);
+    columnWidths = Array(schema?.fields?.length ?? 0).fill(columnWidth);
   });
 
   // Sync selection prop from internal selection state
   $effect(() => {
     const rect = selectionRect;
-    if (!rect || !data) {
+    if (!rect || !schema || !rows) {
       selection = null;
       return;
     }
-    const fields = data.schema.fields.slice(rect.minCol, rect.maxCol + 1);
-    const rows = data.data
+    const selectedFields = schema.fields.slice(rect.minCol, rect.maxCol + 1);
+    const selectedRows = rows
       .slice(rect.minRow, rect.maxRow + 1)
-      .map((row) => row.slice(rect.minCol, rect.maxCol + 1));
-    selection = { fields, rows };
+      .map((row) =>
+        selectedFields.map((field, i) =>
+          valueConverter(row[rect.minCol + i], field, rect.minCol + i)
+        )
+      );
+    selection = { fields: selectedFields, rows: selectedRows };
   });
 
   $effect(() => {
@@ -329,7 +346,7 @@
   });
 </script>
 
-{#if data}
+{#if schema}
   <div
     class="table-container"
     class:dragging
@@ -350,7 +367,7 @@
       <thead>
         <tr style:height="{rowHeight}px">
           <th class="row-num"></th>
-          {#each data.schema.fields as field, colIdx}
+          {#each schema.fields as field, colIdx}
             <th>
               {#if header}
                 {@render header(field)}
@@ -397,7 +414,10 @@
                 {@const flags = cellFlags(absRow, colIdx)}
                 {@const renderCell = resolvedRenderers[colIdx]}
                 <td class:selected={flags.selected} class:active={flags.isActive}
-                  >{@render renderCell(data.schema.fields[colIdx], cell)}</td
+                  >{@render renderCell(
+                    schema.fields[colIdx],
+                    valueConverter(cell, schema.fields[colIdx], colIdx)
+                  )}</td
                 >
               {/each}
               <td class="spacer"></td>

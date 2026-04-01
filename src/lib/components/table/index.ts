@@ -5,8 +5,8 @@ export type {
   Struct,
   List,
   DataType,
-  TableData,
   Selection,
-  CellRendererLookup
+  CellRendererLookup,
+  ValueConverter
 } from "./types";
-export { fieldFromTypeSignature, convertRow } from "./types";
+export { fieldFromTypeSignature, convertValue, convertRow } from "./types";

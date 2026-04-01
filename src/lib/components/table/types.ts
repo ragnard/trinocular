@@ -20,10 +20,7 @@ export type List = DataType[];
 
 export type DataType = "string" | "integer" | "binary" | Struct | List;
 
-export interface TableData {
-  schema: Schema;
-  data: any[][];
-}
+export type ValueConverter = (value: any, field: Field, colIndex: number) => any;
 
 export interface Selection {
   fields: Field[];
@@ -36,7 +33,7 @@ export function convertRow(row: any[], fields: Field[]): any[] {
   return row.map((value, i) => convertValue(value, fields[i].dataType));
 }
 
-function convertValue(value: any, dataType: DataType): any {
+export function convertValue(value: any, dataType: DataType): any {
   if (value === null || value === undefined) return value;
   if (dataType === "binary") {
     return Uint8Array.from(atob(value), c => c.charCodeAt(0));

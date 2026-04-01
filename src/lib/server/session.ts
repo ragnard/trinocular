@@ -1,6 +1,8 @@
 import type { Handle } from "@sveltejs/kit";
 import { EncryptedCookie } from "./EncryptedCookie";
 
+import { type CookieSerializeOptions } from "cookie";
+
 import { logger } from "./logging";
 
 export type SessionID = string;
@@ -8,7 +10,7 @@ export type SessionID = string;
 export interface SessionOptions {
   cookieName: string;
   cookieSecret: string;
-  cookieOptions: import("cookie").CookieSerializeOptions & { path: string };
+  cookieOptions: CookieSerializeOptions & { path: string };
 }
 
 export class Session {

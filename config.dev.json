@@ -1,0 +1,32 @@
+{
+  "session": {
+    "cookieName": "trinette-session",
+    "cookieSecret": "cd6d4189218b5d156071bc44d7d96805"
+  },
+  "authn": {
+    "kind": "none",
+    "user": "alice"
+  },
+  "_authn": {
+    "kind": "oidc",
+    "issuer": "https://keycloak.kind.internal/realms/local",
+    "clientId": "trinette",
+    "clientSecret": "JhqWf5liKQCXNmQET9Y28IHlvmaVvXJy",
+    "redirectPath": "/oidc/callback",
+    "scope": "openid profile email"
+  },
+  "connections": [
+    {
+      "id": "test",
+      "name": "Trino 1",
+      "uri": "http://localhost:8080",
+      "mode": "proxy"
+    },
+    {
+      "id": "trino-2",
+      "name": "Trino 222",
+      "uri": "https://trino.kind.internal",
+      "mode": "proxy"
+    }
+  ]
+}

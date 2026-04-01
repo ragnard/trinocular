@@ -41,7 +41,11 @@ const createHandle = async () => {
       cookieName: config.session.cookieName,
       cookieSecret: config.session.cookieSecret,
       cookieOptions: {
-        path: "/"
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        // ...config.session.cookieOptions,
       }
     }),
     await authnHandler(config)

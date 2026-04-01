@@ -2,92 +2,114 @@ import { error } from "@sveltejs/kit";
 
 import type { RequestEvent } from "./$types";
 
-import { type Connection } from "$lib/server/config";
+import { getConfig, type Connection } from "$lib/server/config";
 
+const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
-import { env } from "$env/dynamic/private";
-
-const LOCAL_URL = "http://localhost:5173"; //env.TRINETTE_ORIGIN;
-
-function toTargetUrl(request: Request, target: Connection): string {
-  return request.url.replace(`${LOCAL_URL}/api/trino/${target.id}`, target.uri);
+function getTrinoPath(event: RequestEvent): string {
+  const path = "/" + (event.params.path ?? "");
+  if (!ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    error(400, `Invalid Trino API path: ${path}`);
+  }
+  return path;
 }
 
-function toProxyUrl(url: string, target: Connection) {
-  return url.replace(target.uri, `${LOCAL_URL}/api/trino/${target.id}`);
+function toTargetUrl(event: RequestEvent, target: Connection): string {
+  const path = getTrinoPath(event);
+  const url = new URL(path, target.uri);
+  // Preserve query string from the original request
+  url.search = event.url.search;
+  return url.toString();
+}
+
+function toProxyUrl(url: string, event: RequestEvent, target: Connection): string {
+  const parsed = new URL(url);
+  const targetBase = new URL(target.uri);
+
+  // Only rewrite URLs that point to the target Trino server
+  if (parsed.origin !== targetBase.origin) {
+    return url;
+  }
+
+  const proxyBase = `${event.url.origin}/api/trino/${target.id}`;
+  return proxyBase + parsed.pathname + parsed.search;
 }
 
 function createUpstreamHeaders(event: RequestEvent) {
-  return {
+  const headers: Record<string, string> = {
     accept: "application/json",
-    'x-trino-user': 'ragge',
-    // authorization: "bearer " + event.locals.accessToken
+    "x-trino-user": event.locals.userId,
   };
+  if (event.locals.accessToken) {
+    headers["authorization"] = "bearer " + event.locals.accessToken;
+  }
+  return headers;
 }
 
-function updateResponseBody(response: Record<any, any>, target: Connection) {
-  ["nextUri", "partialCancelUri"].forEach((k) => {
-    if (response[k]) {
-      response[k] = toProxyUrl(response[k], target);
+function updateResponseBody(
+  response: Record<string, unknown>,
+  event: RequestEvent,
+  target: Connection
+) {
+  for (const k of ["nextUri", "partialCancelUri"]) {
+    if (typeof response[k] === "string") {
+      response[k] = toProxyUrl(response[k] as string, event, target);
     }
-  });
+  }
 }
 
 async function proxy(event: RequestEvent, target: Connection) {
-  event.locals.logger.debug({target}, "proxying request");
-  const request = event.request;
+  event.locals.logger.debug({ target }, "proxying request");
 
-  const url = toTargetUrl(request, target);
+  const url = toTargetUrl(event, target);
   const headers = createUpstreamHeaders(event);
 
-  // console.log("url", url);
-
-  const requestBody = request.body ? await request.blob() : null;
-  // let requestBody = request.body;
+  const requestBody = event.request.body ? await event.request.blob() : null;
 
   const response = await fetch(url, {
-    method: request.method,
+    method: event.request.method,
     headers: headers,
-    body: requestBody
-    //duplex: 'half',
+    body: requestBody,
   });
 
-  if (response.status != 200) {
+  if (response.status !== 200) {
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: response.headers,
     });
   }
-  // console.log(response.headers);
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  }
 
   const responseBody = await response.json();
 
-  updateResponseBody(responseBody, target);
-
-  // console.log(responseBody);
+  updateResponseBody(responseBody, event, target);
 
   return new Response(JSON.stringify(responseBody), {
     status: response.status,
     statusText: response.statusText,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
 function getServer(event: RequestEvent): Connection {
-  // const serverId = event.params.id;
-  // const server = getConfig().connections.find((s) => s.id == serverId);
-  // if (!server) {
-  //   error(404, `No server with id ${serverId}`);
-  // }
-  // return server;
-  return {
-    "id": "test",
-    "name": "test",
-    "uri": "http://localhost:8080",
+  const serverId = event.params.id;
+  const config = getConfig();
+  const server = config.connections?.find((s) => s.id === serverId);
+  if (!server) {
+    error(404, `No server with id ${serverId}`);
   }
+  return server;
 }
 
 export function GET(event: RequestEvent) {

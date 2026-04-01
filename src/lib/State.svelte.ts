@@ -11,7 +11,7 @@ export class Workspace {
     const query = new Query(client, this.#id++, sql);
     this.queries.push(query);
     this.activeQuery = query;
-    query.execute();
+    await query.execute();
   }
 
   setActiveQuery(query: Query) {
@@ -34,9 +34,15 @@ const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
 export class Query {
   client: Trino
   id: number;
-  sql: string = $state("");
-  results: QueryResult[] = $state([]);
+  sql: string;
 
+  queryId?: string = $state();
+  infoUri?: string = $state();
+  columns?: Columns = $state();
+  data?: QueryData[] = $state();
+  stats?: QueryStats = $state();
+  warnings?: string[] = $state();
+  error?: QueryError = $state();
 
   constructor(client: Trino, id: number, sql: string = "") {
     this.client = client;
@@ -44,20 +50,14 @@ export class Query {
     this.sql = sql;
   }
 
-  queryId?: string = $derived(this.latestResult?.id);
-  latestResult?: QueryResult = $derived(this.results && this.results[this.results.length - 1]);
-  latestStats?: QueryStats = $derived(this.latestResult?.stats);
-  queryState?: State = $derived(this.latestStats?.state as State);
-  schema?: Columns = $derived(this.results.find((r) => r.columns)?.columns);
-  data?: QueryData[] = $derived(this.results.filter((r) => r.data).flatMap((r) => r.data ?? []));
-  infoUri?: string = $derived(this.results.find((r) => r.infoUri)?.infoUri);
-  error?: QueryError = $derived(this.results.find((r) => r.error)?.error);
+  queryState?: State = $derived(this.stats?.state as State);
+  schema?: Columns = $derived(this.columns);
   completed?: boolean = $derived(this.queryState && COMPLETED_STATES.has(this.queryState))
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data?.length);
 
   elapsedTimeSeconds = $derived.by(() => {
-    const elapsedMillis = this.latestStats?.elapsedTimeMillis;
+    const elapsedMillis = this.stats?.elapsedTimeMillis;
     if (elapsedMillis) {
       return (elapsedMillis / 1000).toFixed(1);
     } else {
@@ -67,10 +67,34 @@ export class Query {
 
 
   async execute() {
-    const res = await this.client.query(this.sql);
+    try {
+      const res = await this.client.query(this.sql);
 
-    for await (const chunk of res) {
-      this.results.push(chunk);
+      for await (const chunk of res) {
+        if (chunk.id) this.queryId = chunk.id;
+        if (chunk.infoUri) this.infoUri = chunk.infoUri;
+        if (chunk.columns) this.columns = chunk.columns;
+        if (chunk.stats) this.stats = chunk.stats;
+        if (chunk.warnings) this.warnings = chunk.warnings;
+        if (chunk.error) this.error = chunk.error;
+
+        if (chunk.data) {
+          if (this.data) {
+            this.data.push(...chunk.data);
+          } else {
+            this.data = chunk.data;
+          }
+        }
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.error = {
+        message,
+        errorCode: 0,
+        errorName: "CLIENT_ERROR",
+        errorType: "CLIENT_ERROR",
+        failureInfo: { type: "ClientError", message, suppressed: [], stack: [] },
+      };
     }
   }
 

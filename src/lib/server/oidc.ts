@@ -25,6 +25,7 @@ interface OIDCSessionData {
 interface OIDCCallbackData {
   codeVerifier: string;
   returnToUrl: string;
+  state: string;
 }
 
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
@@ -118,19 +119,20 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const redirectToProvider = async (session: Session, event: RequestEvent) => {
     const codeVerifier: string = client.randomPKCECodeVerifier();
     const codeChallenge: string = await client.calculatePKCECodeChallenge(codeVerifier);
-    // let state!: string
+    const state: string = crypto.randomUUID();
 
     const parameters: Record<string, string> = {
       redirect_uri: redirectUri,
       scope: opts.scope,
       code_challenge: codeChallenge,
-      code_challenge_method: "S256"
+      code_challenge_method: "S256",
+      state
     };
 
     const returnToUrl = event.url.pathname;
     const providerUrl = client.buildAuthorizationUrl(config, parameters);
 
-    await session.set("oidc-callback", { codeVerifier, returnToUrl });
+    await session.set("oidc-callback", { codeVerifier, returnToUrl, state });
 
     redirect(303, providerUrl);
   };
@@ -142,8 +144,8 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     }
 
     const tokens = await client.authorizationCodeGrant(config, event.url, {
-      pkceCodeVerifier: callbackData.codeVerifier
-      //expectedState: state,
+      pkceCodeVerifier: callbackData.codeVerifier,
+      expectedState: callbackData.state,
     });
 
     const sessionData = createSessionData(tokens);

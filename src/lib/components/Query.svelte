@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Query } from "$lib/State.svelte";
-  import { Table, fieldFromTypeSignature, convertRow } from "./table";
-  import type { TableData, Selection } from "./table/types";
-  import type { Columns, QueryData } from "$lib/trino";
+  import { Table, fieldFromTypeSignature, convertValue } from "./table";
+  import type { Schema, Selection, ValueConverter } from "./table/types";
+  import type { Columns } from "$lib/trino";
   import Spinner from "./Spinner.svelte";
 
   interface Props {
@@ -12,17 +12,16 @@
 
   let { query, selection = $bindable(null) }: Props = $props();
 
-  const toData = (columns?: Columns, rows?: QueryData[]): TableData | null => {
-    const fields = (columns ?? []).map((col) =>
-      fieldFromTypeSignature(col.typeSignature, col.name, col.type)
-    );
+  const toSchema = (columns?: Columns): Schema | undefined => {
+    if (!columns) return undefined;
     return {
-      schema: { fields },
-      data: (rows ?? []).map((row) => convertRow(row, fields))
+      fields: columns.map((col) => fieldFromTypeSignature(col.typeSignature, col.name, col.type))
     };
   };
 
-  let data = $derived(toData(query.schema, query.data));
+  let schema = $derived(toSchema(query.schema));
+
+  const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 </script>
 
 <div class="query">
@@ -30,9 +29,11 @@
     <div class="message error">
       <span>Error: {query.error.message} ({query.error.errorCode})</span>
     </div>
-  {:else if data}
+  {:else if schema}
     <Table
-      {data}
+      {schema}
+      rows={query.data}
+      {valueConverter}
       bind:selection
       --table-bg="var(--bg-1)"
       --table-header-bg="var(--bg-0)"
