@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Selection, DataType, Field, Struct, List } from "./table/types";
+  import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
   import type { Snippet } from "svelte";
 
   interface Props {
@@ -10,6 +10,20 @@
   }
 
   let { selection = null, hideNulls = true, hideEmpty = true, formatValue }: Props = $props();
+
+  let data: SelectionData | null = $state.raw(null);
+
+  $effect(() => {
+    const sel = selection;
+    if (!sel) {
+      data = null;
+      return;
+    }
+    const timeout = setTimeout(() => {
+      data = sel.getData();
+    }, 100);
+    return () => clearTimeout(timeout);
+  });
 
   interface FlatEntry {
     key: string;
@@ -59,7 +73,7 @@
     return [{ key: prefix, value, field }];
   }
 
-  function flattenRow(row: any[], fields: Selection["fields"]): FlatEntry[] {
+  function flattenRow(row: any[], fields: SelectionData["fields"]): FlatEntry[] {
     return fields.flatMap((field, i) => flatten(row[i], field, field.name));
   }
 
@@ -67,10 +81,11 @@
   let valueFilter = $state("");
   let theadHeight = $state(0);
 
-  let rows = $derived(
-    selection
-      ? selection.rows.map((row) => {
-          let entries = flattenRow(row, selection.fields);
+  let rows = $derived.by(() => {
+    if (!data) return [];
+    const { fields, rows } = data;
+    return rows.map((row) => {
+          let entries = flattenRow(row, fields);
           if (hideNulls) entries = entries.filter((e) => e.value !== null);
           if (hideEmpty) entries = entries.filter((e) => !e.empty);
           if (filter)
@@ -80,13 +95,12 @@
               String(e.value).toLowerCase().includes(valueFilter.toLowerCase())
             );
           return entries;
-        })
-      : []
-  );
+        });
+  });
 </script>
 
 <div class="data-viewer">
-  {#if selection}
+  {#if data}
     <table>
       <thead bind:clientHeight={theadHeight}>
         <tr>
@@ -106,7 +120,7 @@
       </thead>
       {#each rows as entries, ri}
         <tbody>
-          {#if selection.rows.length > 1}
+          {#if data.rows.length > 1}
             <tr class="row-header" style:--thead-h="{theadHeight}px">
               <td colspan="2">Row {ri + 1}</td>
             </tr>

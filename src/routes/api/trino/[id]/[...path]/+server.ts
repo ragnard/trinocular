@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 
 import type { RequestEvent } from "./$types";
 
-import { getConfig, type Connection } from "$lib/server/config";
+import { config, type Connection } from "$lib/server/config";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
@@ -104,7 +104,6 @@ async function proxy(event: RequestEvent, target: Connection) {
 
 function getServer(event: RequestEvent): Connection {
   const serverId = event.params.id;
-  const config = getConfig();
   const server = config.connections?.find((s) => s.id === serverId);
   if (!server) {
     error(404, `No server with id ${serverId}`);

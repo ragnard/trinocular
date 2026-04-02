@@ -38,11 +38,11 @@ export class Query {
 
   queryId?: string = $state();
   infoUri?: string = $state();
-  columns?: Columns = $state();
-  data?: QueryData[] = $state();
-  stats?: QueryStats = $state();
-  warnings?: string[] = $state();
-  error?: QueryError = $state();
+  columns?: Columns = $state.raw();
+  data?: QueryData[] = $state.raw();
+  stats?: QueryStats = $state.raw();
+  warnings?: string[] = $state.raw();
+  error?: QueryError = $state.raw();
 
   constructor(client: Trino, id: number, sql: string = "") {
     this.client = client;
@@ -79,11 +79,7 @@ export class Query {
         if (chunk.error) this.error = chunk.error;
 
         if (chunk.data) {
-          if (this.data) {
-            this.data.push(...chunk.data);
-          } else {
-            this.data = chunk.data;
-          }
+          this.data = this.data ? this.data.concat(chunk.data) : chunk.data;
         }
       }
     } catch (e) {

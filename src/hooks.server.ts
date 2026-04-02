@@ -1,7 +1,8 @@
 import { type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
-import { Config, getConfig } from "$lib/server/config";
+import { config, type Config } from "$lib/server/config";
+import { env } from "$env/dynamic/private";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
@@ -32,7 +33,6 @@ const authnHandler = async (config: Config) => {
 };
 
 const createHandle = async () => {
-  const config = getConfig();
   const sessionStore = new InMemoryStore();
 
   return sequence(
@@ -43,9 +43,8 @@ const createHandle = async () => {
       cookieOptions: {
         path: "/",
         httpOnly: true,
-        secure: true,
+        secure: env.ORIGIN?.startsWith("https") ?? true,
         sameSite: "lax",
-        // ...config.session.cookieOptions,
       }
     }),
     await authnHandler(config)

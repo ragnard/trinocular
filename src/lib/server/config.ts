@@ -1,43 +1,44 @@
 import fs from "fs";
 import path from "path";
-import { type } from "arktype";
+import { z } from "zod";
 
 import { logger } from "./logging";
 import { env } from "$env/dynamic/private";
 
-const Connection = type({
-  id: "string",
-  name: "string",
-  uri: "string.url",
+const ConnectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  uri: z.url(),
 });
 
-const Session = type({
-  cookieName: type("string").default("trinette-session"),
-  cookieSecret: "string",
+const SessionSchema = z.object({
+  cookieName: z.string().default("trinette-session"),
+  cookieSecret: z.string(),
 });
 
-const NoAuthn = type({
-  kind: "'none'",
-  user: "string",
+const NoAuthnSchema = z.object({
+  kind: z.literal("none"),
+  user: z.string(),
 });
 
-const OIDCAuthn = type({
-  kind: "'oidc'",
-  issuer: "string.url",
-  clientId: "string",
-  clientSecret: "string",
-  redirectPath: "string",
-  scope: "string",
-  userIdClaim: type("string").default("preferred_username"),
+const OIDCAuthnSchema = z.object({
+  kind: z.literal("oidc"),
+  issuer: z.url(),
+  clientId: z.string(),
+  clientSecret: z.string(),
+  redirectPath: z.string(),
+  scope: z.string(),
+  userIdClaim: z.string().default("preferred_username"),
 });
 
-const Authn = NoAuthn.or(OIDCAuthn);
-
-export const Config = type({
-  session: Session,
-  authn: Authn,
-  "connections?": Connection.array(),
+const ConfigSchema = z.object({
+  session: SessionSchema,
+  authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
+  connections: ConnectionSchema.array().optional(),
 });
+
+export type Config = z.infer<typeof ConfigSchema>;
+export type Connection = z.infer<typeof ConnectionSchema>;
 
 const DEFAULT_CONFIG = {
   authn: {
@@ -45,35 +46,43 @@ const DEFAULT_CONFIG = {
     user: "alice",
   },
   session: {
-    cookieSecret: "8e04c69ea4adc52a4dfb0a13ba952ec4",
+    cookieSecret: crypto.randomUUID().replace(/-/g, ""),
   },
 };
 
-export type Config = typeof Config.infer;
-export type Connection = typeof Connection.infer;
-
-function loadConfig(configPath?: string): Config {
-  try {
-    if (!configPath) {
-      logger.warn("No config path specified, using defaults");
-      return Config.assert(DEFAULT_CONFIG);
-    }
-
-    const resolvedPath = path.resolve(configPath);
-    logger.info({ configPath, resolvedPath }, "loading config");
-
-    const raw = JSON.parse(fs.readFileSync(resolvedPath, "utf-8"));
-    return Config.assert(raw);
-  } catch (err) {
-    throw new Error(`Failed to load config from ${configPath}: ${err}`);
+function parseFile(content: string, filePath: string): unknown {
+  if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+    return Bun.YAML.parse(content);
   }
+  return JSON.parse(content);
 }
 
-let loadedConfig: Config | null = null;
-
-export const getConfig = (): Config => {
-  if (!loadedConfig) {
-    loadedConfig = loadConfig(env.TRINETTE_CONFIG);
+function loadConfig(configPath?: string): Config {
+  if (!configPath) {
+    logger.warn(
+      "No config path specified, using defaults with random cookie secret (sessions will not persist across restarts)"
+    );
+    return ConfigSchema.parse(DEFAULT_CONFIG);
   }
-  return loadedConfig;
-};
+
+  const resolvedPath = path.resolve(configPath);
+  logger.info({ configPath, resolvedPath }, "loading config");
+
+  let raw: unknown;
+  try {
+    raw = parseFile(fs.readFileSync(resolvedPath, "utf-8"), resolvedPath);
+  } catch (err) {
+    logger.error(`Failed to read config from ${resolvedPath}: ${err}`);
+    process.exit(1);
+  }
+
+  const result = ConfigSchema.safeParse(raw);
+  if (!result.success) {
+    logger.error("Config validation failed:\n" + z.prettifyError(result.error));
+    process.exit(1);
+  }
+
+  return result.data;
+}
+
+export const config: Config = loadConfig(env.TRINETTE_CONFIG);

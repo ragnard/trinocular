@@ -312,15 +312,22 @@
       selection = null;
       return;
     }
-    const selectedFields = schema.fields.slice(rect.minCol, rect.maxCol + 1);
-    const selectedRows = rows
-      .slice(rect.minRow, rect.maxRow + 1)
-      .map((row) =>
-        selectedFields.map((field, i) =>
-          valueConverter(row[rect.minCol + i], field, rect.minCol + i)
-        )
-      );
-    selection = { fields: selectedFields, rows: selectedRows };
+    const { minRow, maxRow, minCol, maxCol } = rect;
+    const s = schema;
+    const r = rows;
+    const vc = valueConverter;
+    selection = {
+      minRow, maxRow, minCol, maxCol,
+      getData() {
+        const fields = s.fields.slice(minCol, maxCol + 1);
+        const selectedRows = r
+          .slice(minRow, maxRow + 1)
+          .map((row) =>
+            fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
+          );
+        return { fields, rows: selectedRows };
+      }
+    };
   });
 
   $effect(() => {

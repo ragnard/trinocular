@@ -23,7 +23,7 @@ export class Session {
   }
 
   async set<T>(key: string, value: T): Promise<T> {
-    this.#store.set(this.sessionId, key, value);
+    await this.#store.set(this.sessionId, key, value);
     return value;
   }
 
@@ -87,12 +87,17 @@ export class InMemoryStore implements SessionStore {
 type HandlerFactory = (store: SessionStore, opts: SessionOptions) => Promise<Handle>;
 
 export const SessionHandler: HandlerFactory = async (store, opts) => {
-  const cookieKey = await EncryptedCookie.createKey(opts.cookieSecret);
+  const cookieKey = await EncryptedCookie.createKey(opts.cookieSecret, opts.cookieName);
   const cookie = new EncryptedCookie(opts.cookieName, cookieKey);
 
   return async ({ event, resolve }) => {
     // get or create sessionId from encrypted cookie
-    let sessionId = await cookie.getValue(event);
+    let sessionId: string | null = null;
+    try {
+      sessionId = await cookie.getValue(event);
+    } catch {
+      logger.warn("failed to decrypt session cookie, issuing new session");
+    }
     if (!sessionId) {
       sessionId = crypto.randomUUID();
       await cookie.setValue(event, sessionId, opts.cookieOptions);

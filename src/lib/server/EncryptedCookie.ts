@@ -11,7 +11,7 @@ export class EncryptedCookie {
     this.#key = key;
   }
 
-  static async createKey(secret: string): Promise<CryptoKey> {
+  static async createKey(secret: string, name: string): Promise<CryptoKey> {
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
       EncryptedCookie.#encoder.encode(secret),
@@ -25,7 +25,7 @@ export class EncryptedCookie {
         name: "HKDF",
         hash: "SHA-256",
         salt: EncryptedCookie.#encoder.encode("EncryptedCookie"),
-        info: new Uint8Array(0)
+        info: EncryptedCookie.#encoder.encode(name)
       },
       keyMaterial,
       { name: "AES-GCM", length: 256 },
