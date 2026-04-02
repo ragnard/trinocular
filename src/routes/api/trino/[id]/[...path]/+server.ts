@@ -3,6 +3,7 @@ import { error } from "@sveltejs/kit";
 import type { RequestEvent } from "./$types";
 
 import { config, type Connection } from "$lib/server/config";
+import { isTrinoHeader } from "$lib/trino";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
@@ -38,8 +39,14 @@ function toProxyUrl(url: string, event: RequestEvent, target: Connection, id: st
 function createUpstreamHeaders(event: RequestEvent) {
   const headers: Record<string, string> = {
     accept: "application/json",
-    "x-trino-user": event.locals.userId,
   };
+  event.request.headers.forEach((value, name) => {
+    if (isTrinoHeader(name)) {
+      headers[name] = value;
+    }
+  });
+  // Override with server-side auth — takes precedence over client-sent values
+  headers["x-trino-user"] = event.locals.userId;
   if (event.locals.accessToken) {
     headers["authorization"] = "bearer " + event.locals.accessToken;
   }
@@ -94,12 +101,19 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
 
   updateResponseBody(responseBody, event, target, id);
 
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  response.headers.forEach((value, name) => {
+    if (isTrinoHeader(name)) {
+      responseHeaders[name] = value;
+    }
+  });
+
   return new Response(JSON.stringify(responseBody), {
     status: response.status,
     statusText: response.statusText,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: responseHeaders,
   });
 }
 

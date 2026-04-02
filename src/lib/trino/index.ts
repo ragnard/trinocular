@@ -4,6 +4,9 @@ const DEFAULT_USER = ''
 
 // Trino headers
 const TRINO_HEADER_PREFIX = 'X-Trino-';
+
+export const isTrinoHeader = (name: string): boolean =>
+  name.toLowerCase().startsWith(TRINO_HEADER_PREFIX.toLowerCase());
 const TRINO_PREPARED_STATEMENT_HEADER = TRINO_HEADER_PREFIX + 'Prepared-Statement';
 const TRINO_ADDED_PREPARE_HEADER = TRINO_HEADER_PREFIX + 'Added-Prepare';
 const TRINO_USER_HEADER = TRINO_HEADER_PREFIX + 'User';
