@@ -74,11 +74,17 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
 
   const requestBody = event.request.body ? await event.request.blob() : null;
 
-  const response = await fetch(url, {
-    method: event.request.method,
-    headers: headers,
-    body: requestBody,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: event.request.method,
+      headers: headers,
+      body: requestBody,
+    });
+  } catch (err) {
+    event.locals.logger.error({ id, url, err }, "upstream request failed");
+    error(502, `Failed to connect to upstream Trino server: ${err instanceof Error ? err.message : err}`);
+  }
 
   if (response.status !== 200) {
     return new Response(response.body, {

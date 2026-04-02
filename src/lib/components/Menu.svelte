@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Query, Workspace } from "$lib/State.svelte";
   import {
-    ChevronDown,
     ChevronRight,
     CircleAlert,
     CircleStop,
@@ -31,10 +30,31 @@
   <div class="menu-content">
     <details open>
       <summary>
-        Queries
+        <ChevronRight size={14} class="toggle" />
+        <span class="title">Connection</span>
+        <span class="fill"></span>
         <button class="settings"><Settings size={16} /></button>
       </summary>
-      <div class="query-list">
+      <div class="details connection-select">
+        <select
+          value={workspace.connectionId}
+          onchange={(e) => workspace.setConnection(e.currentTarget.value)}
+        >
+          {#each page.data.connections as conn (conn.id)}
+            <option value={conn.id}>{conn.name}</option>
+          {/each}
+        </select>
+      </div>
+    </details>
+
+    <details open>
+      <summary>
+        <ChevronRight size={14} class="toggle" />
+        <span class="title">Queries</span>
+        <span class="fill"></span>
+        <button class="settings"><Settings size={16} /></button>
+      </summary>
+      <div class="details query-list">
         {#if workspace.queries.length}
           {#each workspace.queries as query (query.id)}
             <div class="query">
@@ -71,16 +91,12 @@
 
     <details open>
       <summary>
-        Data Sources
+        <ChevronRight size={14} class="toggle" />
+        <span class="title" >Browse</span>
+        <span class="fill"></span>
         <button class="settings"><Settings size={16} /></button>
       </summary>
-      <div class="connection-list">
-        {#each page.data.connections as conn (conn.id)}
-          <div class="connection" class:active={workspace.connectionId === conn.id}>
-            <span>{conn.name}</span>
-          </div>
-        {/each}
-      </div>
+      <div class="details">TODO</div>
     </details>
   </div>
 
@@ -112,8 +128,12 @@
   }
 
   .menu-content {
+    display: flex;
+    flex-direction: column;
+    /* gap: 2em; */
     flex: 1;
     overflow: auto;
+    padding: 1em;
   }
 
   .menu-bottom {
@@ -139,23 +159,43 @@
     color: var(--text-2);
   }
 
-  details {
-    padding: 1em;
+  details[open] > summary :global(.toggle) {
+    transform: rotate(90deg);
+  }
 
+  details {
     summary {
-      list-style: none;
       display: flex;
+      list-style: none;
       flex-direction: row;
       align-items: center;
-      font-size: 0.8em;
-      color: var(--text-2);
-      text-transform: uppercase;
       margin-bottom: 1em;
       cursor: pointer;
       justify-content: space-between;
-      font-weight: bold;
-      padding: 0.25em;
+      color: var(--text-2);
+
+      :global(.toggle) {
+        transition: transform 0.15s ease;
+        margin-right: 0.25em;
+      }
+
+      .title {
+        font-size: 0.8em;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+
+      .fill {
+        flex: 1;
+      }
+
     }
+
+    .details {
+      margin-bottom: 2em;
+      margin-left: 0.25em;
+    }
+
 
     button {
       padding: 0;
@@ -175,21 +215,17 @@
       flex-direction: column;
     }
 
-    .connection-list {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .connection {
-      padding: 0.25em 0.25em;
-      border-radius: 4px;
-
-      &:hover {
-        background-color: lightgrey;
-      }
-
-      &.active {
-        font-weight: bold;
+    .connection-select {
+      select {
+        width: 100%;
+        padding: 0.35em 0.5em;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg-1, inherit);
+        color: inherit;
+        font-size: 0.9em;
+        cursor: pointer;
+        /*appearance: none;*/
       }
     }
 
@@ -199,6 +235,8 @@
       justify-content: space-between;
       align-items: center;
       padding: 0.25em 0.25em;
+      margin-left: -0.25em;
+      margin-right: -0.25em;
 
       &:hover {
         background-color: lightgrey;

@@ -26,7 +26,10 @@ export class Workspace {
 
   async executeQuery(sql: string) {
     const query = new Query(this.client, this.#id++, sql);
-    this.queries.push(query);
+    this.queries.unshift(query);
+    if (this.queries.length > 10) {
+      this.queries.pop();
+    }
     this.activeQuery = query;
     await query.execute();
   }
@@ -69,7 +72,7 @@ export class Query {
 
   queryState?: State = $derived(this.stats?.state as State);
   schema?: Columns = $derived(this.columns);
-  completed?: boolean = $derived(this.queryState && COMPLETED_STATES.has(this.queryState))
+  completed?: boolean = $derived(this.error || (this.queryState && COMPLETED_STATES.has(this.queryState)))
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data?.length);
 
