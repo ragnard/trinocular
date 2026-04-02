@@ -10,9 +10,19 @@ const ConnectionSchema = z.object({
   uri: z.url(),
 });
 
+const CookieSchema = z.object({
+  path: z.string().optional(),
+  httpOnly: z.boolean().optional(),
+  secure: z.boolean().optional(),
+  sameSite: z.enum(["strict", "lax", "none"]).optional(),
+  domain: z.string().optional(),
+  maxAge: z.number().int().positive().optional(),
+});
+
 const SessionSchema = z.object({
   cookieName: z.string().default("trinette-session"),
   cookieSecret: z.string(),
+  cookie: CookieSchema.optional(),
 });
 
 const NoAuthnSchema = z.object({

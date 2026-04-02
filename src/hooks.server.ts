@@ -41,10 +41,12 @@ const createHandle = async () => {
       cookieName: config.session.cookieName,
       cookieSecret: config.session.cookieSecret,
       cookieOptions: {
-        path: "/",
-        httpOnly: true,
-        secure: env.ORIGIN?.startsWith("https") ?? true,
-        sameSite: "lax"
+        path: config.session.cookie?.path ?? "/",
+        httpOnly: config.session.cookie?.httpOnly ?? true,
+        secure: config.session.cookie?.secure ?? (env.ORIGIN?.startsWith("https") ?? true),
+        sameSite: config.session.cookie?.sameSite ?? "lax",
+        ...(config.session.cookie?.domain && { domain: config.session.cookie.domain }),
+        ...(config.session.cookie?.maxAge && { maxAge: config.session.cookie.maxAge }),
       }
     }),
     await authnHandler(config)
