@@ -72,7 +72,7 @@ export class Query {
 
   queryState?: State = $derived(this.stats?.state as State);
   schema?: Columns = $derived(this.columns);
-  completed?: boolean = $derived(this.error || (this.queryState && COMPLETED_STATES.has(this.queryState)))
+  completed?: boolean = $derived(this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState)))
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data?.length);
 

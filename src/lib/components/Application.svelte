@@ -210,16 +210,8 @@ select * from iceberg.censys.web limit 50;
     flex: 1;
   }
 
-  .editor {
-    /* border-bottom: 2px solid var(--border-dark); */
-  }
-
   .results {
     display: flex;
-  }
-
-  .data-viewer {
-    /* border-left: 0px solid var(--border-dark); */
   }
 
   .no-query {

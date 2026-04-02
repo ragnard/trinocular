@@ -59,13 +59,13 @@
           {#each workspace.queries as query (query.id)}
             <div class="query">
               <span>
-                <a onclick={(_ev) => workspace.setActiveQuery(query)}
+                <button onclick={(_ev) => workspace.setActiveQuery(query)}
                   >Query #{query.id}
                   {#if query.rowCount}
                     <span class="stats">({query.rowCount} rows in {query.elapsedTimeSeconds}s)</span
                     >
                   {/if}
-                </a>
+                </button>
               </span>
               <div class="actions">
                 {#if query?.running}
@@ -243,7 +243,8 @@
         border-radius: 4px;
       }
 
-      a {
+      button {
+        color: black;
         cursor: pointer;
         text-decoration: none;
       }

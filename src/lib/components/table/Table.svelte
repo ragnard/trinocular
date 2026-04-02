@@ -462,9 +462,6 @@
     table-layout: fixed;
   }
 
-  thead {
-  }
-
   th {
     position: sticky;
     top: 0;
