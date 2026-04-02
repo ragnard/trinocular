@@ -7,8 +7,25 @@ export class Workspace {
 
   activeQuery: Query | null = $state.raw(null);
 
-  async executeQuery(client: Trino, sql: string) {
-    const query = new Query(client, this.#id++, sql);
+  connectionId: string = $state("");
+  client: Trino = $state.raw(null!);
+
+  constructor(connectionId: string) {
+    this.connectionId = connectionId;
+    this.client = this.#createClient(connectionId);
+  }
+
+  #createClient(connectionId: string): Trino {
+    return Trino.create({ server: `/api/trino/${connectionId}` });
+  }
+
+  setConnection(connectionId: string) {
+    this.connectionId = connectionId;
+    this.client = this.#createClient(connectionId);
+  }
+
+  async executeQuery(sql: string) {
+    const query = new Query(this.client, this.#id++, sql);
     this.queries.push(query);
     this.activeQuery = query;
     await query.execute();

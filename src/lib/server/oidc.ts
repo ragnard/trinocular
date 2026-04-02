@@ -55,6 +55,17 @@ const isSafeReturnUrl = (url: string): boolean => {
   return url.startsWith("/") && !url.startsWith("//");
 };
 
+/** Checks that the session has claims with a usable userId. The library
+ *  already validates aud/iss/sub/exp/nonce at token exchange time. */
+const hasValidUserId = (
+  claims: client.IDToken | undefined,
+  userIdClaim: string
+): claims is client.IDToken => {
+  if (!claims) return false;
+  const userId = claims[userIdClaim];
+  return typeof userId === "string" && userId !== "";
+};
+
 class TokenRefreshCoalescer {
   #inflight = new Map<string, Promise<OIDCSessionData>>();
   #config: client.Configuration;
@@ -78,8 +89,11 @@ class TokenRefreshCoalescer {
   }
 
   async #doRefresh(session: Session, data: OIDCSessionData): Promise<OIDCSessionData> {
+    if (!data.refreshToken) {
+      throw new Error("Cannot refresh: no refresh token");
+    }
     this.#log.info({ sessionId: session.sessionId }, "refreshing token");
-    const response = await client.refreshTokenGrant(this.#config, data.refreshToken!);
+    const response = await client.refreshTokenGrant(this.#config, data.refreshToken);
     const newData = createSessionData(response, data);
     await session.set("oidc", newData);
     this.#log.info({ sessionId: session.sessionId }, "token refreshed");
@@ -88,6 +102,10 @@ class TokenRefreshCoalescer {
 }
 
 export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
+  if (!env.ORIGIN) {
+    throw new Error("ORIGIN environment variable is required for OIDC");
+  }
+
   const config: client.Configuration = await client.discovery(
     opts.issuer,
     opts.clientId,
@@ -122,18 +140,32 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   };
 
   const handleCallback = async (session: Session, event: RequestEvent) => {
-    const callbackData = await session.take<OIDCCallbackData>("oidc-callback");
+    const callbackData = await session.get<OIDCCallbackData>("oidc-callback");
     if (!callbackData) {
       error(500, "callback data missing from session");
     }
 
-    const tokens = await client.authorizationCodeGrant(config, event.url, {
-      pkceCodeVerifier: callbackData.codeVerifier,
-      expectedState: callbackData.state,
-      expectedNonce: callbackData.nonce,
-    });
+    let tokens;
+    try {
+      tokens = await client.authorizationCodeGrant(config, event.url, {
+        pkceCodeVerifier: callbackData.codeVerifier,
+        expectedState: callbackData.state,
+        expectedNonce: callbackData.nonce,
+      });
+    } catch (e) {
+      event.locals.logger.error({ error: e }, "OIDC token exchange failed");
+      return await redirectToProvider(session, event);
+    }
+
+    await session.take("oidc-callback");
 
     const sessionData = createSessionData(tokens);
+
+    if (!hasValidUserId(sessionData.claims, opts.userIdClaim)) {
+      error(403, "Authentication failed: ID token missing or invalid required claims");
+    }
+
+    session.rotate();
     await session.set<OIDCSessionData>("oidc", sessionData);
 
     const returnTo = isSafeReturnUrl(callbackData.returnToUrl) ? callbackData.returnToUrl : "/";
@@ -177,28 +209,15 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       });
     }
 
-    // validate audience and issuer on stored claims
-    if (oidcData.claims) {
-      const aud = oidcData.claims.aud;
-      const audValid = aud === opts.clientId ||
-        (Array.isArray(aud) && aud.includes(opts.clientId));
-      if (!audValid) {
-        event.locals.logger.warn("ID token audience mismatch, re-authenticating");
-        return await redirectToProvider(session, event);
-      }
-      const issuer = opts.issuer.toString().replace(/\/$/, "");
-      if (oidcData.claims.iss !== issuer) {
-        event.locals.logger.warn("ID token issuer mismatch, re-authenticating");
-        return await redirectToProvider(session, event);
-      }
+    // validate required claims on stored session data
+    if (!hasValidUserId(oidcData.claims, opts.userIdClaim)) {
+      event.locals.logger.warn("stored claims missing or invalid, re-authenticating");
+      return await redirectToProvider(session, event);
     }
 
-    const claims = oidcData.claims;
-    const userId = claims != null ? claims[opts.userIdClaim] : null;
-
     event.locals.accessToken = oidcData.accessToken;
-    event.locals.claims = claims;
-    event.locals.userId = userId as string;
+    event.locals.claims = oidcData.claims;
+    event.locals.userId = oidcData.claims[opts.userIdClaim] as string;
 
     const res = await resolve(event);
 

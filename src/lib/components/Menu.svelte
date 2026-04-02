@@ -74,8 +74,13 @@
         Data Sources
         <button class="settings"><Settings size={16} /></button>
       </summary>
-      <div>TBD</div>
-
+      <div class="connection-list">
+        {#each page.data.connections as conn (conn.id)}
+          <div class="connection" class:active={workspace.connectionId === conn.id}>
+            <span>{conn.name}</span>
+          </div>
+        {/each}
+      </div>
     </details>
   </div>
 
@@ -168,6 +173,24 @@
     .query-list {
       display: flex;
       flex-direction: column;
+    }
+
+    .connection-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .connection {
+      padding: 0.25em 0.25em;
+      border-radius: 4px;
+
+      &:hover {
+        background-color: lightgrey;
+      }
+
+      &.active {
+        font-weight: bold;
+      }
     }
 
     .query {

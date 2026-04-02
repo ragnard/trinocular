@@ -22,7 +22,7 @@ function toTargetUrl(event: RequestEvent, target: Connection): string {
   return url.toString();
 }
 
-function toProxyUrl(url: string, event: RequestEvent, target: Connection): string {
+function toProxyUrl(url: string, event: RequestEvent, target: Connection, id: string): string {
   const parsed = new URL(url);
   const targetBase = new URL(target.uri);
 
@@ -31,7 +31,7 @@ function toProxyUrl(url: string, event: RequestEvent, target: Connection): strin
     return url;
   }
 
-  const proxyBase = `${event.url.origin}/api/trino/${target.id}`;
+  const proxyBase = `${event.url.origin}/api/trino/${id}`;
   return proxyBase + parsed.pathname + parsed.search;
 }
 
@@ -49,17 +49,18 @@ function createUpstreamHeaders(event: RequestEvent) {
 function updateResponseBody(
   response: Record<string, unknown>,
   event: RequestEvent,
-  target: Connection
+  target: Connection,
+  id: string
 ) {
   for (const k of ["nextUri", "partialCancelUri"]) {
     if (typeof response[k] === "string") {
-      response[k] = toProxyUrl(response[k] as string, event, target);
+      response[k] = toProxyUrl(response[k] as string, event, target, id);
     }
   }
 }
 
-async function proxy(event: RequestEvent, target: Connection) {
-  event.locals.logger.debug({ target }, "proxying request");
+async function proxy(event: RequestEvent, target: Connection, id: string) {
+  event.locals.logger.debug({ id, target }, "proxying request");
 
   const url = toTargetUrl(event, target);
   const headers = createUpstreamHeaders(event);
@@ -91,7 +92,7 @@ async function proxy(event: RequestEvent, target: Connection) {
 
   const responseBody = await response.json();
 
-  updateResponseBody(responseBody, event, target);
+  updateResponseBody(responseBody, event, target, id);
 
   return new Response(JSON.stringify(responseBody), {
     status: response.status,
@@ -102,23 +103,23 @@ async function proxy(event: RequestEvent, target: Connection) {
   });
 }
 
-function getServer(event: RequestEvent): Connection {
-  const serverId = event.params.id;
-  const server = config.connections?.find((s) => s.id === serverId);
+function getServer(event: RequestEvent): [Connection, string] {
+  const id = event.params.id;
+  const server = config.connections?.[id];
   if (!server) {
-    error(404, `No server with id ${serverId}`);
+    error(404, `No server with id ${id}`);
   }
-  return server;
+  return [server, id];
 }
 
 export function GET(event: RequestEvent) {
-  return proxy(event, getServer(event));
+  return proxy(event, ...getServer(event));
 }
 
 export async function POST(event: RequestEvent) {
-  return proxy(event, getServer(event));
+  return proxy(event, ...getServer(event));
 }
 
 export async function DELETE(event: RequestEvent) {
-  return proxy(event, getServer(event));
+  return proxy(event, ...getServer(event));
 }

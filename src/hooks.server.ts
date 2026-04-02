@@ -44,7 +44,7 @@ const createHandle = async () => {
         path: "/",
         httpOnly: true,
         secure: env.ORIGIN?.startsWith("https") ?? true,
-        sameSite: "lax",
+        sameSite: "lax"
       }
     }),
     await authnHandler(config)

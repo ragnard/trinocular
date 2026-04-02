@@ -15,24 +15,32 @@ export interface SessionOptions {
 
 export class Session {
   #store: SessionStore;
-  readonly sessionId: SessionID;
+  #sessionId: SessionID;
 
   constructor(store: SessionStore, sessionId: SessionID) {
     this.#store = store;
-    this.sessionId = sessionId;
+    this.#sessionId = sessionId;
+  }
+
+  get sessionId(): SessionID {
+    return this.#sessionId;
+  }
+
+  rotate(): void {
+    this.#sessionId = crypto.randomUUID();
   }
 
   async set<T>(key: string, value: T): Promise<T> {
-    await this.#store.set(this.sessionId, key, value);
+    await this.#store.set(this.#sessionId, key, value);
     return value;
   }
 
   async get<T>(key: string): Promise<T | undefined> {
-    return this.#store.get(this.sessionId, key);
+    return this.#store.get(this.#sessionId, key);
   }
 
   async take<T>(key: string): Promise<T | undefined> {
-    return this.#store.take(this.sessionId, key);
+    return this.#store.take(this.#sessionId, key);
   }
 }
 
@@ -110,6 +118,10 @@ export const SessionHandler: HandlerFactory = async (store, opts) => {
     event.locals.session = session;
 
     const res = await resolve(event);
+
+    if (session.sessionId !== sessionId) {
+      await cookie.setValue(event, session.sessionId, opts.cookieOptions);
+    }
 
     return res;
   };

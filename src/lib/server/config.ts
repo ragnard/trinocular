@@ -6,7 +6,6 @@ import { logger } from "./logging";
 import { env } from "$env/dynamic/private";
 
 const ConnectionSchema = z.object({
-  id: z.string(),
   name: z.string(),
   uri: z.url(),
 });
@@ -34,7 +33,7 @@ const OIDCAuthnSchema = z.object({
 const ConfigSchema = z.object({
   session: SessionSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
-  connections: ConnectionSchema.array().optional(),
+  connections: z.record(z.string(), ConnectionSchema).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

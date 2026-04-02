@@ -5,7 +5,6 @@
   import * as monaco from "monaco-editor";
   import { onMount } from "svelte";
 
-  import Trino, { type QueryResult } from "$lib/trino";
   import { SplitPane } from "./split-pane";
   import Query from "./Query.svelte";
   import DataViewer from "./DataViewer.svelte";
@@ -79,15 +78,7 @@ select * from iceberg.censys.web limit 50;
   async function handleExecuteSql(sql: string, startLine: number) {
     console.log("Execute SQL:", sql);
     statementStartLine = startLine;
-
-    const trino: Trino = Trino.create({
-      server: "http://localhost:5173/api/trino/test"
-      // catalog: 'tpcds',
-      // schema: 'sf100000',
-      // auth: new BasicAuth('test'),
-    });
-
-    workspace.executeQuery(trino, sql);
+    workspace.executeQuery(sql);
   }
 
   const decoder = new TextDecoder("utf-8", { fatal: true });
