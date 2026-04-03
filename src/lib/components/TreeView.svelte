@@ -114,7 +114,7 @@
   }
 
   .label:hover {
-    background-color: var(--bg-hover, rgba(128, 128, 128, 0.15));
+    background-color: var(--bg-2);
   }
 
   .node-label {

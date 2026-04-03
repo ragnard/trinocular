@@ -35,9 +35,9 @@
       rows={query.data}
       {valueConverter}
       bind:selection
-      --table-bg="var(--bg-1)"
-      --table-header-bg="var(--bg-0)"
-      --table-row-num-bg="var(--bg-0)"
+      --table-bg="var(--bg-0)"
+      --table-header-bg="var(--bg-1)"
+      --table-row-num-bg="var(--bg-1)"
       --table-selected-bg="var(--accent-bg)"
     >
       {#snippet header(field)}

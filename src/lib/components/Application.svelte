@@ -201,7 +201,7 @@ select * from iceberg.censys.web limit 50;
     flex-direction: column;
     height: 100vh;
     width: 100vw;
-    background-color: var(--bg-1);
+    background-color: var(--bg-0);
   }
 
   pre {
@@ -210,7 +210,7 @@ select * from iceberg.censys.web limit 50;
   }
 
   .menu {
-    background-color: var(--bg-0);
+    background-color: var(--bg-1);
   }
 
   .workspace {

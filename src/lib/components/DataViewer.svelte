@@ -189,7 +189,7 @@
     padding: 0.5em 0.5em;
     border-bottom: 1px solid var(--border-dark);
     text-align: left;
-    background: var(--bg-0);
+    background: var(--bg-1);
     position: sticky;
     top: 0;
     z-index: 2;
@@ -222,7 +222,7 @@
     position: sticky;
     top: var(--thead-h, 0px);
     z-index: 1;
-    background: var(--bg-0);
+    background: var(--bg-1);
     font-weight: 600;
     font-size: 0.85em;
     color: var(--text-2);
@@ -247,7 +247,7 @@
     right: 2px;
     z-index: 3;
     gap: 2px;
-    background: color-mix(in srgb, var(--bg-0) 85%, transparent);
+    background: color-mix(in srgb, var(--bg-1) 85%, transparent);
     padding: 1px;
     border-radius: 3px;
   }
@@ -264,7 +264,7 @@
     line-height: 1;
     padding: 3px 3px;
     border-radius: 3px;
-    background: var(--bg-1);
+    background: var(--bg-0);
     border: 1px solid var(--border);
     opacity: 0.8;
   }

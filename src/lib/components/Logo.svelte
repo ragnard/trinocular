@@ -2,7 +2,7 @@
 
 <style>
  .logo {
-     background: var(--bg-1);
+     background: var(--bg-0);
      border-radius: 50%;
      border: 1px solid var(--border);
      display: inline-flex;

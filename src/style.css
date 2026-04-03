@@ -1,6 +1,6 @@
 :root {
-    --bg-0: #f0f0f0;
-    --bg-1: #ffffff;
+    --bg-0: #ffffff;
+    --bg-1: #f0f0f0;
     --bg-2: #f5f5f5;
     --text-0: #000000;
     --text-1: #333333;
@@ -35,7 +35,7 @@
 
 html {
     font-family: var(--font);
-    background-color: var(--bg-1);
+    background-color: var(--bg-0);
     color: var(--text-0);
 }
 
@@ -47,7 +47,7 @@ pre {
 input[type="text"] {
     /* padding: 0.25em 0.25em; */
     /* border: 1px solid var(--border); */
-    /* background: var(--bg-1, transparent); */
+    /* background: var(--bg-0, transparent); */
     /* color: inherit; */
     /* font: var(--font); */
     /* line-height: normal; */

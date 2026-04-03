@@ -261,7 +261,7 @@
       margin: 0;
       border: none;
       background: transparent;
-      color: gray;
+      color: var(--text-2);
       cursor: pointer;
 
       &:hover {
@@ -280,7 +280,7 @@
         padding: 0.35em 0.5em;
         border: 1px solid var(--border);
         border-radius: 4px;
-        background: var(--bg-1, inherit);
+        background: var(--bg-0, inherit);
         color: inherit;
         font-size: 0.9em;
         cursor: pointer;
@@ -298,19 +298,19 @@
       margin-right: -0.25em;
 
       &:hover {
-        background-color: lightgrey;
+        background-color: var(--bg-2);
         border-radius: 4px;
       }
 
       button {
-        color: black;
+        color: var(--text-0);
         cursor: pointer;
         text-decoration: none;
       }
 
       .stats {
         font-size: 0.8em;
-        color: gray;
+        color: var(--text-2);
       }
 
       .actions {
