@@ -11,6 +11,8 @@ const ConnectionSchema = z.object({
 });
 
 const CookieSchema = z.object({
+  name: z.string().default("trinette-session"),
+  secret: z.string().min(32, "cookie secret must be at least 32 characters for adequate security"),
   path: z.string().optional(),
   httpOnly: z.boolean().optional(),
   secure: z.boolean().optional(),
@@ -20,9 +22,8 @@ const CookieSchema = z.object({
 });
 
 const SessionSchema = z.object({
-  cookieName: z.string().default("trinette-session"),
-  cookieSecret: z.string().min(32, "cookieSecret must be at least 32 characters for adequate security"),
-  cookie: CookieSchema.optional(),
+  cookie: CookieSchema,
+  maxLifetimeSeconds: z.number().int().positive().default(86400),
 });
 
 const NoAuthnSchema = z.object({
@@ -67,7 +68,9 @@ const DEFAULT_CONFIG = {
     user: "alice",
   },
   session: {
-    cookieSecret: crypto.randomUUID().replace(/-/g, ""),
+    cookie: {
+      secret: crypto.randomUUID().replace(/-/g, ""),
+    },
   },
 };
 

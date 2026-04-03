@@ -6,21 +6,35 @@ import { type CookieSerializeOptions } from "cookie";
 import { logger } from "./logging";
 
 export type SessionID = string;
+export type SessionData = Record<string, unknown>;
 
 export interface SessionOptions {
   cookieName: string;
   cookieSecret: string;
   cookieOptions: CookieSerializeOptions & { path: string };
+  maxLifetimeSeconds: number;
+}
+
+export interface SessionStore {
+  load(sessionId: SessionID): Promise<SessionData | null>;
+  save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void>;
+  destroy(sessionId: SessionID): Promise<void>;
 }
 
 export class Session {
   #store: SessionStore;
   #sessionId: SessionID;
+  #previousSessionId: SessionID | null = null;
+  #data: SessionData | null = null;
+  #loadPromise: Promise<void> | null = null;
+  #dirty = false;
   #destroyed = false;
+  #maxLifetimeSeconds: number;
 
-  constructor(store: SessionStore, sessionId: SessionID) {
+  constructor(store: SessionStore, sessionId: SessionID, maxLifetimeSeconds: number) {
     this.#store = store;
     this.#sessionId = sessionId;
+    this.#maxLifetimeSeconds = maxLifetimeSeconds;
   }
 
   get sessionId(): SessionID {
@@ -31,76 +45,115 @@ export class Session {
     return this.#destroyed;
   }
 
+  #ensureLoaded(): Promise<void> {
+    if (this.#data !== null) return Promise.resolve();
+    if (!this.#loadPromise) {
+      this.#loadPromise = this.#store.load(this.#sessionId).then((data) => {
+        this.#data = data ?? {};
+      });
+    }
+    return this.#loadPromise;
+  }
+
+  async get<T>(key: string): Promise<T | undefined> {
+    await this.#ensureLoaded();
+    return this.#data![key] as T | undefined;
+  }
+
+  async set<T>(key: string, value: T): Promise<T> {
+    await this.#ensureLoaded();
+    this.#data![key] = value;
+    this.#dirty = true;
+    return value;
+  }
+
+  async take<T>(key: string): Promise<T | undefined> {
+    await this.#ensureLoaded();
+    const value = this.#data![key] as T | undefined;
+    if (value !== undefined) {
+      delete this.#data![key];
+      this.#dirty = true;
+    }
+    return value;
+  }
+
   rotate(): void {
+    if (!this.#previousSessionId) {
+      this.#previousSessionId = this.#sessionId;
+    }
     this.#sessionId = crypto.randomUUID();
   }
 
   async destroy(): Promise<void> {
     await this.#store.destroy(this.#sessionId);
+    if (this.#previousSessionId) {
+      await this.#store.destroy(this.#previousSessionId);
+    }
+    this.#data = {};
+    this.#dirty = false;
     this.#destroyed = true;
   }
 
-  async set<T>(key: string, value: T): Promise<T> {
-    await this.#store.set(this.#sessionId, key, value);
-    return value;
-  }
+  async commit(): Promise<void> {
+    if (this.#destroyed) return;
+    if (!this.#dirty && !this.#previousSessionId) return;
 
-  async get<T>(key: string): Promise<T | undefined> {
-    return this.#store.get(this.#sessionId, key);
-  }
+    if (this.#data !== null) {
+      await this.#store.save(this.#sessionId, this.#data, this.#maxLifetimeSeconds);
+    }
 
-  async take<T>(key: string): Promise<T | undefined> {
-    return this.#store.take(this.#sessionId, key);
+    if (this.#previousSessionId) {
+      await this.#store.destroy(this.#previousSessionId);
+    }
   }
 }
 
-export interface SessionStore {
-  set<T>(sessionId: SessionID, key: string, value: T): Promise<T>;
-  get<T>(sessionId: SessionID, key: string): Promise<T | undefined>;
-  take<T>(sessionId: SessionID, key: string): Promise<T | undefined>;
-  destroy(sessionId: SessionID): Promise<void>;
+interface StoreEntry {
+  data: SessionData;
+  expiresAt: number;
 }
 
 export class InMemoryStore implements SessionStore {
-  #sessions: Map<SessionID, Map<string, any>>;
+  #sessions = new Map<SessionID, StoreEntry>();
+  #sweepInterval: ReturnType<typeof setInterval>;
 
-  constructor() {
-    this.#sessions = new Map();
+  constructor(sweepIntervalMs: number = 60_000) {
+    this.#sweepInterval = setInterval(() => this.#sweep(), sweepIntervalMs);
+    if (this.#sweepInterval.unref) this.#sweepInterval.unref();
   }
 
-  async set<T>(sessionId: SessionID, key: string, value: T): Promise<T> {
-    if (!this.#sessions.has(sessionId)) {
-      this.#sessions.set(sessionId, new Map());
+  async load(sessionId: SessionID): Promise<SessionData | null> {
+    const entry = this.#sessions.get(sessionId);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.#sessions.delete(sessionId);
+      return null;
     }
-    const session = this.#sessions.get(sessionId);
-
-    session!.set(key, value);
-
-    return value;
+    return { ...entry.data };
   }
 
-  async get<T>(sessionId: SessionID, key: string): Promise<T | undefined> {
-    const session = this.#sessions.get(sessionId);
-    if (session) {
-      return session.get(key) as T;
-    } else {
-      return;
-    }
-  }
-
-  async take<T>(sessionId: SessionID, key: string): Promise<T | undefined> {
-    const session = this.#sessions.get(sessionId);
-    if (session) {
-      const value = session.get(key);
-      if (value) {
-        session.delete(key);
-        return value as T;
-      }
-    }
+  async save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void> {
+    this.#sessions.set(sessionId, {
+      data: { ...data },
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
   }
 
   async destroy(sessionId: SessionID): Promise<void> {
     this.#sessions.delete(sessionId);
+  }
+
+  #sweep(): void {
+    const now = Date.now();
+    for (const [id, entry] of this.#sessions) {
+      if (now > entry.expiresAt) {
+        this.#sessions.delete(id);
+      }
+    }
+  }
+
+  dispose(): void {
+    clearInterval(this.#sweepInterval);
   }
 }
 
@@ -111,7 +164,6 @@ export const SessionHandler: HandlerFactory = async (store, opts) => {
   const cookie = new EncryptedCookie(opts.cookieName, cookieKey);
 
   return async ({ event, resolve }) => {
-    // get or create sessionId from encrypted cookie
     let sessionId: string | null = null;
     try {
       sessionId = await cookie.getValue(event);
@@ -123,16 +175,19 @@ export const SessionHandler: HandlerFactory = async (store, opts) => {
       await cookie.setValue(event, sessionId, opts.cookieOptions);
     }
 
-    // get or create session
-    const session = new Session(store, sessionId);
-    // event.locals.logger.debug("session");
-
+    const session = new Session(store, sessionId, opts.maxLifetimeSeconds);
     event.locals.session = session;
 
     let res: Response;
     try {
       res = await resolve(event);
     } finally {
+      try {
+        await session.commit();
+      } catch (e) {
+        logger.error({ error: e }, "failed to commit session");
+      }
+
       if (session.destroyed) {
         event.cookies.delete(opts.cookieName, { path: opts.cookieOptions.path });
       } else if (session.sessionId !== sessionId) {

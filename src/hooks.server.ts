@@ -38,15 +38,16 @@ const createHandle = async () => {
   return sequence(
     await LoggingHandler(),
     await SessionHandler(sessionStore, {
-      cookieName: config.session.cookieName,
-      cookieSecret: config.session.cookieSecret,
+      cookieName: config.session.cookie.name,
+      cookieSecret: config.session.cookie.secret,
+      maxLifetimeSeconds: config.session.maxLifetimeSeconds,
       cookieOptions: {
-        path: config.session.cookie?.path ?? "/",
-        httpOnly: config.session.cookie?.httpOnly ?? true,
-        secure: config.session.cookie?.secure ?? (env.ORIGIN?.startsWith("https") ?? true),
-        sameSite: config.session.cookie?.sameSite ?? "lax",
-        ...(config.session.cookie?.domain && { domain: config.session.cookie.domain }),
-        ...(config.session.cookie?.maxAge && { maxAge: config.session.cookie.maxAge }),
+        path: config.session.cookie.path ?? "/",
+        httpOnly: config.session.cookie.httpOnly ?? true,
+        secure: config.session.cookie.secure ?? (env.ORIGIN?.startsWith("https") ?? true),
+        sameSite: config.session.cookie.sameSite ?? "lax",
+        ...(config.session.cookie.domain && { domain: config.session.cookie.domain }),
+        ...(config.session.cookie.maxAge && { maxAge: config.session.cookie.maxAge }),
       }
     }),
     await authnHandler(config)

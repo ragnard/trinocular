@@ -1,6 +1,6 @@
 import { redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 import * as client from "openid-client";
-import type { Session, SessionStore } from "./session";
+import type { Session } from "./session";
 
 import { env } from "$env/dynamic/private";
 import { error as error } from "./errors";
@@ -241,10 +241,11 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
         return await redirectToProvider(session, event);
       }
     } else if (nearExpiry(oidcData.accessTokenExpiresAt, 30) && oidcData.refreshToken) {
-      // proactive fire-and-forget refresh for next request
-      coalescer.refresh(session, oidcData).catch((e) => {
+      try {
+        oidcData = await coalescer.refresh(session, oidcData);
+      } catch (e) {
         event.locals.logger.warn({ error: e }, "proactive refresh failed");
-      });
+      }
     }
 
     // validate required claims on stored session data
