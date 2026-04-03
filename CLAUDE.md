@@ -57,3 +57,7 @@ Monaco Editor → handleExecuteSql() → Trino client (fetch) → server proxy �
 - Large/frequently-updated data (`Query.data`, `Query.columns`, `Query.stats`) must use `$state.raw()`, not `$state()`, to avoid proxy overhead.
 - CSS theming via custom properties (`--bg-0`, `--text-0`, `--accent`, etc.) toggled by `data-theme` attribute on `<html>`.
 - Formatting: 2-space indent, double quotes, no trailing commas, 100-char line width (Prettier with Svelte plugin).
+
+## References
+
+- Svelte/SvelteKit LLM docs: https://svelte.dev/llms.txt — consult when up-to-date Svelte or SvelteKit information is needed.

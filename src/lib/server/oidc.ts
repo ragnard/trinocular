@@ -10,8 +10,13 @@ interface OIDCOptions {
   clientId: string;
   clientSecret: string;
   scope: string;
-  redirectPath: string;
   userIdClaim: string;
+  paths: {
+    prefix: string;
+    callback: string;
+    login: string;
+    error: string;
+  };
 }
 
 interface OIDCSessionData {
@@ -114,7 +119,9 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
   const coalescer = new TokenRefreshCoalescer(config);
 
-  const redirectUri = env.ORIGIN + opts.redirectPath;
+  const callbackPath = opts.paths.prefix + "/" + opts.paths.callback;
+  const errorPath = opts.paths.prefix + "/" + opts.paths.error;
+  const redirectUri = env.ORIGIN + callbackPath;
 
   const redirectToProvider = async (session: Session, event: RequestEvent) => {
     const codeVerifier: string = client.randomPKCECodeVerifier();
@@ -154,7 +161,11 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       });
     } catch (e) {
       event.locals.logger.error({ error: e }, "OIDC token exchange failed");
-      return await redirectToProvider(session, event);
+      await session.take("oidc-callback");
+      await session.set("auth-error", {
+        requestId: event.locals.logger.bindings().requestId,
+      });
+      redirect(303, errorPath);
     }
 
     await session.take("oidc-callback");
@@ -162,6 +173,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     const sessionData = createSessionData(tokens);
 
     if (!hasValidUserId(sessionData.claims, opts.userIdClaim)) {
+      event.locals.logger.error({ tokens }, "auth failed");
       error(403, "Authentication failed: ID token missing or invalid required claims");
     }
 
@@ -179,8 +191,13 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     }
 
     // is this an auth callback request?
-    if (event.url.pathname === opts.redirectPath && event.request.method === "GET") {
+    if (event.url.pathname === callbackPath && event.request.method === "GET") {
       return await handleCallback(session, event);
+    }
+
+    // allow unauthenticated access to auth pages (login, error)
+    if (event.url.pathname.startsWith(opts.paths.prefix + "/")) {
+      return await resolve(event);
     }
 
     // do we have OIDC session data?

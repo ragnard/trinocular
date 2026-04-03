@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Workspace } from "$lib/State.svelte";
   import Editor from "$lib/monaco/Editor.svelte";
-  import { StaticMetadataProvider } from "monaco-language-trino";
   import * as monaco from "monaco-editor";
   import { onMount } from "svelte";
+  import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
+  import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
 
   import { SplitPane } from "./split-pane";
   import Query from "./Query.svelte";
@@ -40,6 +41,14 @@
     manualOverride = true;
     theme = theme === "light" ? "dark" : "light";
   }
+
+  const metadataProvider = new DelegatingMetadataProvider(
+    new TrinoMetadataProvider(workspace.catalog)
+  );
+
+  $effect(() => {
+    metadataProvider.delegate = new TrinoMetadataProvider(workspace.catalog);
+  });
 
   let statementStartLine = $state(1);
 
@@ -124,7 +133,7 @@ select * from iceberg.censys.web limit 50;
   <div class="editor">
     <Editor
       value={query}
-      metadataProvider={new StaticMetadataProvider()}
+      {metadataProvider}
       markers={editorMarkers}
       onexecutesql={handleExecuteSql}
       {theme}

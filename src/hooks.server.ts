@@ -25,9 +25,9 @@ const authnHandler = async (config: Config) => {
         issuer: new URL(authn.issuer),
         clientId: authn.clientId,
         clientSecret: authn.clientSecret,
-        redirectPath: authn.redirectPath,
         scope: authn.scope,
-        userIdClaim: authn.userIdClaim
+        userIdClaim: authn.userIdClaim,
+        paths: authn.paths,
       });
   }
 };

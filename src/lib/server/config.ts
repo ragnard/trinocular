@@ -35,9 +35,19 @@ const OIDCAuthnSchema = z.object({
   issuer: z.url(),
   clientId: z.string(),
   clientSecret: z.string(),
-  redirectPath: z.string(),
   scope: z.string(),
   userIdClaim: z.string().default("preferred_username"),
+  paths: z.object({
+    prefix: z.string().default("/auth"),
+    callback: z.string().default("callback"),
+    login: z.string().default("login"),
+    error: z.string().default("error"),
+  }).default({
+    prefix: "/auth",
+    callback: "callback",
+    login: "login",
+    error: "error",
+  }),
 });
 
 const ConfigSchema = z.object({

@@ -1,14 +1,19 @@
 <script lang="ts">
   import type { Query, Workspace } from "$lib/State.svelte";
+  import type { TreeNode } from "./TreeView.svelte";
   import {
+    Box,
     ChevronRight,
     CircleAlert,
     CircleStop,
     CircleX,
+    Database,
     LoaderCircle,
-    Settings
+    Settings,
+    Table
   } from "@lucide/svelte";
   import Logo from "./Logo.svelte";
+  import TreeView from "./TreeView.svelte";
   import { page } from "$app/state";
 
   interface Props {
@@ -20,6 +25,47 @@
   let { workspace, theme, onToggleTheme }: Props = $props();
 
   let userId = $derived(page.data.userId);
+
+  let browseNodes: TreeNode[] = $derived.by(() => {
+    const cache = workspace.catalog;
+    const loading = cache.loading;
+    return cache.catalogs.map((catalog) => ({
+      id: catalog,
+      label: catalog,
+      loading: loading.has(`schemas:${catalog}`),
+      children: cache.getSchemas(catalog).map((schema) => ({
+        id: `${catalog}.${schema}`,
+        label: schema,
+        loading: loading.has(`tables:${catalog}.${schema}`),
+        children: cache.getTables(catalog, schema).map((table) => ({
+          id: `${catalog}.${schema}.${table}`,
+          label: table,
+          loading: loading.has(`columns:${catalog}.${schema}.${table}`),
+          children: cache.getColumns(catalog, schema, table).map((col) => ({
+            id: `${catalog}.${schema}.${table}.${col.name}`,
+            label: col.name,
+            detail: col.type
+          }))
+        }))
+      }))
+    }));
+  });
+
+  function handleExpand(node: TreeNode) {
+    const parts = node.id.split(".");
+    const cache = workspace.catalog;
+    if (parts.length === 1) {
+      cache.loadSchemas(parts[0]);
+    } else if (parts.length === 2) {
+      cache.loadTables(parts[0], parts[1]);
+    } else if (parts.length === 3) {
+      cache.loadColumns(parts[0], parts[1], parts[2]);
+    }
+  }
+
+  $effect(() => {
+    workspace.catalog.loadCatalogs();
+  });
 </script>
 
 <div class="menu-container">
@@ -92,11 +138,24 @@
     <details open>
       <summary>
         <ChevronRight size={14} class="toggle" />
-        <span class="title" >Browse</span>
+        <span class="title">Browse</span>
         <span class="fill"></span>
         <button class="settings"><Settings size={16} /></button>
       </summary>
-      <div class="details">TODO</div>
+      <div class="details browse-tree">
+        <TreeView nodes={browseNodes} onexpand={handleExpand}>
+          {#snippet icon(node)}
+            {@const depth = node.id.split(".").length}
+            {#if depth === 1}
+              <Database size={16} />
+            {:else if depth === 2}
+              <Box size={16} />
+            {:else if depth === 3}
+              <Table size={16} />
+            {/if}
+          {/snippet}
+        </TreeView>
+      </div>
     </details>
   </div>
 

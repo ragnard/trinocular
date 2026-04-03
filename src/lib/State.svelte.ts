@@ -1,5 +1,6 @@
 import Trino  from "$lib/trino";
 import type { Columns, QueryData, QueryError, QueryResult, QueryStats } from "$lib/trino";
+import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 
 export class Workspace {
   #id: number = 1;
@@ -9,10 +10,12 @@ export class Workspace {
 
   connectionId: string = $state("");
   client: Trino = $state.raw(null!);
+  catalog: CatalogCache = $state.raw(null!);
 
   constructor(connectionId: string) {
     this.connectionId = connectionId;
     this.client = this.#createClient(connectionId);
+    this.catalog = new CatalogCache(this.client);
   }
 
   #createClient(connectionId: string): Trino {
@@ -22,6 +25,7 @@ export class Workspace {
   setConnection(connectionId: string) {
     this.connectionId = connectionId;
     this.client = this.#createClient(connectionId);
+    this.catalog = new CatalogCache(this.client);
   }
 
   async executeQuery(sql: string) {

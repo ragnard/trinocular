@@ -76,7 +76,6 @@
     const position = editor.getPosition();
     if (!position) return;
 
-    const text = model.getValue();
     const cursorOffset = model.getOffsetAt(position);
     const statement = findStatementAtOffset(model, cursorOffset);
 
