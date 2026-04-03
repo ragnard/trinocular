@@ -1,8 +1,9 @@
-import { error, redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
+import { redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 import * as client from "openid-client";
 import type { Session, SessionStore } from "./session";
 
 import { env } from "$env/dynamic/private";
+import { error as error } from "./errors";
 import { logger } from "./logging";
 
 interface OIDCOptions {
@@ -151,7 +152,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const handleCallback = async (session: Session, event: RequestEvent) => {
     const callbackData = await session.get<OIDCCallbackData>("oidc-callback");
     if (!callbackData) {
-      error(500, "callback data missing from session");
+      error(event.locals.logger, 500, "Internal server error", "callback data missing from session");
     }
 
     let tokens;
@@ -175,8 +176,12 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     const sessionData = createSessionData(tokens);
 
     if (!hasValidUserId(sessionData.claims, opts.userIdClaim)) {
-      event.locals.logger.error({ tokens }, "auth failed");
-      error(403, "Authentication failed: ID token missing or invalid required claims");
+      error(
+        event.locals.logger, 403,
+        "Authentication failed: ID token missing or invalid required claims",
+        "auth failed: missing or invalid userId claim",
+        { claims: sessionData.claims }
+      );
     }
 
     session.rotate();
@@ -189,7 +194,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   return async ({ event, resolve }) => {
     const session: Session = event.locals.session;
     if (!session) {
-      error(500, "No session in request event");
+      error(event.locals.logger, 500, "Internal server error", "no session in request event");
     }
 
     // is this a logout request?

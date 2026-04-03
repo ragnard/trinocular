@@ -1,10 +1,11 @@
 ---
 # trinette-vt4p
 title: Proxy error responses may leak internal infrastructure details
-status: todo
+status: completed
 type: bug
+priority: normal
 created_at: 2026-04-03T11:57:00Z
-updated_at: 2026-04-03T11:57:00Z
+updated_at: 2026-04-03T13:11:26Z
 parent: trinette-eqt4
 ---
 
@@ -39,3 +40,5 @@ error(502, "Failed to connect to upstream Trino server");
 
 ## Files
 - `src/routes/api/trino/[id]/[...path]/+server.ts:86,14`
+
+## Summary of Changes\n\nCreated `src/lib/server/errors.ts` with a `serverError(logger, status, clientMessage, logMessage, context?)` wrapper that logs detailed context server-side and returns a safe generic message to the client.\n\nReplaced 3 `error()` calls in the Trino proxy (`+server.ts`) and 1 in OIDC handler (`oidc.ts`) with `serverError()`. Internal hostnames, error messages, and token data are no longer exposed to clients.

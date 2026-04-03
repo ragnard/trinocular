@@ -1,8 +1,7 @@
-import { error } from "@sveltejs/kit";
-
 import type { RequestEvent } from "./$types";
 
 import { config, type Connection } from "$lib/server/config";
+import { error } from "$lib/server/errors";
 import { isTrinoHeader } from "$lib/trino";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
@@ -10,7 +9,7 @@ const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 function getTrinoPath(event: RequestEvent): string {
   const path = "/" + (event.params.path ?? "");
   if (!ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    error(400, `Invalid Trino API path: ${path}`);
+    error(event.locals.logger, 400, "Invalid Trino API path", "invalid trino API path requested", { path });
   }
   return path;
 }
@@ -82,8 +81,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
       body: requestBody,
     });
   } catch (err) {
-    event.locals.logger.error({ id, url, err }, "upstream request failed");
-    error(502, `Failed to connect to upstream Trino server: ${err instanceof Error ? err.message : err}`);
+    error(event.locals.logger, 502, "Failed to connect to upstream Trino server", "upstream request failed", { id, url, err });
   }
 
   if (response.status !== 200) {
@@ -127,7 +125,7 @@ function getServer(event: RequestEvent): [Connection, string] {
   const id = event.params.id;
   const server = config.connections?.[id];
   if (!server) {
-    error(404, `No server with id ${id}`);
+    error(event.locals.logger, 404, "Unknown server", "no server with requested id", { id });
   }
   return [server, id];
 }
