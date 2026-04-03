@@ -1,10 +1,11 @@
 ---
 # trinette-4yfm
 title: No logout or session revocation endpoint
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-03T11:56:25Z
-updated_at: 2026-04-03T11:56:25Z
+updated_at: 2026-04-03T12:56:06Z
 parent: trinette-eqt4
 ---
 
@@ -33,3 +34,5 @@ Add a `/auth/logout` endpoint that:
 ## Files
 - `src/lib/server/oidc.ts` — add logout route handling
 - `src/lib/server/session.ts` — add `destroy()` method to `Session` and `SessionStore`
+
+## Summary of Changes\n\nAdded `POST /auth/logout` endpoint:\n\n- **`src/lib/server/session.ts`**: Added `destroy()` method to `Session`, `SessionStore` interface, and `InMemoryStore`. Session sets a `destroyed` flag so `SessionHandler` clears the cookie after resolve.\n- **`src/lib/server/oidc.ts`**: New logout route that revokes the refresh token at the OIDC provider (best-effort), destroys the server-side session, and redirects to `/`.\n- **`src/lib/server/config.ts`**: Added `logout` path to OIDC paths schema (defaults to `"logout"`).

@@ -1,10 +1,11 @@
 ---
 # trinette-vkgs
 title: Session IDs logged in plaintext
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-03T11:56:53Z
-updated_at: 2026-04-03T11:56:53Z
+updated_at: 2026-04-03T12:46:38Z
 parent: trinette-eqt4
 ---
 
@@ -32,3 +33,5 @@ Either:
 
 ## Files
 - `src/lib/server/oidc.ts:100,104`
+
+## Summary of Changes\n\nTruncated session IDs to first 8 characters in log output at `src/lib/server/oidc.ts:100,104`. Logs remain useful for correlation but are no longer directly exploitable for session hijacking.

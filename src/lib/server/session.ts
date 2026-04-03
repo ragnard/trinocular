@@ -16,6 +16,7 @@ export interface SessionOptions {
 export class Session {
   #store: SessionStore;
   #sessionId: SessionID;
+  #destroyed = false;
 
   constructor(store: SessionStore, sessionId: SessionID) {
     this.#store = store;
@@ -26,8 +27,17 @@ export class Session {
     return this.#sessionId;
   }
 
+  get destroyed(): boolean {
+    return this.#destroyed;
+  }
+
   rotate(): void {
     this.#sessionId = crypto.randomUUID();
+  }
+
+  async destroy(): Promise<void> {
+    await this.#store.destroy(this.#sessionId);
+    this.#destroyed = true;
   }
 
   async set<T>(key: string, value: T): Promise<T> {
@@ -48,9 +58,7 @@ export interface SessionStore {
   set<T>(sessionId: SessionID, key: string, value: T): Promise<T>;
   get<T>(sessionId: SessionID, key: string): Promise<T | undefined>;
   take<T>(sessionId: SessionID, key: string): Promise<T | undefined>;
-
-  // getOrCreate(sessionId: string, fn: () => Map<string, any>): Promise<Session>;
-  // save(sessionId: string, session: Session): Promise<void>;
+  destroy(sessionId: SessionID): Promise<void>;
 }
 
 export class InMemoryStore implements SessionStore {
@@ -90,6 +98,10 @@ export class InMemoryStore implements SessionStore {
       }
     }
   }
+
+  async destroy(sessionId: SessionID): Promise<void> {
+    this.#sessions.delete(sessionId);
+  }
 }
 
 type HandlerFactory = (store: SessionStore, opts: SessionOptions) => Promise<Handle>;
@@ -117,10 +129,15 @@ export const SessionHandler: HandlerFactory = async (store, opts) => {
 
     event.locals.session = session;
 
-    const res = await resolve(event);
-
-    if (session.sessionId !== sessionId) {
-      await cookie.setValue(event, session.sessionId, opts.cookieOptions);
+    let res: Response;
+    try {
+      res = await resolve(event);
+    } finally {
+      if (session.destroyed) {
+        event.cookies.delete(opts.cookieName, { path: opts.cookieOptions.path });
+      } else if (session.sessionId !== sessionId) {
+        await cookie.setValue(event, session.sessionId, opts.cookieOptions);
+      }
     }
 
     return res;

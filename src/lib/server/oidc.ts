@@ -15,6 +15,7 @@ interface OIDCOptions {
     prefix: string;
     callback: string;
     login: string;
+    logout: string;
     error: string;
   };
 }
@@ -97,11 +98,11 @@ class TokenRefreshCoalescer {
     if (!data.refreshToken) {
       throw new Error("Cannot refresh: no refresh token");
     }
-    this.#log.info({ sessionId: session.sessionId }, "refreshing token");
+    this.#log.info({ sessionId: session.sessionId.slice(0, 8) }, "refreshing token");
     const response = await client.refreshTokenGrant(this.#config, data.refreshToken);
     const newData = createSessionData(response, data);
     await session.set("oidc", newData);
-    this.#log.info({ sessionId: session.sessionId }, "token refreshed");
+    this.#log.info({ sessionId: session.sessionId.slice(0, 8) }, "token refreshed");
     return newData;
   }
 }
@@ -120,6 +121,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const coalescer = new TokenRefreshCoalescer(config);
 
   const callbackPath = opts.paths.prefix + "/" + opts.paths.callback;
+  const logoutPath = opts.paths.prefix + "/" + opts.paths.logout;
   const errorPath = opts.paths.prefix + "/" + opts.paths.error;
   const redirectUri = env.ORIGIN + callbackPath;
 
@@ -188,6 +190,20 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     const session: Session = event.locals.session;
     if (!session) {
       error(500, "No session in request event");
+    }
+
+    // is this a logout request?
+    if (event.url.pathname === logoutPath && event.request.method === "POST") {
+      const oidcData = await session.get<OIDCSessionData>("oidc");
+      if (oidcData?.refreshToken) {
+        try {
+          await client.tokenRevocation(config, oidcData.refreshToken);
+        } catch (e) {
+          event.locals.logger.warn({ error: e }, "token revocation failed");
+        }
+      }
+      await session.destroy();
+      redirect(303, "/");
     }
 
     // is this an auth callback request?

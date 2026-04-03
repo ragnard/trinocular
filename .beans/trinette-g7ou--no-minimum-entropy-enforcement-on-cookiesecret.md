@@ -1,10 +1,11 @@
 ---
 # trinette-g7ou
 title: No minimum entropy enforcement on cookieSecret
-status: todo
+status: completed
 type: bug
+priority: normal
 created_at: 2026-04-03T11:56:47Z
-updated_at: 2026-04-03T11:56:47Z
+updated_at: 2026-04-03T12:59:03Z
 parent: trinette-eqt4
 ---
 
@@ -34,3 +35,7 @@ The default config already generates a 32-char random secret (\`crypto.randomUUI
 
 ## Files
 - `src/lib/server/config.ts:26` — SessionSchema
+
+## Summary of Changes
+
+Added `.min(32)` validation to `cookieSecret` in `SessionSchema` (`src/lib/server/config.ts:24`). User-provided secrets shorter than 32 characters now fail config validation with a clear error message. The default config already generates a 32-char random secret, so this only affects explicitly configured values.

@@ -21,7 +21,7 @@ const CookieSchema = z.object({
 
 const SessionSchema = z.object({
   cookieName: z.string().default("trinette-session"),
-  cookieSecret: z.string(),
+  cookieSecret: z.string().min(32, "cookieSecret must be at least 32 characters for adequate security"),
   cookie: CookieSchema.optional(),
 });
 
@@ -41,11 +41,13 @@ const OIDCAuthnSchema = z.object({
     prefix: z.string().default("/auth"),
     callback: z.string().default("callback"),
     login: z.string().default("login"),
+    logout: z.string().default("logout"),
     error: z.string().default("error"),
   }).default({
     prefix: "/auth",
     callback: "callback",
     login: "login",
+    logout: "logout",
     error: "error",
   }),
 });
