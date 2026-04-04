@@ -10,7 +10,6 @@
      justify-content: center;
      width: 2em;
      height: 2em;
-     font-size: 1.0em;
      animation: spin 37s linear infinite;
   }
 

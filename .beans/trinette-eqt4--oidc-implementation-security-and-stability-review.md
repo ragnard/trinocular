@@ -1,11 +1,11 @@
 ---
 # trinette-eqt4
 title: OIDC implementation security and stability review
-status: in-progress
+status: completed
 type: epic
 priority: normal
 created_at: 2026-04-03T11:53:37Z
-updated_at: 2026-04-03T12:15:04Z
+updated_at: 2026-04-03T16:44:54Z
 ---
 
 Thorough review of the OIDC authentication implementation to identify security vulnerabilities and stability issues.
@@ -34,3 +34,16 @@ Thorough review of the OIDC authentication implementation to identify security v
 - Cookie encryption uses AES-GCM with HKDF key derivation and AAD
 - Token refresh coalescing prevents redundant refresh requests
 - SvelteKit's built-in CSRF protection covers proxy endpoints
+
+## Summary of Changes
+
+All identified security and stability issues have been addressed:
+- Session rotation now correctly cleans up old session data (SessionStore redesign)
+- Server-side session expiration with configurable TTL and periodic sweep
+- Proactive token refresh is now awaited instead of fire-and-forget
+- Cookie secret minimum length enforcement
+- Session IDs truncated in logs
+- Proxy error responses sanitized
+- Logout and session revocation implemented
+
+A final security review found no additional exploitable issues. Trino's own auth model covers header-level concerns, and SvelteKit's built-in CSRF protection covers cross-origin attacks.

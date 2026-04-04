@@ -169,10 +169,8 @@
 
 <style>
   .data-viewer {
-    /* padding: 0.75em; */
     overflow: auto;
     height: 100%;
-    font-size: 1em;
     padding-right: 1px;
   }
 
@@ -181,12 +179,11 @@
     table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0;
-    /*border: 1px solid var(--border);*/
   }
 
   th {
     width: 50%;
-    padding: 0.5em 0.5em;
+    padding: 0.25em 0.5em;
     border-bottom: 1px solid var(--border-dark);
     text-align: left;
     background: var(--bg-1);
@@ -209,14 +206,10 @@
   }
 
   td {
-    padding: 0.5em 0.5em;
+    padding: 6px;
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
-
-  /* tr:nth-child(even) {
-    background: var(--bg-2, transparent);
-    } */
 
   .row-header td {
     position: sticky;
@@ -224,7 +217,7 @@
     z-index: 1;
     background: var(--bg-1);
     font-weight: 600;
-    font-size: 0.85em;
+    font-size: var(--font-sm);
     color: var(--text-2);
     border-bottom: 1px solid var(--border-dark);
   }
@@ -260,7 +253,7 @@
   .cell-actions button {
     all: unset;
     cursor: pointer;
-    font-size: 0.75em;
+    font-size: var(--font-sm);
     line-height: 1;
     padding: 3px 3px;
     border-radius: 3px;

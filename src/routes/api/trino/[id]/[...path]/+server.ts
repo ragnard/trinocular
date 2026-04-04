@@ -66,6 +66,13 @@ function updateResponseBody(
 }
 
 async function proxy(event: RequestEvent, target: Connection, id: string) {
+  if (!event.locals.userId) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   event.locals.logger.debug({ id, target }, "proxying request");
 
   const url = toTargetUrl(event, target);

@@ -39,6 +39,8 @@
       --table-header-bg="var(--bg-1)"
       --table-row-num-bg="var(--bg-1)"
       --table-selected-bg="var(--accent-bg)"
+      --table-active-outline="var(--accent)"
+      --table-cell-border="var(--border)"
     >
       {#snippet header(field)}
         <div class="header">
@@ -96,11 +98,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
       text-transform: uppercase;
-      font-size: 0.8em;
+      font-size: var(--font-sm);
     }
 
     .type {
-      font-size: 0.7em;
+      font-size: var(--font-sm);
       color: var(--text-2);
     }
   }

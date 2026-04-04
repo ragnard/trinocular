@@ -126,7 +126,9 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const errorPath = opts.paths.prefix + "/" + opts.paths.error;
   const redirectUri = env.ORIGIN + callbackPath;
 
-  const redirectToProvider = async (session: Session, event: RequestEvent) => {
+  const loginPath = opts.paths.prefix + "/" + opts.paths.login;
+
+  const redirectToProvider = async (session: Session, returnToUrl: string) => {
     const codeVerifier: string = client.randomPKCECodeVerifier();
     const codeChallenge: string = await client.calculatePKCECodeChallenge(codeVerifier);
     const state: string = crypto.randomUUID();
@@ -141,7 +143,6 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       nonce
     };
 
-    const returnToUrl = event.url.pathname + event.url.search;
     const providerUrl = client.buildAuthorizationUrl(config, parameters);
 
     await session.set("oidc-callback", { codeVerifier, returnToUrl, state, nonce });
@@ -216,50 +217,52 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       return await handleCallback(session, event);
     }
 
+    // is this a login request?
+    if (event.url.pathname === loginPath && event.request.method === "GET") {
+      const returnTo = event.url.searchParams.get("returnTo") ?? "/";
+      const returnToUrl = isSafeReturnUrl(returnTo) ? returnTo : "/";
+      return await redirectToProvider(session, returnToUrl);
+    }
+
     // allow unauthenticated access to auth pages (login, error)
     if (event.url.pathname.startsWith(opts.paths.prefix + "/")) {
       return await resolve(event);
     }
 
-    // do we have OIDC session data?
+    // try to resolve valid tokens — if we can't, proceed without setting locals
     let oidcData = await session.get<OIDCSessionData>("oidc");
-    if (!oidcData) {
-      event.locals.logger.info("no oidc data in session, redirecting to provider");
-      return await redirectToProvider(session, event);
-    }
-
-    // if access token is expired, refresh before proceeding
-    if (expired(oidcData.accessTokenExpiresAt)) {
-      if (oidcData.refreshToken) {
+    if (oidcData) {
+      if (expired(oidcData.accessTokenExpiresAt)) {
+        if (oidcData.refreshToken) {
+          try {
+            oidcData = await coalescer.refresh(session, oidcData);
+          } catch (e) {
+            event.locals.logger.warn({ error: e }, "refresh failed");
+            oidcData = undefined;
+          }
+        } else {
+          oidcData = undefined;
+        }
+      } else if (nearExpiry(oidcData.accessTokenExpiresAt, 30) && oidcData.refreshToken) {
         try {
           oidcData = await coalescer.refresh(session, oidcData);
         } catch (e) {
-          event.locals.logger.warn({ error: e }, "refresh failed, redirecting to provider");
-          return await redirectToProvider(session, event);
+          event.locals.logger.warn({ error: e }, "proactive refresh failed");
         }
-      } else {
-        return await redirectToProvider(session, event);
       }
-    } else if (nearExpiry(oidcData.accessTokenExpiresAt, 30) && oidcData.refreshToken) {
-      try {
-        oidcData = await coalescer.refresh(session, oidcData);
-      } catch (e) {
-        event.locals.logger.warn({ error: e }, "proactive refresh failed");
+
+      if (oidcData && !hasValidUserId(oidcData.claims, opts.userIdClaim)) {
+        event.locals.logger.warn("stored claims missing or invalid");
+        oidcData = undefined;
+      }
+
+      if (oidcData) {
+        event.locals.accessToken = oidcData.accessToken;
+        event.locals.claims = oidcData.claims;
+        event.locals.userId = oidcData.claims![opts.userIdClaim] as string;
       }
     }
 
-    // validate required claims on stored session data
-    if (!hasValidUserId(oidcData.claims, opts.userIdClaim)) {
-      event.locals.logger.warn("stored claims missing or invalid, re-authenticating");
-      return await redirectToProvider(session, event);
-    }
-
-    event.locals.accessToken = oidcData.accessToken;
-    event.locals.claims = oidcData.claims;
-    event.locals.userId = oidcData.claims[opts.userIdClaim] as string;
-
-    const res = await resolve(event);
-
-    return res;
+    return await resolve(event);
   };
 };

@@ -1,10 +1,11 @@
 ---
 # trinette-g7hf
 title: Session rotation orphans old session data (memory leak)
-status: todo
+status: completed
 type: bug
+priority: normal
 created_at: 2026-04-03T11:56:40Z
-updated_at: 2026-04-03T11:56:40Z
+updated_at: 2026-04-03T14:54:28Z
 parent: trinette-eqt4
 ---
 
@@ -41,3 +42,7 @@ rotate(): void {
 ## Files
 - `src/lib/server/session.ts:29-31` — `Session.rotate()`
 - `src/lib/server/session.ts:47-54` — `SessionStore` interface (add `delete`)
+
+## Summary of Changes
+
+Resolved by the SessionStore redesign. `Session.rotate()` now records the previous session ID, and `Session.commit()` (called at end of request by `SessionHandler`) saves data under the new ID and destroys the old one. No data is orphaned.

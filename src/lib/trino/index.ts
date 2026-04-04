@@ -1,3 +1,12 @@
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, statusText: string) {
+    super(`HTTP error ${status}: ${statusText}`);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
 const DEFAULT_SERVER = 'http://localhost:8080';
 const DEFAULT_SOURCE = 'trinette';
 const DEFAULT_USER = ''
@@ -251,7 +260,7 @@ class Client {
     const response = await fetch(url, init);
 
     if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+      throw new HttpError(response.status, response.statusText);
     }
 
     const respHeaders = response.headers;

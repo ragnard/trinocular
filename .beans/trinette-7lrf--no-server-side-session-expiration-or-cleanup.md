@@ -1,10 +1,11 @@
 ---
 # trinette-7lrf
 title: No server-side session expiration or cleanup
-status: todo
+status: completed
 type: bug
+priority: normal
 created_at: 2026-04-03T11:56:34Z
-updated_at: 2026-04-03T11:56:34Z
+updated_at: 2026-04-03T14:54:30Z
 parent: trinette-eqt4
 ---
 
@@ -35,3 +36,7 @@ The session cookie also has no `maxAge` by default (`src/hooks.server.ts:49`), m
 - `src/lib/server/session.ts` — `SessionStore` interface, `Session` class
 - `src/hooks.server.ts` — cookie options
 - `src/lib/server/config.ts` — add session lifetime config options
+
+## Summary of Changes
+
+Resolved by the SessionStore redesign. The `SessionStore` interface now accepts a `ttlSeconds` parameter on `save()`. `InMemoryStore` tracks expiry timestamps per session and runs a periodic sweep (default 60s) to evict expired entries. `maxLifetimeSeconds` is configurable in the session config (default 24h), acting as a sliding window renewed on each request.

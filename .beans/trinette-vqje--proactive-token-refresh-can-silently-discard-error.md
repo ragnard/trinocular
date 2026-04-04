@@ -1,10 +1,11 @@
 ---
 # trinette-vqje
 title: Proactive token refresh can silently discard errors without re-auth
-status: todo
+status: completed
 type: bug
+priority: normal
 created_at: 2026-04-03T11:57:09Z
-updated_at: 2026-04-03T11:57:09Z
+updated_at: 2026-04-03T14:54:32Z
 parent: trinette-eqt4
 ---
 
@@ -36,3 +37,7 @@ The subtle issue: if the refresh token was **rotated** by the provider during a 
 
 ## Files
 - `src/lib/server/oidc.ts:221-225`
+
+## Summary of Changes
+
+The proactive token refresh is now awaited instead of fire-and-forget. This ensures the refreshed token is written to the in-memory session cache before `commit()` persists it, eliminating the race where a fire-and-forget refresh could complete after the session was already committed.

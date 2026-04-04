@@ -1,4 +1,4 @@
-import Trino  from "$lib/trino";
+import Trino, { HttpError } from "$lib/trino";
 import type { Columns, QueryData, QueryError, QueryResult, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 
@@ -43,6 +43,10 @@ export class Workspace {
   }
 
   removeQuery(query: Query) {
+    if (query == this.activeQuery) {
+      this.activeQuery = null;
+    }
+
     const index = this.queries.indexOf(query);
     if (index !== -1) {
       this.queries.splice(index, 1);
@@ -107,6 +111,10 @@ export class Query {
         }
       }
     } catch (e) {
+      if (e instanceof HttpError && e.status === 401) {
+        window.location.href = "/auth/login";
+        return;
+      }
       const message = e instanceof Error ? e.message : String(e);
       this.error = {
         message,

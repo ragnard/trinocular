@@ -105,16 +105,20 @@
     color: inherit;
     cursor: pointer;
     font: inherit;
-    font-size: 0.85em;
+    font-size: var(--font);
     text-align: left;
     border-radius: 3px;
     white-space: nowrap;
+
+    :global(svg) {
+      flex-shrink: 0;
+    }
     /* overflow: hidden;
        text-overflow: ellipsis; */
   }
 
   .label:hover {
-    background-color: var(--bg-2);
+    background-color: var(--bg-focus);
   }
 
   .node-label {
@@ -124,7 +128,7 @@
 
   .node-detail {
     color: var(--text-2);
-    font-size: 0.85em;
+    font-size: var(--font-sm);
     margin-left: 0.25em;
     flex-shrink: 0;
   }
