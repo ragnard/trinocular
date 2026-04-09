@@ -3,7 +3,8 @@ import type { Columns, QueryData, QueryError, QueryResult, QueryStats } from "$l
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 
 export class Workspace {
-  #id: number = 1;
+  id: string;
+  #queryId: number = 1;
   queries: Array<Query> = $state([])
 
   activeQuery: Query | null = $state.raw(null);
@@ -12,7 +13,8 @@ export class Workspace {
   client: Trino = $state.raw(null!);
   catalog: CatalogCache = $state.raw(null!);
 
-  constructor(connectionId: string) {
+  constructor(connectionId: string, id: string = "default") {
+    this.id = id;
     this.connectionId = connectionId;
     this.client = this.#createClient(connectionId);
     this.catalog = new CatalogCache(this.client);
@@ -29,7 +31,7 @@ export class Workspace {
   }
 
   async executeQuery(sql: string) {
-    const query = new Query(this.client, this.#id++, sql);
+    const query = new Query(this.client, this.#queryId++, sql);
     this.queries.unshift(query);
     if (this.queries.length > 10) {
       this.queries.pop();

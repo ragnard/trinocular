@@ -10,10 +10,11 @@
     metadataProvider?: MetadataProvider;
     markers?: monaco.editor.IMarkerData[];
     onexecutesql?: (sql: string, startLine: number) => void;
+    onchange?: (content: string) => void;
     theme?: 'light' | 'dark';
   }
 
-  let { value = "", options = {}, metadataProvider, markers = [], onexecutesql, theme = 'light' }: Props = $props();
+  let { value = "", options = {}, metadataProvider, markers = [], onexecutesql, onchange, theme = 'light' }: Props = $props();
 
   let container: HTMLDivElement;
   let editorModel: monaco.editor.ITextModel | undefined = $state();
@@ -116,6 +117,10 @@
       ...options
     });
 
+    const contentListener = model.onDidChangeContent(() => {
+      onchange?.(model.getValue());
+    });
+
     editor.addAction({
       id: "trino.runCurrentStatement",
       label: "Run Current Statement",
@@ -149,6 +154,7 @@
     });
 
     return () => {
+      contentListener.dispose();
       codelensProvider.dispose();
       runCommand.dispose();
       editor.dispose();

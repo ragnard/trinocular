@@ -45,6 +45,7 @@
     <li class="node" class:leaf={isLeaf}>
       {#if isLeaf}
         <button class="label leaf-label" onclick={() => onclick?.(node)}>
+          <ChevronRight size={12} style="visibility: hidden;" />
           {#if icon}{@render icon(node)}{/if}
           <span class="node-label">{node.label}</span>
           {#if node.detail}

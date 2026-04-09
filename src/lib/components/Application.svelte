@@ -67,22 +67,25 @@
     ];
   });
 
-  const query = `SELECT * from tpch.sf1.customer limit 50;
+  const storageKey = `trinette:workspace:${workspace.id}:editor`;
 
-SELECT custkey, count(*) from tpch.sf10.orders group by 1 order by 2 desc limit 50;
+  const initialContent = (() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored !== null) return stored;
+    } catch {}
+    return "";
+  })();
 
-SELECT
-  row(array[row('foo', i), row('bar', i+2)], array[1, 2, 3, 4, 5]) as complex,
-  row(i, i*2, i*4, 'oink') as bleh,
-  array[row('alice', i), row('bob', i*2), row('cecil', i-2)] as bloh
-from table(sequence(1, 100)) as t(i);
-
-select * from iceberg.censys.host_ipv4 limit 50;
-
-select * from iceberg.censys.web limit 50;
-
-
-  `;
+  let saveTimer: ReturnType<typeof setTimeout>;
+  function handleEditorChange(content: string) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(storageKey, content);
+      } catch {}
+    }, 500);
+  }
 
   async function handleExecuteSql(sql: string, startLine: number) {
     console.log("Execute SQL:", sql);
@@ -132,10 +135,11 @@ select * from iceberg.censys.web limit 50;
 {#snippet editor()}
   <div class="editor">
     <Editor
-      value={query}
+      value={initialContent}
       {metadataProvider}
       markers={editorMarkers}
       onexecutesql={handleExecuteSql}
+      onchange={handleEditorChange}
       {theme}
     />
   </div>
