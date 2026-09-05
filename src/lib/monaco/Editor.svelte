@@ -269,23 +269,39 @@
     return match ?? statements[statements.length - 1];
   }
 
+  /**
+   * The result anchored over `range`, if any — the one question every caller
+   * that maps between editor positions and results needs answered.
+   *
+   * `liveOnly` skips results whose tracked range has collapsed: the statement
+   * they belonged to was erased, so they must not be claimed by whatever gets
+   * written at that position next. Only `runRange` passes false, so that a
+   * lens click arriving a render behind the model still replaces the result
+   * its statement owns rather than opening a second one beside it.
+   */
+  function resultAtRange(
+    model: monaco.editor.ITextModel,
+    range: monaco.IRange,
+    liveOnly = true
+  ): Result | undefined {
+    const owner = fileOfModel.get(model);
+    if (!owner) return undefined;
+    for (const result of owner.results) {
+      if (!result.anchorId) continue;
+      const entry = anchors.get(result.anchorId);
+      if (!entry || entry.model !== model) continue;
+      const ranges = entry.collection.getRanges();
+      if (liveOnly && isCollapsed(ranges)) continue;
+      if (ranges.some((r) => rangesOverlap(r, range))) return result;
+    }
+    return undefined;
+  }
+
   function resultForStatement(
     model: monaco.editor.ITextModel,
     statement: Statement
   ): Result | undefined {
-    const owner = fileOfModel.get(model);
-    if (!owner) return undefined;
-    const range = statementRange(model, statement);
-    for (const result of owner.results) {
-      const entry = anchors.get(result.anchorId);
-      if (!entry || entry.model !== model) continue;
-      const ranges = entry.collection.getRanges();
-      // A collapsed range means the tracked statement was erased; its result
-      // must not attach to newly written statements at the same position.
-      if (isCollapsed(ranges)) continue;
-      if (ranges.some((r) => rangesOverlap(r, range))) return result;
-    }
-    return undefined;
+    return resultAtRange(model, statementRange(model, statement));
   }
 
   /**
@@ -301,14 +317,7 @@
       if (detached.length === 0) break;
       // If this statement already has an active, non-collapsed anchor, skip it.
       const range = statementRange(model, statement);
-      const hasActiveResult = owner.results.some((r) => {
-        if (!r.anchorId) return false;
-        const entry = anchors.get(r.anchorId);
-        if (!entry || entry.model !== model) return false;
-        const ranges = entry.collection.getRanges();
-        return !isCollapsed(ranges) && ranges.some((ar) => rangesOverlap(ar, range));
-      });
-      if (hasActiveResult) continue;
+      if (resultAtRange(model, range)) continue;
 
       const sql = statement.text.trim();
       const match = detached.find((r) => r.sql === sql);
@@ -352,15 +361,7 @@
     const owner = fileOfModel.get(model);
     if (!owner) return;
     // Re-running a statement replaces its previous result.
-    let replacesId: string | undefined;
-    for (const result of owner.results) {
-      const entry = anchors.get(result.anchorId);
-      if (!entry || entry.model !== model) continue;
-      if (entry.collection.getRanges().some((r) => rangesOverlap(r, range))) {
-        replacesId = result.id;
-        break;
-      }
-    }
+    const replacesId = resultAtRange(model, range, false)?.id;
     const anchorId = crypto.randomUUID();
     anchors.set(anchorId, {
       collection: editor.createDecorationsCollection([{ range, options: {} }]),
@@ -418,9 +419,8 @@
         let changed = dead.length > 0;
         if (changed) {
           for (const result of dead) {
-            const entry = anchors.get(result.anchorId);
-            entry?.collection.clear();
-            if (entry) anchors.delete(result.anchorId);
+            anchors.get(result.anchorId)?.collection.clear();
+            anchors.delete(result.anchorId);
           }
           owner.detachResults(dead);
         }
