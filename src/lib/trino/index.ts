@@ -412,6 +412,8 @@ export class Iterator<T> implements AsyncIterableIterator<T> {
  * Iterator for the query result data.
  */
 export class QueryIterator implements AsyncIterableIterator<QueryResult> {
+  private finished = false;
+
   constructor(
     private readonly client: Client,
     private queryResult: QueryResult
@@ -430,27 +432,23 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
   }
 
   /**
-   * Retrieves the next QueryResult available. If there's no nextUri then there are no more
-   * results and the query reached a completion state, successful or failure.
-   * @returns The next set of results.
+   * Retrieves the next QueryResult available. The final chunk (no nextUri) is
+   * yielded once with done: false — for-await ignores value when done is true,
+   * so returning it as done would drop the entire result for queries that
+   * finish in a single batch.
    */
   async next(): Promise<IteratorResult<QueryResult>> {
-    if (!this.hasNext()) {
-      return Promise.resolve({ value: this.queryResult, done: true });
+    if (this.hasNext()) {
+      this.queryResult = await this.client.request<QueryResult>({
+        url: this.queryResult.nextUri,
+      });
+      return { value: this.queryResult, done: false };
     }
-
-    this.queryResult = await this.client.request<QueryResult>({
-      url: this.queryResult.nextUri,
-    });
-
-    // const data = this.queryResult.data ?? [];
-    // if (data.length === 0) {
-    //   if (this.hasNext()) {
-    //     return this.next();
-    //   }
-    // }
-
-    return Promise.resolve({ value: this.queryResult, done: false });
+    if (this.finished) {
+      return { value: this.queryResult, done: true };
+    }
+    this.finished = true;
+    return { value: this.queryResult, done: false };
   }
 }
 

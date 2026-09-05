@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Workspace } from "$lib/State.svelte";
+  import type { Result as ResultModel, Workspace } from "$lib/State.svelte";
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
   import { onMount } from "svelte";
@@ -7,7 +7,7 @@
   import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
 
   import { SplitPane } from "./split-pane";
-  import Query from "./Query.svelte";
+  import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
   import Menu from "./Menu.svelte";
@@ -50,47 +50,34 @@
     metadataProvider.delegate = new TrinoMetadataProvider(workspace.catalog);
   });
 
-  let statementStartLine = $state(1);
+  let activeResult: ResultModel | null = $derived(workspace.activeFile?.activeResult ?? null);
 
   const editorMarkers: monaco.editor.IMarkerData[] = $derived.by(() => {
-    const error = workspace.activeQuery?.error;
-    if (!error?.errorLocation) return [];
+    const result = activeResult;
+    if (!result?.error?.errorLocation) return [];
     return [
       {
-        startLineNumber: error.errorLocation.lineNumber + statementStartLine - 1,
-        startColumn: error.errorLocation.columnNumber,
-        endLineNumber: error.errorLocation.lineNumber + statementStartLine - 1,
-        endColumn: error.errorLocation.columnNumber + 1,
-        message: error.message,
+        startLineNumber: result.error.errorLocation.lineNumber + result.startLine - 1,
+        startColumn: result.error.errorLocation.columnNumber,
+        endLineNumber: result.error.errorLocation.lineNumber + result.startLine - 1,
+        endColumn: result.error.errorLocation.columnNumber + 1,
+        message: result.error.message,
         severity: monaco.MarkerSeverity.Error
       }
     ];
   });
-
-  const storageKey = `trinette:workspace:${workspace.id}:editor`;
-
-  const initialContent = (() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored !== null) return stored;
-    } catch {}
-    return "";
-  })();
-
   let saveTimer: ReturnType<typeof setTimeout>;
-  function handleEditorChange(content: string) {
+  function handleEditorChange() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      try {
-        localStorage.setItem(storageKey, content);
-      } catch {}
-    }, 500);
+    saveTimer = setTimeout(() => workspace.persist(), 500);
   }
 
-  async function handleExecuteSql(sql: string, startLine: number) {
-    console.log("Execute SQL:", sql);
-    statementStartLine = startLine;
-    workspace.executeQuery(sql);
+  function handleExecuteSql(sql: string, startLine: number, anchorId: string, replacesId?: string) {
+    workspace.run(sql, startLine, anchorId, replacesId);
+  }
+
+  function handleShowResult(result: ResultModel) {
+    workspace.showResult(result);
   }
 
   const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -135,10 +122,12 @@
 {#snippet editor()}
   <div class="editor">
     <Editor
-      value={initialContent}
+      file={workspace.activeFile}
+      files={workspace.files}
       {metadataProvider}
       markers={editorMarkers}
       onexecutesql={handleExecuteSql}
+      onshowresult={handleShowResult}
       onchange={handleEditorChange}
       {theme}
     />
@@ -147,11 +136,11 @@
 
 {#snippet results()}
   <div class="results">
-    {#if workspace.activeQuery}
-      <Query query={workspace.activeQuery} bind:selection />
+    {#if activeResult}
+      <Result result={activeResult} bind:selection />
     {:else}
       <div class="no-query">
-        <span>Nothing here yet...</span>
+        <span>Run a statement to see results here</span>
       </div>
     {/if}
   </div>

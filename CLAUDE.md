@@ -23,17 +23,19 @@ No test framework is configured.
 ### Client-side data flow
 
 ```
-Monaco Editor → handleExecuteSql() → Trino client (fetch) → server proxy → Trino cluster
+Monaco Editor → runStatement() → Trino client (fetch, one per run) → server proxy → Trino cluster
                                           ↓
-                              Query (State.svelte.ts)
+                              Result (State.svelte.ts)
                               accumulates chunks into $state.raw fields
                                           ↓
-                              Query.svelte → Table.svelte (virtual scroll)
+                              Result.svelte → Table.svelte (virtual scroll)
                                                 ↓ (Selection: rect + lazy getData)
                                           DataViewer.svelte (debounced)
 ```
 
-- **State management**: Svelte 5 runes on class instances (`Workspace`, `Query` in `src/lib/State.svelte.ts`). `Query` fields use `$state.raw()` to avoid deep proxy overhead on large datasets.
+- **State management**: Svelte 5 runes on class instances (`Workspace`, `SqlFile`, `Result` in `src/lib/State.svelte.ts`). `Result` fields use `$state.raw()` to avoid deep proxy overhead on large datasets.
+- **Files**: `Workspace` holds `SqlFile`s (name + content), persisted to `localStorage` via `src/lib/fileStorage.ts` (swap that module for a server store later). Results are session-only.
+- **Result ↔ statement association**: results belong strictly to Monaco range anchors (`Result.anchorId`), not SQL strings. Multiple identical statements in a file remain completely independent. Erasing a statement detaches its result (invisible, zeroed anchor); cutting and pasting the statement back allows the unanchored result to be claimed 1:1 by exact text match at the new position. Re-running replaces only that specific statement's result. The `☰ Results` code lens points the results pane at a statement's result.
 - **Trino client** (`src/lib/trino/index.ts`): Async iterator over paginated Trino REST API responses. Manages Trino session headers (catalog, schema, prepared statements) across requests. One `Client` instance per query — not safe for concurrent use due to mutable header state.
 - **Type conversion** (`src/lib/trino/table.ts`): Converts Trino `TypeSignature` → table `Field`/`DataType`. Handles nested rows, arrays, and binary (base64→Uint8Array).
 - **Table** (`src/lib/components/table/`): Virtual-scrolling table rendering only visible rows. Selection is a lightweight rect; `getData()` lazily extracts and converts cell values.

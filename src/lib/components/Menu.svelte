@@ -1,21 +1,17 @@
 <script lang="ts">
-  import type { Query, Workspace } from "$lib/State.svelte";
+  import type { Workspace } from "$lib/State.svelte";
   import type { TreeNode } from "./TreeView.svelte";
   import {
     Box,
     ChevronRight,
-    CircleAlert,
-    CircleStop,
     CircleX,
     Database,
-    Download,
-    LoaderCircle,
-    Save,
+    Pencil,
+    Plus,
     Settings,
     Table,
-
+    Trash2,
     Type
-
   } from "@lucide/svelte";
   import Logo from "./Logo.svelte";
   import TreeView from "./TreeView.svelte";
@@ -101,51 +97,41 @@
     <details open>
       <summary>
         <ChevronRight size={14} class="toggle" />
-        <span class="title">History</span>
+        <span class="title">Files</span>
         <span class="fill"></span>
-        <button class="settings"><Settings size={16} /></button>
+        <button class="settings" title="New file" onclick={(e) => { e.stopPropagation(); workspace.createFile(); }}>
+          <Plus size={16} />
+        </button>
       </summary>
       <div class="details query-list">
-        {#if workspace.queries.length}
-          {#each workspace.queries as query (query.id)}
-            <div class="query" role="button" tabindex="0"
-              onclick={() => workspace.setActiveQuery(query)}
-              onkeydown={(e) => { if (e.key === "Enter") workspace.setActiveQuery(query); }}
-            >
-              <span class="query-label">
-                Query #{query.id}
-                {#if query.rowCount}
-                  <span class="stats">({query.rowCount} rows in {query.elapsedTimeSeconds}s)</span>
-                {/if}
-              </span>
-              <span class="query-icons">
-                {#if query?.running}
-                  <button class="action" onclick={(e) => { e.stopPropagation(); query.cancel(); }}>
-                    <CircleStop size={16} />
-                  </button>
-                {:else}
-                  <!-- <button class="action" title="Download to file" onclick={(e) => { }}>
-                       <Download size={16} />
-                       </button> -->
-                  <button class="action" title="Save to workspace" onclick={(e) => { e.stopPropagation(); }}>
-                    <Save size={16} />
-                  </button>
-                  <button class="action" title="Remove" onclick={(e) => { e.stopPropagation(); workspace.removeQuery(query); }}>
-                    <CircleX size={16} />
-                  </button>
-                {/if}
-                {#if query?.running}
-                  <LoaderCircle size={16} class="spin" />
-                {/if}
-                {#if query?.error}
-                  <CircleAlert size={16} />
-                {/if}
-              </span>
-            </div>
-          {/each}
-        {:else}
-          <span class="placeholder">No queries yet</span>
-        {/if}
+        {#each workspace.files as file (file.id)}
+          <div
+            class="query"
+            class:active={file === workspace.activeFile}
+            role="button"
+            tabindex="0"
+            onclick={() => workspace.openFile(file)}
+            onkeydown={(e) => { if (e.key === "Enter") workspace.openFile(file); }}
+          >
+            <span class="query-label">{file.name}</span>
+            <span class="query-icons">
+              <button
+                class="action"
+                title="Rename"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  const name = prompt("File name", file.name);
+                  if (name) workspace.renameFile(file, name);
+                }}
+              >
+                <Pencil size={16} />
+              </button>
+              <button class="action" title="Delete" onclick={(e) => { e.stopPropagation(); workspace.deleteFile(file); }}>
+                <Trash2 size={16} />
+              </button>
+            </span>
+          </div>
+        {/each}
       </div>
     </details>
 
@@ -265,12 +251,6 @@
 
     }
 
-    .placeholder {
-      /* font-size: var(--font-sm); */
-      color: var(--text-2);
-      padding: 0.25em 0.25em;
-    }
-
     .details {
       margin-bottom: 2em;
       margin-left: 0.25em;
@@ -313,7 +293,8 @@
       text-align: left;
       cursor: pointer;
 
-      &:hover {
+      &:hover,
+      &.active {
         background-color: var(--bg-focus);
         border-radius: 4px;
       }
@@ -321,11 +302,6 @@
       .query-label {
         flex: 1;
         min-width: 0;
-      }
-
-      .stats {
-        font-size: var(--font-sm);
-        color: var(--text-2);
       }
 
       .query-icons {

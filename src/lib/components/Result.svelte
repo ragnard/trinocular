@@ -1,16 +1,16 @@
 <script lang="ts">
-  import type { Query } from "$lib/State.svelte";
+  import type { Result as ResultModel } from "$lib/State.svelte";
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import Spinner from "./Spinner.svelte";
 
   interface Props {
-    query: Query;
+    result: ResultModel;
     selection?: Selection | null;
   }
 
-  let { query, selection = $bindable(null) }: Props = $props();
+  let { result, selection = $bindable(null) }: Props = $props();
 
   const toSchema = (columns?: Columns): Schema | undefined => {
     if (!columns) return undefined;
@@ -19,20 +19,20 @@
     };
   };
 
-  let schema = $derived(toSchema(query.schema));
+  let schema = $derived(toSchema(result.schema));
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 </script>
 
-<div class="query">
-  {#if query.error}
+<div class="result">
+  {#if result.error}
     <div class="message error">
-      <span>Error: {query.error.message} ({query.error.errorCode})</span>
+      <span>Error: {result.error.message} ({result.error.errorCode})</span>
     </div>
   {:else if schema}
     <Table
       {schema}
-      rows={query.data}
+      rows={result.data}
       {valueConverter}
       bind:selection
       --table-bg="var(--bg-0)"
@@ -50,11 +50,11 @@
       {/snippet}
       {#snippet empty()}
         <div class="message">
-          {#if query?.queryState == "FINISHED"}
+          {#if result?.queryState == "FINISHED"}
             <div>No data</div>
           {:else}
             <Spinner />
-            <div style="text-transform: capitalize;">{query?.queryState?.toLowerCase()} ...</div>
+            <div style="text-transform: capitalize;">{result?.queryState?.toLowerCase()} ...</div>
           {/if}
         </div>
       {/snippet}
@@ -68,7 +68,7 @@
 </div>
 
 <style>
-  .query {
+  .result {
     width: 100%;
     height: 100%;
     overflow: hidden;

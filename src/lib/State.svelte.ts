@@ -1,70 +1,28 @@
 import Trino, { HttpError } from "$lib/trino";
-import type { Columns, QueryData, QueryError, QueryResult, QueryStats } from "$lib/trino";
+import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
+import { loadFiles, saveFiles, legacyEditorContent, clearLegacyEditor } from "$lib/fileStorage";
 
-export class Workspace {
-  id: string;
-  #queryId: number = 1;
-  queries: Array<Query> = $state([])
-
-  activeQuery: Query | null = $state.raw(null);
-
-  connectionId: string = $state("");
-  client: Trino = $state.raw(null!);
-  catalog: CatalogCache = $state.raw(null!);
-
-  constructor(connectionId: string, id: string = "default") {
-    this.id = id;
-    this.connectionId = connectionId;
-    this.client = this.#createClient(connectionId);
-    this.catalog = new CatalogCache(this.client);
-  }
-
-  #createClient(connectionId: string): Trino {
-    return Trino.create({ server: `/api/trino/${connectionId}` });
-  }
-
-  setConnection(connectionId: string) {
-    this.connectionId = connectionId;
-    this.client = this.#createClient(connectionId);
-    this.catalog = new CatalogCache(this.client);
-  }
-
-  async executeQuery(sql: string) {
-    const query = new Query(this.client, this.#queryId++, sql);
-    this.queries.unshift(query);
-    if (this.queries.length > 10) {
-      this.queries.pop();
-    }
-    this.activeQuery = query;
-    await query.execute();
-  }
-
-  setActiveQuery(query: Query) {
-    this.activeQuery = query;
-  }
-
-  removeQuery(query: Query) {
-    if (query == this.activeQuery) {
-      this.activeQuery = null;
-    }
-
-    const index = this.queries.indexOf(query);
-    if (index !== -1) {
-      this.queries.splice(index, 1);
-    }
-  }
-
-}
+const MAX_RESULTS_PER_FILE = 10;
 
 export type State = "PLANNING" | "QUEUED" | "RUNNING" | "FINISHED" | "FAILED";
 
 const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
 
-export class Query {
-  client: Trino
-  id: number;
+/**
+ * The result of one statement execution. The editor plants a hidden Monaco
+ * decoration on the statement's range at run time (`anchorId`); decorations
+ * track the text through edits, so the result stays associated with "its"
+ * statement even after the statement is changed. Re-running replaces the
+ * result (see `SqlFile.addResult`).
+ */
+export class Result {
+  client: Trino;
+  id: string;
+  anchorId: string;
+  startLine: number;
   sql: string;
+  startedAt: number = Date.now();
 
   queryId?: string = $state();
   infoUri?: string = $state();
@@ -74,10 +32,12 @@ export class Query {
   warnings?: string[] = $state.raw();
   error?: QueryError = $state.raw();
 
-  constructor(client: Trino, id: number, sql: string = "") {
+  constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
     this.client = client;
-    this.id = id;
+    this.id = crypto.randomUUID();
     this.sql = sql;
+    this.startLine = startLine;
+    this.anchorId = anchorId;
   }
 
   queryState?: State = $derived(this.stats?.state as State);
@@ -95,11 +55,9 @@ export class Query {
     }
   });
 
-
   async execute() {
     try {
       const res = await this.client.query(this.sql);
-
       for await (const chunk of res) {
         if (chunk.id) this.queryId = chunk.id;
         if (chunk.infoUri) this.infoUri = chunk.infoUri;
@@ -133,5 +91,159 @@ export class Query {
       await this.client.cancel(this.queryId)
     }
   }
+}
 
+export class SqlFile {
+  id: string;
+  name: string = $state("");
+  content: string = $state("");
+  results: Result[] = $state([]);
+  activeResult: Result | null = $state.raw(null);
+
+  constructor(id: string, name: string, content: string = "") {
+    this.id = id;
+    this.name = name;
+    this.content = content;
+  }
+
+  addResult(result: Result, replacesId?: string) {
+    if (replacesId) {
+      const index = this.results.findIndex((r) => r.id === replacesId);
+      if (index !== -1) this.results.splice(index, 1);
+    }
+    this.results.unshift(result);
+    while (this.results.length > MAX_RESULTS_PER_FILE) {
+      // Prefer evicting detached results (statement erased, not pasted back)
+      // over live ones. `results` is newest-first, so scan from the tail.
+      let oldestDetached = -1;
+      for (let i = this.results.length - 1; i > 0; i--) {
+        if (!this.results[i].anchorId) {
+          oldestDetached = i;
+          break;
+        }
+      }
+      this.results.splice(oldestDetached !== -1 ? oldestDetached : this.results.length - 1, 1);
+    }
+    this.activeResult = result;
+  }
+
+  /**
+   * Detaches results whose statement was erased (the editor reports their
+   * tracked range collapsed): the result becomes invisible and cannot match
+   * by anchor, but stays in the list so pasting the same statement text back
+   * can reattach it (exact text match in the editor). Detached results carry
+   * an empty `anchorId` and are evicted first.
+   */
+  detachResults(dead: Result[]) {
+    for (const result of dead) {
+      result.anchorId = "";
+    }
+    if (this.activeResult && dead.some((r) => r.id === this.activeResult?.id)) {
+      this.activeResult = null;
+    }
+  }
+
+  showResult(result: Result) {
+    if (this.results.includes(result)) {
+      this.activeResult = result;
+    }
+  }
+}
+
+export class Workspace {
+  id: string;
+  connectionId: string = $state("");
+  client: Trino = $state.raw(null!);
+  catalog: CatalogCache = $state.raw(null!);
+
+  files: SqlFile[] = $state([]);
+  activeFile: SqlFile | null = $state.raw(null);
+
+  constructor(connectionId: string, id: string = "default") {
+    this.id = id;
+    this.connectionId = connectionId;
+    this.client = this.#createClient(connectionId);
+    this.catalog = new CatalogCache(this.client);
+    this.#restoreFiles();
+  }
+
+  #createClient(connectionId: string): Trino {
+    return Trino.create({ server: `/api/trino/${connectionId}` });
+  }
+
+  setConnection(connectionId: string) {
+    this.connectionId = connectionId;
+    this.client = this.#createClient(connectionId);
+    this.catalog = new CatalogCache(this.client);
+  }
+
+  #restoreFiles() {
+    const stored = loadFiles(this.id);
+    if (stored.files.length > 0) {
+      this.files = stored.files.map((f) => new SqlFile(f.id, f.name, f.content));
+    } else {
+      const legacy = legacyEditorContent(this.id);
+      this.files = [new SqlFile(crypto.randomUUID(), "scratch.sql", legacy ?? "")];
+      if (legacy != null) clearLegacyEditor(this.id);
+    }
+    this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
+  }
+
+  persist() {
+    saveFiles(
+      this.id,
+      this.files.map((f) => ({ id: f.id, name: f.name, content: f.content })),
+      this.activeFile?.id
+    );
+  }
+
+  openFile(file: SqlFile) {
+    this.activeFile = file;
+  }
+
+  createFile() {
+    const names = new Set(this.files.map((f) => f.name));
+    let n = 1;
+    while (names.has(`query-${n}.sql`)) n++;
+    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`);
+    this.files.unshift(file);
+    this.activeFile = file;
+    this.persist();
+    return file;
+  }
+
+  deleteFile(file: SqlFile) {
+    const index = this.files.indexOf(file);
+    if (index === -1) return;
+    this.files.splice(index, 1);
+    if (this.files.length === 0) {
+      this.files.push(new SqlFile(crypto.randomUUID(), "scratch.sql"));
+    }
+    if (this.activeFile === file) {
+      this.activeFile = this.files[0];
+    }
+    this.persist();
+  }
+
+  renameFile(file: SqlFile, name: string) {
+    const trimmed = name.trim();
+    if (trimmed) {
+      file.name = trimmed;
+      this.persist();
+    }
+  }
+
+  run(sql: string, startLine: number, anchorId: string, replacesId?: string) {
+    const file = this.activeFile;
+    if (!file) return;
+    // One client per run: the Trino client keeps mutable session header state
+    // (prepared statements), which is not safe to share across concurrent runs.
+    const result = new Result(this.#createClient(this.connectionId), sql, startLine, anchorId);
+    file.addResult(result, replacesId);
+    void result.execute();
+  }
+
+  showResult(result: Result) {
+    this.activeFile?.showResult(result);
+  }
 }
