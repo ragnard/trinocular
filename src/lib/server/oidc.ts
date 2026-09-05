@@ -167,7 +167,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       event.locals.logger.error({ error: e }, "OIDC token exchange failed");
       await session.take("oidc-callback");
       await session.set("auth-error", {
-        requestId: event.locals.logger.bindings().requestId,
+        requestId: event.locals.requestId,
       });
       redirect(303, errorPath);
     }

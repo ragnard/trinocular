@@ -9,6 +9,7 @@ declare global {
     // interface Error {}
     interface Locals {
       logger: Logger;
+      requestId: string;
       session: Session;
       userId: string;
       accessToken: string;

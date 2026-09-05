@@ -20,6 +20,10 @@ export const LoggingHandler: () => Promise<Handle> = async () => {
     const requestIdLogger: Logger = logger.child({ request_id: requestId });
 
     event.locals.logger = requestIdLogger;
+    // Carried explicitly rather than read back out of the logger's bindings:
+    // the binding is named request_id, and anything user-facing that quotes an
+    // id (the auth error page) needs the same value the logs are tagged with.
+    event.locals.requestId = requestId;
 
     try {
       const res = await resolve(event);
