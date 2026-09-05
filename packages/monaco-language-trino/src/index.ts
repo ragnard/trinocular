@@ -1,6 +1,6 @@
 // Core setup
 export { register } from './editor/register';
-export type { TrinoLanguageOptions } from './editor/register';
+export type { TrinoLanguageOptions, TrinoLanguageRegistration } from './editor/register';
 
 // Individual providers (for advanced/custom usage)
 export { TrinoCompletionProvider } from './editor/trinoCompletionProvider';

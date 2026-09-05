@@ -14,10 +14,20 @@ export interface TrinoLanguageOptions {
   metadataProvider?: MetadataProvider;
 }
 
+export interface TrinoLanguageRegistration extends monacoApi.IDisposable {
+  /**
+   * The parse service backing the registered providers. Exposed so a host
+   * that also needs statement boundaries (to place code lenses, say) can share
+   * this cache instead of re-lexing the document itself — the cache is keyed
+   * on the model version, so a host asking for the same version pays nothing.
+   */
+  readonly parseService: DocumentParseService;
+}
+
 export function register(
   monaco: Pick<typeof monacoApi, 'languages' | 'editor'>,
   options?: TrinoLanguageOptions,
-): monacoApi.IDisposable {
+): TrinoLanguageRegistration {
   const languageId = options?.languageId ?? DEFAULT_LANGUAGE_ID;
   const disposables: monacoApi.IDisposable[] = [];
   const parseService = new DocumentParseService();
@@ -84,6 +94,7 @@ export function register(
   );
 
   return {
+    parseService,
     dispose() {
       for (const d of diagnosticsMap.values()) {
         d.dispose();

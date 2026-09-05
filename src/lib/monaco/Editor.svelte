@@ -2,10 +2,28 @@
   import { onMount, untrack } from "svelte";
   import * as monaco from "monaco-editor";
   import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-  import { register, splitStatements, type MetadataProvider } from "monaco-language-trino";
+  import {
+    register,
+    type DocumentParseService,
+    type MetadataProvider,
+    type StatementSlice
+  } from "monaco-language-trino";
   import type { Result, SqlFile } from "$lib/State.svelte";
 
-  type Statement = ReturnType<typeof splitStatements>[number];
+  type Statement = StatementSlice;
+
+  /**
+   * Statement boundaries come from the language registration's parse service
+   * rather than a bare `splitStatements` call: the service memoises on the
+   * model version, so the lens provider, the run commands and the change
+   * listener all share one lex per edit instead of re-lexing the whole
+   * document each time (the lens provider alone runs on every render).
+   */
+  let parseService: DocumentParseService | undefined;
+
+  function statementsOf(model: monaco.editor.ITextModel): Statement[] {
+    return parseService?.getStatements(model) ?? [];
+  }
 
   interface Props {
     file?: SqlFile | null;
@@ -244,7 +262,7 @@
   }
 
   function statementAtOffset(model: monaco.editor.ITextModel, offset: number): Statement | null {
-    const statements = splitStatements(model.getValue());
+    const statements = statementsOf(model);
     if (statements.length === 0) return null;
     const match = statements.find((s) => offset >= s.startOffset && offset <= s.endOffset);
     // Cursor is past all statements (trailing whitespace after last ";") — use last statement
@@ -279,7 +297,7 @@
     const detached = owner.results.filter((r) => !r.anchorId);
     if (detached.length === 0 || !editor) return false;
     let reattached = false;
-    for (const statement of splitStatements(model.getValue())) {
+    for (const statement of statementsOf(model)) {
       if (detached.length === 0) break;
       // If this statement already has an active, non-collapsed anchor, skip it.
       const range = statementRange(model, statement);
@@ -368,7 +386,8 @@
   }
 
   onMount(() => {
-    const disposable = register(monaco, { metadataProvider });
+    const registration = register(monaco, { metadataProvider });
+    parseService = registration.parseService;
     editor = monaco.editor.create(container, {
       language: "trino-sql",
       theme: theme === "dark" ? "trino-dark" : "trino-light",
@@ -426,7 +445,7 @@
     monaco.editor.registerCommand("trino.runStatement", (_accessor, sql: string, codeStart: number, startLine: number) => {
       const model = editor?.getModel();
       if (!model) return;
-      const statements = splitStatements(model.getValue());
+      const statements = statementsOf(model);
       // Prefer the statement now living at the lens' code start; fall back to
       // exact text (the lens may be a render behind the model).
       const statement =
@@ -452,7 +471,7 @@
         const owner = fileOfModel.get(model);
         if (!owner) return { lenses: [] };
         const lenses: monaco.languages.CodeLens[] = [];
-        for (const statement of splitStatements(model.getValue())) {
+        for (const statement of statementsOf(model)) {
           const range = statementRange(model, statement);
           const line = range.startLineNumber;
           lenses.push({
@@ -504,7 +523,8 @@
       editor?.dispose();
       editorReady = false;
       editorModel = undefined;
-      disposable.dispose();
+      parseService = undefined;
+      registration.dispose();
     };
   });
 </script>
