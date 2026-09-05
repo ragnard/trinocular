@@ -484,22 +484,33 @@
       toolbarModel = model;
     }
 
-    const statements = statementsOf(model);
+    // One strip per *line*, not per statement. Monaco places a content widget
+    // from its anchor alone and does no collision avoidance, so two statements
+    // sharing a start line ("select 1; select 2;") would stack their strips
+    // exactly on top of each other. The first statement on a line owns it,
+    // which is what monaco's own lens controller does with duplicate lines —
+    // and what this editor showed before, since that dedupe used to happen
+    // inside monaco. Ctrl+Enter still runs whichever statement holds the caret.
+    const slots: { statement: Statement; line: number }[] = [];
+    for (const statement of statementsOf(model)) {
+      const line = statementRange(model, statement).startLineNumber;
+      if (slots.length > 0 && slots[slots.length - 1].line === line) continue;
+      slots.push({ statement, line });
+    }
     const { fontSize, height } = toolbarMetrics();
 
     editor.changeViewZones((accessor) => {
-      while (toolbars.length > statements.length) {
+      while (toolbars.length > slots.length) {
         const toolbar = toolbars.pop()!;
         accessor.removeZone(toolbar.zoneId);
         editor?.removeContentWidget(toolbar.widget);
       }
-      while (toolbars.length < statements.length) {
+      while (toolbars.length < slots.length) {
         toolbars.push(createToolbar(toolbars.length, accessor));
       }
 
-      statements.forEach((statement, i) => {
+      slots.forEach(({ statement, line }, i) => {
         const toolbar = toolbars[i];
-        const line = statementRange(model, statement).startLineNumber;
         toolbar.statement = statement;
         toolbar.line = line;
         toolbar.node.style.fontSize = `${fontSize}px`;
