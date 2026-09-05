@@ -66,60 +66,20 @@
     { collection: monaco.editor.IEditorDecorationsCollection; model: monaco.editor.ITextModel }
   >();
 
-  const lensEmitter = new monaco.Emitter<monaco.languages.CodeLensProvider>();
-  let codelensProvider: monaco.languages.CodeLensProvider | undefined;
-
-  /**
-   * Monaco renders code lens titles through TWO chained adaptive debounces
-   * (provide >=250ms, then resolve >=250ms — see CodeLensController) and has
-   * no public flush; result-state changes would lag half a second or more
-   * behind execution. Both schedulers are reachable through the controller
-   * (`_localToDispose._toDispose` for provide, `_resolveCodeLensesScheduler`
-   * for resolve); scheduling them with delay 0 makes the update run in the
-   * next macrotask. The resolve pass must run *after* the provide pass has
-   * swapped its data, so it is flushed again shortly afterwards. Guarded so
-   * a monaco upgrade simply falls back to the normal debounce.
-   */
-  function flushCodeLenses(): void {
-    const controller = editor?.getContribution("css.editor.codeLens") as
-      | {
-          _localToDispose?: { _toDispose?: Set<unknown> };
-          _resolveCodeLensesScheduler?: { schedule?: (delay?: number) => void };
-        }
-      | undefined;
-    if (!controller) return;
-    const store = controller._localToDispose?._toDispose;
-    if (store) {
-      for (const disposable of store) {
-        const scheduler = disposable as { schedule?: (delay?: number) => void };
-        if (typeof scheduler.schedule === "function") {
-          scheduler.schedule(0);
-        }
-      }
-    }
-    const resolve = controller._resolveCodeLensesScheduler;
-    if (resolve && typeof resolve.schedule === "function") {
-      resolve.schedule(0);
-      window.setTimeout(() => resolve.schedule?.(0), 80);
-      window.setTimeout(() => resolve.schedule?.(0), 400);
-    }
-  }
-
-  function fireLensUpdate(): void {
-    if (codelensProvider) lensEmitter.fire(codelensProvider);
-    flushCodeLenses();
-  }
-
-  // Re-render code lenses when a result changes state (running -> done/error).
+  // Redraw the statement toolbars when a result changes state (running ->
+  // finished / failed / cancelling). Reading the fields is what subscribes
+  // this effect to them; the redraw itself is a textContent write.
   $effect(() => {
-    const results = file?.results ?? [];
-    for (const result of results) {
+    void editorModel; // re-sync after a file switch swaps the model
+    for (const result of file?.results ?? []) {
       void result.queryState;
       void result.rowCount;
       void result.error;
       void result.cancelling;
+      void result.canceled;
+      void result.elapsedTimeSeconds;
     }
-    fireLensUpdate();
+    syncToolbars();
   });
 
   $effect(() => {
@@ -257,10 +217,6 @@
     };
   }
 
-  function statementCodeStart(model: monaco.editor.ITextModel, statement: Statement): number {
-    return statement.startOffset + codeStartIndex(statement.text);
-  }
-
   function statementAtOffset(model: monaco.editor.ITextModel, offset: number): Statement | null {
     const statements = statementsOf(model);
     if (statements.length === 0) return null;
@@ -336,15 +292,9 @@
     return reattached;
   }
 
-  // Marker codicon: it renders as an empty, hidden span and exists only so the
-  // style block can select the lenses that should be red. Monaco escapes lens
-  // titles and gives lenses no class of their own, so this is the only handle
-  // CSS gets. The Trino error name lives in the lens tooltip instead.
-  const FAILED = "$(trinette-failed)";
-
   function resultTitle(result: Result): string {
-    if (result.canceled) return `${FAILED}☰ Results · canceled`;
-    if (result.error) return `${FAILED}☰ Results · error`;
+    if (result.canceled) return "☰ Results · canceled";
+    if (result.error) return "☰ Results · error";
     if (result.cancelling) return "⏳ Cancelling…";
     if (result.running) return "⏳ Running…";
     return `☰ Results · ${result.rowCount ?? 0} rows · ${result.elapsedTimeSeconds}s`;
@@ -354,6 +304,219 @@
     if (!result.error) return undefined;
     const { errorName, message } = result.error;
     return errorName ? `${errorName}: ${message}` : message;
+  }
+
+  /* --- Statement toolbars -------------------------------------------------
+   *
+   * The "▶ Run / status / ✕ Cancel" strip above each statement is drawn by
+   * this component rather than by a CodeLensProvider: a view zone opens the
+   * band and a content widget fills it, which is how monaco builds its own
+   * code lenses (contrib/codelens/browser/codelensWidget). What it leaves out
+   * is the two chained RunOnceSchedulers monaco puts in front of provide and
+   * resolve — a query's state reached a lens a third of a second late, and
+   * monaco exposes no way to flush them, so this used to be done by reaching
+   * into the controller's private schedulers.
+   *
+   * Owning the DOM means a state change is a textContent write, and the failed
+   * state can take a real CSS class instead of being smuggled through a marker
+   * codicon in an escaped title string.
+   */
+
+  interface StatementToolbar {
+    node: HTMLElement;
+    run: HTMLElement;
+    status: HTMLElement;
+    cancel: HTMLElement;
+    widget: monaco.editor.IContentWidget;
+    /** The zone object monaco holds: mutate it, then ask for a re-layout. */
+    zone: monaco.editor.IViewZone;
+    zoneId: string;
+    line: number;
+    statement: Statement | null;
+    result: Result | null;
+  }
+
+  let toolbars: StatementToolbar[] = [];
+  let toolbarModel: monaco.editor.ITextModel | undefined;
+
+  /** Band height and text size, mirroring monaco's own code lens sizing. */
+  function toolbarMetrics(): { fontSize: number; height: number } {
+    const opts = monaco.editor.EditorOption;
+    const editorFontSize = editor?.getOption(opts.fontSize) ?? 14;
+    const lineHeight = editor?.getOption(opts.lineHeight) ?? 19;
+    const fontSize =
+      editor?.getOption(opts.codeLensFontSize) || Math.floor(editorFontSize * 0.9);
+    const factor = Math.max(1.3, lineHeight / editorFontSize);
+    return { fontSize, height: Math.floor(fontSize * factor) };
+  }
+
+  function createToolbar(
+    index: number,
+    accessor: monaco.editor.IViewZoneChangeAccessor
+  ): StatementToolbar {
+    const node = document.createElement("div");
+    node.className = "trinette-statement-toolbar";
+
+    const button = (className: string, text?: string) => {
+      const el = document.createElement("a");
+      el.className = `action ${className}`;
+      el.setAttribute("role", "button");
+      if (text) el.textContent = text;
+      return el;
+    };
+
+    const run = button("run", "▶ Run");
+    const status = button("status");
+    const cancel = button("cancel", "✕ Cancel");
+    cancel.title = "Cancel this query";
+    node.append(run, status, cancel);
+
+    const zone: monaco.editor.IViewZone = {
+      afterLineNumber: 0,
+      afterColumn: Number.MAX_SAFE_INTEGER,
+      heightInPx: toolbarMetrics().height,
+      domNode: document.createElement("div"),
+      suppressMouseDown: true
+    };
+
+    const toolbar: StatementToolbar = {
+      node,
+      run,
+      status,
+      cancel,
+      widget: null!,
+      zone,
+      zoneId: "",
+      line: 1,
+      statement: null,
+      result: null
+    };
+
+    // The handlers read the toolbar's *current* statement and result, so a
+    // strip that has been reused for a different statement still acts on the
+    // right one.
+    run.addEventListener("click", () => {
+      const model = editor?.getModel();
+      if (!model || !toolbar.statement) return;
+      const range = statementRange(model, toolbar.statement);
+      runRange(model, range, toolbar.statement.text.trim(), range.startLineNumber);
+    });
+    status.addEventListener("click", () => {
+      if (toolbar.result) onshowresult?.(toolbar.result);
+    });
+    cancel.addEventListener("click", () => {
+      if (toolbar.result) oncancelresult?.(toolbar.result);
+    });
+
+    toolbar.widget = {
+      // Monaco keys its widget map by this id, so it has to be unique —
+      // reusing one for another strip would silently replace the first.
+      getId: () => `trinette.statement-toolbar.${index}`,
+      getDomNode: () => node,
+      // Keeps the caret put when a button is pressed. Only mousedown is
+      // suppressed, so the click still lands on the button.
+      suppressMouseDown: true,
+      allowEditorOverflow: false,
+      getPosition: () => {
+        const model = editor?.getModel();
+        if (!model || toolbar.line > model.getLineCount()) return null;
+        return {
+          position: {
+            lineNumber: toolbar.line,
+            column: model.getLineFirstNonWhitespaceColumn(toolbar.line) || 1
+          },
+          preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE]
+        };
+      }
+    };
+
+    toolbar.zoneId = accessor.addZone(zone);
+    editor?.addContentWidget(toolbar.widget);
+    return toolbar;
+  }
+
+  function removeAllToolbars(): void {
+    if (toolbars.length === 0) return;
+    const dead = toolbars;
+    toolbars = [];
+    editor?.changeViewZones((accessor) => {
+      for (const toolbar of dead) {
+        accessor.removeZone(toolbar.zoneId);
+        editor?.removeContentWidget(toolbar.widget);
+      }
+    });
+  }
+
+  function renderToolbar(toolbar: StatementToolbar, result: Result | undefined): void {
+    toolbar.result = result ?? null;
+    toolbar.status.hidden = !result;
+    toolbar.cancel.hidden = true;
+    if (!result) return;
+
+    toolbar.status.textContent = resultTitle(result);
+    // A cancelled query is reported by Trino as a USER_CANCELED failure, so
+    // both it and a genuine error land on the same styling.
+    toolbar.status.classList.toggle("failed", Boolean(result.error));
+    const tooltip = resultTooltip(result);
+    if (tooltip) toolbar.status.title = tooltip;
+    else toolbar.status.removeAttribute("title");
+    // Only offered while the cancel can still do something — once asked for,
+    // the status beside it reads "Cancelling…" instead.
+    toolbar.cancel.hidden = !(result.running && !result.cancelling);
+  }
+
+  /**
+   * Brings the toolbars in line with the document: one per statement, in
+   * document order, each showing its statement's result. Strips are reused,
+   * so the common case (a result changing state) touches only text and
+   * classes; only the ones falling off the end are torn down.
+   */
+  function syncToolbars(): void {
+    if (!editor) return;
+    const model = editor.getModel();
+    if (!model) {
+      removeAllToolbars();
+      toolbarModel = undefined;
+      return;
+    }
+    if (model !== toolbarModel) {
+      removeAllToolbars();
+      toolbarModel = model;
+    }
+
+    const statements = statementsOf(model);
+    const { fontSize, height } = toolbarMetrics();
+
+    editor.changeViewZones((accessor) => {
+      while (toolbars.length > statements.length) {
+        const toolbar = toolbars.pop()!;
+        accessor.removeZone(toolbar.zoneId);
+        editor?.removeContentWidget(toolbar.widget);
+      }
+      while (toolbars.length < statements.length) {
+        toolbars.push(createToolbar(toolbars.length, accessor));
+      }
+
+      statements.forEach((statement, i) => {
+        const toolbar = toolbars[i];
+        const line = statementRange(model, statement).startLineNumber;
+        toolbar.statement = statement;
+        toolbar.line = line;
+        toolbar.node.style.fontSize = `${fontSize}px`;
+        toolbar.node.style.lineHeight = `${height}px`;
+        // Monaco reads the zone object it was handed, so mutate it in place.
+        if (toolbar.zone.afterLineNumber !== line - 1 || toolbar.zone.heightInPx !== height) {
+          toolbar.zone.afterLineNumber = line - 1;
+          toolbar.zone.heightInPx = height;
+          accessor.layoutZone(toolbar.zoneId);
+        }
+        renderToolbar(toolbar, resultForStatement(model, statement));
+      });
+    });
+
+    // A content widget only refreshes the model position it caches when it is
+    // laid out, so this is required after any edit, not just a line change.
+    for (const toolbar of toolbars) editor.layoutContentWidget(toolbar.widget);
   }
 
   function runRange(model: monaco.editor.ITextModel, range: monaco.IRange, sql: string, startLine: number) {
@@ -398,7 +561,6 @@
       minimap: { enabled: false },
       wordBasedSuggestions: "off",
       "semanticHighlighting.enabled": true,
-      codeLens: true,
       scrollBeyondLastLine: false,
       automaticLayout: true,
       ...options
@@ -416,8 +578,7 @@
           const entry = anchors.get(result.anchorId);
           return entry?.model === model && isCollapsed(entry.collection.getRanges());
         });
-        let changed = dead.length > 0;
-        if (changed) {
+        if (dead.length > 0) {
           for (const result of dead) {
             anchors.get(result.anchorId)?.collection.clear();
             anchors.delete(result.anchorId);
@@ -425,10 +586,11 @@
           owner.detachResults(dead);
         }
         // A pasted-back statement has the same text it was erased with —
-        // reattach its result. Exact text match, same rule the lens uses.
-        if (reattachDetached(model, owner)) changed = true;
-        if (changed) fireLensUpdate();
+        // reattach its result. Exact text match, same rule the toolbar uses.
+        reattachDetached(model, owner);
       }
+      // Every edit can move a statement, so the strips are always re-synced.
+      syncToolbars();
       onchange?.(model.getValue());
     });
 
@@ -442,84 +604,18 @@
       }
     });
 
-    monaco.editor.registerCommand("trino.runStatement", (_accessor, sql: string, codeStart: number, startLine: number) => {
-      const model = editor?.getModel();
-      if (!model) return;
-      const statements = statementsOf(model);
-      // Prefer the statement now living at the lens' code start; fall back to
-      // exact text (the lens may be a render behind the model).
-      const statement =
-        statements.find((s) => statementCodeStart(model, s) === codeStart) ??
-        statements.find((s) => s.text.trim() === sql);
-      const range = statement ? statementRange(model, statement) : new monaco.Range(startLine, 1, startLine, 1);
-      runRange(model, range, statement ? statement.text.trim() : sql, range.startLineNumber);
-    });
-
-    monaco.editor.registerCommand("trino.showResult", (_accessor, resultId: string) => {
-      const result = file?.results.find((r) => r.id === resultId);
-      if (result) onshowresult?.(result);
-    });
-
-    monaco.editor.registerCommand("trino.cancelResult", (_accessor, resultId: string) => {
-      const result = file?.results.find((r) => r.id === resultId);
-      if (result) oncancelresult?.(result);
-    });
-
-    const provider: monaco.languages.CodeLensProvider = {
-      onDidChange: lensEmitter.event,
-      provideCodeLenses(model) {
-        const owner = fileOfModel.get(model);
-        if (!owner) return { lenses: [] };
-        const lenses: monaco.languages.CodeLens[] = [];
-        for (const statement of statementsOf(model)) {
-          const range = statementRange(model, statement);
-          const line = range.startLineNumber;
-          lenses.push({
-            range: new monaco.Range(line, 1, line, 1),
-            command: {
-              id: "trino.runStatement",
-              title: "▶ Run",
-              arguments: [statement.text.trim(), statementCodeStart(model, statement), line]
-            }
-          });
-          const result = resultForStatement(model, statement);
-          if (result) {
-            lenses.push({
-              range: new monaco.Range(line, 1, line, 1),
-              command: {
-                id: "trino.showResult",
-                title: resultTitle(result),
-                tooltip: resultTooltip(result),
-                arguments: [result.id]
-              }
-            });
-            // Only offered while the cancel can still do something — once
-            // asked for, the lens above reads "Cancelling…" instead.
-            if (result.running && !result.cancelling) {
-              lenses.push({
-                range: new monaco.Range(line, 1, line, 1),
-                command: {
-                  id: "trino.cancelResult",
-                  title: "✕ Cancel",
-                  tooltip: "Cancel this query",
-                  arguments: [result.id]
-                }
-              });
-            }
-          }
-        }
-        return { lenses };
-      }
-    };
-    codelensProvider = provider;
-    const providerDisposable = monaco.languages.registerCodeLensProvider("trino-sql", provider);
+    // The band's height is derived from the font metrics, so a font or
+    // line-height change has to redraw it.
+    const configListener = editor.onDidChangeConfiguration(() => syncToolbars());
 
     editorReady = true;
+    syncToolbars();
 
     return () => {
       contentListener.dispose();
-      providerDisposable.dispose();
-      codelensProvider = undefined;
+      configListener.dispose();
+      removeAllToolbars();
+      toolbarModel = undefined;
       editor?.dispose();
       editorReady = false;
       editorModel = undefined;
@@ -537,16 +633,37 @@
     height: 100%;
   }
 
-  /* Failed and cancelled result lenses, keyed off the marker codicon their
-     title carries (see `FAILED` above). Monaco's `:hover` rule still wins over
-     this, because that one is !important. */
-  :global(.monaco-editor .codelens-decoration > a:has(.codicon-trinette-failed)) {
-    color: var(--error);
+  /* The statement toolbar is built in script and mounted by monaco outside
+     this component's markup, so its rules have to be global. */
+  /* Laid out with inline flow and sibling margins rather than flex: monaco
+     sets `display` inline on a content widget's own node, which would beat a
+     stylesheet rule short of !important. Its own code lens spaces its links
+     the same way. */
+  :global(.monaco-editor .trinette-statement-toolbar) {
+    white-space: nowrap;
+    color: var(--text-2);
   }
 
-  /* The marker is a selector hook, not something to look at. Monaco only draws
-     a codicon that some registry gave a glyph to, so this is belt and braces. */
-  :global(.monaco-editor .codelens-decoration .codicon-trinette-failed) {
+  :global(.monaco-editor .trinette-statement-toolbar [hidden]) {
     display: none;
+  }
+
+  :global(.monaco-editor .trinette-statement-toolbar .action) {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  :global(.monaco-editor .trinette-statement-toolbar .action + .action) {
+    margin-left: 1em;
+  }
+
+  :global(.monaco-editor .trinette-statement-toolbar .action:hover) {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* Failed and cancelled results — Trino reports a cancel as a failure. */
+  :global(.monaco-editor .trinette-statement-toolbar .status.failed) {
+    color: var(--error);
   }
 </style>
