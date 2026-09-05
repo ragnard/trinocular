@@ -56,10 +56,43 @@ interface StatementCache {
   errors: CollectedError[];
 }
 
+/**
+ * Upper bound on statement-level cache entries.
+ *
+ * The cache is keyed by statement text so that editing one statement does not
+ * reparse the others, but that means every intermediate text a statement takes
+ * on while it is being typed becomes an entry of its own, each retaining a full
+ * parse tree and token array. Unbounded, a long editing session holds on to
+ * thousands of dead parses. Entries are evicted least-recently-used.
+ */
+const MAX_CACHED_STATEMENTS = 200;
+
 export class DocumentParseService {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly statementCache = new Map<string, StatementCache>();
   private readonly disposeListeners = new Map<string, monaco.IDisposable>();
+
+  /**
+   * Reads a statement-level entry, marking it most recently used. A Map
+   * iterates in insertion order, so re-inserting on read is enough to make
+   * `keys().next()` the least-recently-used entry.
+   */
+  private takeCachedStatement(text: string): StatementCache | undefined {
+    const entry = this.statementCache.get(text);
+    if (!entry) return undefined;
+    this.statementCache.delete(text);
+    this.statementCache.set(text, entry);
+    return entry;
+  }
+
+  private putCachedStatement(text: string, entry: StatementCache): void {
+    this.statementCache.set(text, entry);
+    while (this.statementCache.size > MAX_CACHED_STATEMENTS) {
+      const oldest = this.statementCache.keys().next();
+      if (oldest.done) break;
+      this.statementCache.delete(oldest.value);
+    }
+  }
 
   /**
    * Get lightweight statement slices (no full parse).
@@ -111,7 +144,7 @@ export class DocumentParseService {
       }
 
       // Check statement-level cache by text
-      const stmtCached = this.statementCache.get(stmt.text);
+      const stmtCached = this.takeCachedStatement(stmt.text);
       if (stmtCached) {
         results.push({
           slice: stmt,
@@ -146,7 +179,7 @@ export class DocumentParseService {
       };
 
       // Cache by statement text
-      this.statementCache.set(stmt.text, stmtResult);
+      this.putCachedStatement(stmt.text, stmtResult);
 
       results.push({
         slice: stmt,
