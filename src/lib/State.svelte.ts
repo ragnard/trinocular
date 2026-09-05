@@ -34,6 +34,8 @@ export class Result {
   /** A cancel has been asked for; the query has not settled on it yet. */
   cancelRequested: boolean = $state(false);
   #cancelSent = false;
+  /** The result was dropped from its file; nothing will read further chunks. */
+  #discarded = false;
 
   constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
     this.client = client;
@@ -70,6 +72,9 @@ export class Result {
           // A cancel asked for before Trino handed back an id is sent now.
           if (this.cancelRequested) void this.#sendCancel();
         }
+        // Checked after the id is picked up, so a discard that lands before
+        // Trino answers the POST still gets its DELETE sent above.
+        if (this.#discarded) break;
         if (chunk.infoUri) this.infoUri = chunk.infoUri;
         if (chunk.columns) this.columns = chunk.columns;
         if (chunk.stats) this.stats = chunk.stats;
@@ -110,6 +115,22 @@ export class Result {
     await this.#sendCancel();
   }
 
+  /**
+   * Drops a result that has become unreachable — re-run, evicted past
+   * MAX_RESULTS_PER_FILE, or its file deleted. Without this the polling loop
+   * keeps walking `nextUri` for a result nobody can see or cancel, and the
+   * query stays alive on the cluster. Unlike `cancel()` there is no UI left to
+   * settle, so the loop stops rather than waiting for the USER_CANCELED chunk.
+   */
+  discard() {
+    if (this.#discarded) return;
+    this.#discarded = true;
+    if (this.completed) return;
+    // Also makes `execute` fire the DELETE if the query id has not arrived yet.
+    this.cancelRequested = true;
+    void this.#sendCancel();
+  }
+
   async #sendCancel() {
     if (this.#cancelSent || !this.queryId) return;
     this.#cancelSent = true;
@@ -142,7 +163,9 @@ export class SqlFile {
   addResult(result: Result, replacesId?: string) {
     if (replacesId) {
       const index = this.results.findIndex((r) => r.id === replacesId);
-      if (index !== -1) this.results.splice(index, 1);
+      // Re-running a statement abandons the previous run: stop it rather than
+      // leaving it polling for a result the pane can no longer reach.
+      if (index !== -1) this.results.splice(index, 1)[0].discard();
     }
     this.results.unshift(result);
     while (this.results.length > MAX_RESULTS_PER_FILE) {
@@ -155,7 +178,8 @@ export class SqlFile {
           break;
         }
       }
-      this.results.splice(oldestDetached !== -1 ? oldestDetached : this.results.length - 1, 1);
+      const at = oldestDetached !== -1 ? oldestDetached : this.results.length - 1;
+      this.results.splice(at, 1)[0].discard();
     }
     this.activeResult = result;
   }
@@ -249,6 +273,8 @@ export class Workspace {
     const index = this.files.indexOf(file);
     if (index === -1) return;
     this.files.splice(index, 1);
+    // The file's results go with it — stop anything still running.
+    for (const result of file.results) result.discard();
     if (this.files.length === 0) {
       this.files.push(new SqlFile(crypto.randomUUID(), "scratch.sql"));
     }
