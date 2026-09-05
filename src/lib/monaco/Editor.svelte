@@ -309,16 +309,24 @@
     return reattached;
   }
 
-  /**
-   * The `$(error)` codicon is both the icon and the only handle CSS gets on a
-   * failed lens: monaco renders titles as escaped text with no per-lens class,
-   * so the red styling hangs off `a:has(.codicon-error)` in the style block.
-   */
+  // Marker codicon: it renders as an empty, hidden span and exists only so the
+  // style block can select the lenses that should be red. Monaco escapes lens
+  // titles and gives lenses no class of their own, so this is the only handle
+  // CSS gets. The Trino error name lives in the lens tooltip instead.
+  const FAILED = "$(trinette-failed)";
+
   function resultTitle(result: Result): string {
-    if (result.error) return `☰ Results · $(error) ${result.error.errorName || "error"}`;
+    if (result.canceled) return `${FAILED}☰ Results · canceled`;
+    if (result.error) return `${FAILED}☰ Results · error`;
     if (result.cancelling) return "⏳ Cancelling…";
     if (result.running) return "⏳ Running…";
     return `☰ Results · ${result.rowCount ?? 0} rows · ${result.elapsedTimeSeconds}s`;
+  }
+
+  function resultTooltip(result: Result): string | undefined {
+    if (!result.error) return undefined;
+    const { errorName, message } = result.error;
+    return errorName ? `${errorName}: ${message}` : message;
   }
 
   function runRange(model: monaco.editor.ITextModel, range: monaco.IRange, sql: string, startLine: number) {
@@ -462,7 +470,7 @@
               command: {
                 id: "trino.showResult",
                 title: resultTitle(result),
-                tooltip: result.error?.message,
+                tooltip: resultTooltip(result),
                 arguments: [result.id]
               }
             });
@@ -509,12 +517,16 @@
     height: 100%;
   }
 
-  /* Monaco builds code lens titles as escaped text plus codicon spans and
-     gives individual lenses no class of their own, so the `$(error)` icon in
-     the title is the only hook available for colouring a failed result's lens.
-     Monaco's own rule paints the icon in `currentColor`, so it follows along,
-     and the `:hover` rule still wins because it is !important. */
-  :global(.monaco-editor .codelens-decoration > a:has(.codicon-error)) {
+  /* Failed and cancelled result lenses, keyed off the marker codicon their
+     title carries (see `FAILED` above). Monaco's `:hover` rule still wins over
+     this, because that one is !important. */
+  :global(.monaco-editor .codelens-decoration > a:has(.codicon-trinette-failed)) {
     color: var(--error);
+  }
+
+  /* The marker is a selector hook, not something to look at. Monaco only draws
+     a codicon that some registry gave a glyph to, so this is belt and braces. */
+  :global(.monaco-editor .codelens-decoration .codicon-trinette-failed) {
+    display: none;
   }
 </style>

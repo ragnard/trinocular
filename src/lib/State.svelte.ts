@@ -49,6 +49,8 @@ export class Result {
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data?.length);
   cancelling?: boolean = $derived(this.cancelRequested && !this.completed);
+  /** Trino reports a killed query as a USER_CANCELED failure. */
+  canceled?: boolean = $derived(this.error?.errorName === "USER_CANCELED");
 
   elapsedTimeSeconds = $derived.by(() => {
     const elapsedMillis = this.stats?.elapsedTimeMillis;
