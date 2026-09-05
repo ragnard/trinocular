@@ -31,6 +31,9 @@ export class Result {
   stats?: QueryStats = $state.raw();
   warnings?: string[] = $state.raw();
   error?: QueryError = $state.raw();
+  /** A cancel has been asked for; the query has not settled on it yet. */
+  cancelRequested: boolean = $state(false);
+  #cancelSent = false;
 
   constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
     this.client = client;
@@ -45,6 +48,7 @@ export class Result {
   completed?: boolean = $derived(this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState)))
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data?.length);
+  cancelling?: boolean = $derived(this.cancelRequested && !this.completed);
 
   elapsedTimeSeconds = $derived.by(() => {
     const elapsedMillis = this.stats?.elapsedTimeMillis;
@@ -59,7 +63,11 @@ export class Result {
     try {
       const res = await this.client.query(this.sql);
       for await (const chunk of res) {
-        if (chunk.id) this.queryId = chunk.id;
+        if (chunk.id) {
+          this.queryId = chunk.id;
+          // A cancel asked for before Trino handed back an id is sent now.
+          if (this.cancelRequested) void this.#sendCancel();
+        }
         if (chunk.infoUri) this.infoUri = chunk.infoUri;
         if (chunk.columns) this.columns = chunk.columns;
         if (chunk.stats) this.stats = chunk.stats;
@@ -86,9 +94,32 @@ export class Result {
     }
   }
 
+  /**
+   * Asks Trino to kill the query. The click can land while the POST that
+   * creates the query is still in flight, so the request is remembered and
+   * `execute` sends it as soon as a query id arrives. The polling loop is
+   * deliberately left running: Trino reports the cancellation as a
+   * USER_CANCELED error on a following chunk, which settles the result
+   * through the same path as any other failure.
+   */
   async cancel() {
-    if (this.queryId) {
-      await this.client.cancel(this.queryId)
+    if (this.completed || this.cancelRequested) return;
+    this.cancelRequested = true;
+    await this.#sendCancel();
+  }
+
+  async #sendCancel() {
+    if (this.#cancelSent || !this.queryId) return;
+    this.#cancelSent = true;
+    try {
+      await this.client.cancel(this.queryId);
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 401) {
+        window.location.href = "/auth/login";
+        return;
+      }
+      // The query may have finished between the click and the request; the
+      // polling loop reports whatever state it actually settled in.
     }
   }
 }
@@ -241,6 +272,10 @@ export class Workspace {
     const result = new Result(this.#createClient(this.connectionId), sql, startLine, anchorId);
     file.addResult(result, replacesId);
     void result.execute();
+  }
+
+  cancel(result: Result) {
+    void result.cancel();
   }
 
   showResult(result: Result) {

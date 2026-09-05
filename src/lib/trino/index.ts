@@ -303,6 +303,11 @@ class Client {
 
     this.headers = cleanHeaders(this.headers);
 
+    // Cancelling a query answers 204 with an empty body — json() throws on it.
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
     return response.json() as Promise<T>;
   }
 

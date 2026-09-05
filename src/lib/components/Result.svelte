@@ -90,6 +90,10 @@
     }
   }
 
+  .message.error {
+    color: var(--error);
+  }
+
   .header {
     padding: 0.4em 0.2em;
     flex-direction: column;

@@ -15,6 +15,7 @@
     markers?: monaco.editor.IMarkerData[];
     onexecutesql?: (sql: string, startLine: number, anchorId: string, replacesResultId?: string) => void;
     onshowresult?: (result: Result) => void;
+    oncancelresult?: (result: Result) => void;
     onchange?: (content: string) => void;
     theme?: "light" | "dark";
   }
@@ -27,6 +28,7 @@
     markers = [],
     onexecutesql,
     onshowresult,
+    oncancelresult,
     onchange,
     theme = "light"
   }: Props = $props();
@@ -97,6 +99,7 @@
       void result.queryState;
       void result.rowCount;
       void result.error;
+      void result.cancelling;
     }
     fireLensUpdate();
   });
@@ -306,8 +309,14 @@
     return reattached;
   }
 
+  /**
+   * The `$(error)` codicon is both the icon and the only handle CSS gets on a
+   * failed lens: monaco renders titles as escaped text with no per-lens class,
+   * so the red styling hangs off `a:has(.codicon-error)` in the style block.
+   */
   function resultTitle(result: Result): string {
-    if (result.error) return "☰ Results · error";
+    if (result.error) return `☰ Results · $(error) ${result.error.errorName || "error"}`;
+    if (result.cancelling) return "⏳ Cancelling…";
     if (result.running) return "⏳ Running…";
     return `☰ Results · ${result.rowCount ?? 0} rows · ${result.elapsedTimeSeconds}s`;
   }
@@ -424,6 +433,11 @@
       if (result) onshowresult?.(result);
     });
 
+    monaco.editor.registerCommand("trino.cancelResult", (_accessor, resultId: string) => {
+      const result = file?.results.find((r) => r.id === resultId);
+      if (result) oncancelresult?.(result);
+    });
+
     const provider: monaco.languages.CodeLensProvider = {
       onDidChange: lensEmitter.event,
       provideCodeLenses(model) {
@@ -445,8 +459,26 @@
           if (result) {
             lenses.push({
               range: new monaco.Range(line, 1, line, 1),
-              command: { id: "trino.showResult", title: resultTitle(result), arguments: [result.id] }
+              command: {
+                id: "trino.showResult",
+                title: resultTitle(result),
+                tooltip: result.error?.message,
+                arguments: [result.id]
+              }
             });
+            // Only offered while the cancel can still do something — once
+            // asked for, the lens above reads "Cancelling…" instead.
+            if (result.running && !result.cancelling) {
+              lenses.push({
+                range: new monaco.Range(line, 1, line, 1),
+                command: {
+                  id: "trino.cancelResult",
+                  title: "✕ Cancel",
+                  tooltip: "Cancel this query",
+                  arguments: [result.id]
+                }
+              });
+            }
           }
         }
         return { lenses };
@@ -475,5 +507,14 @@
   .editor-container {
     width: 100%;
     height: 100%;
+  }
+
+  /* Monaco builds code lens titles as escaped text plus codicon spans and
+     gives individual lenses no class of their own, so the `$(error)` icon in
+     the title is the only hook available for colouring a failed result's lens.
+     Monaco's own rule paints the icon in `currentColor`, so it follows along,
+     and the `:hover` rule still wins because it is !important. */
+  :global(.monaco-editor .codelens-decoration > a:has(.codicon-error)) {
+    color: var(--error);
   }
 </style>

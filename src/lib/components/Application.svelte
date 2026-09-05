@@ -80,6 +80,10 @@
     workspace.showResult(result);
   }
 
+  function handleCancelResult(result: ResultModel) {
+    workspace.cancel(result);
+  }
+
   const decoder = new TextDecoder("utf-8", { fatal: true });
 
   function decodeBinary(bytes: Uint8Array): string {
@@ -128,6 +132,7 @@
       markers={editorMarkers}
       onexecutesql={handleExecuteSql}
       onshowresult={handleShowResult}
+      oncancelresult={handleCancelResult}
       onchange={handleEditorChange}
       {theme}
     />
