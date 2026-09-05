@@ -6,17 +6,24 @@ import { isTrinoHeader } from "$lib/trino";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
-function getTrinoPath(event: RequestEvent): string {
-  const path = "/" + (event.params.path ?? "");
-  if (!ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    error(event.locals.logger, 400, "Invalid Trino API path", "invalid trino API path requested", { path });
-  }
-  return path;
-}
-
+/**
+ * Resolves the upstream URL, enforcing the path allowlist.
+ *
+ * The allowlist has to be checked against `url.pathname` — that is, *after* the
+ * URL parser has resolved dot segments — rather than against the raw parameter.
+ * SvelteKit decodes a route param once, so a double-encoded traversal
+ * (`%252e%252e`) arrives here as the literal text "%2e%2e": it slips past a
+ * `startsWith("/v1/statement")` check on the raw string and is only then
+ * normalised away by `new URL`, which would reach any upstream endpoint with
+ * the caller's bearer token attached.
+ */
 function toTargetUrl(event: RequestEvent, target: Connection): string {
-  const path = getTrinoPath(event);
-  const url = new URL(path, target.uri);
+  const url = new URL("/" + (event.params.path ?? ""), target.uri);
+  if (!ALLOWED_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+    error(event.locals.logger, 400, "Invalid Trino API path", "invalid trino API path requested", {
+      path: url.pathname
+    });
+  }
   // Preserve query string from the original request
   url.search = event.url.search;
   return url.toString();
