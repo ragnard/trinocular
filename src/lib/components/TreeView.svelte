@@ -66,6 +66,7 @@
             {expanded}
             {ontoggle}
             {onclick}
+            {icon}
             depth={depth + 1}
           />
         {/if}
