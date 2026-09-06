@@ -152,13 +152,20 @@ export class SqlFile {
   id: string;
   name: string = $state("");
   content: string = $state("");
+  /**
+   * The Trino cluster this document's statements run against. A property of
+   * the document, not of the app: switching connection re-points one file,
+   * and every other open file keeps meaning what it meant.
+   */
+  connectionId: string = $state("");
   results: Result[] = $state([]);
   activeResult: Result | null = $state.raw(null);
 
-  constructor(id: string, name: string, content: string = "") {
+  constructor(id: string, name: string, content: string = "", connectionId: string = "") {
     this.id = id;
     this.name = name;
     this.content = content;
+    this.connectionId = connectionId;
   }
 
   addResult(result: Result, replacesId?: string) {
@@ -202,38 +209,80 @@ export class SqlFile {
 
 export class Workspace {
   id: string;
-  connectionId: string = $state("");
-  client: Trino = $state.raw(null!);
-  catalog: CatalogCache = $state.raw(null!);
+  /** Connection for new files, and for files stored before this was per-file. */
+  defaultConnectionId: string;
+  #connectionIds: Set<string>;
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
 
-  constructor(connectionId: string, id: string = "default") {
+  /**
+   * One catalog cache per connection, kept for the session. Browsing a Trino
+   * cluster is slow enough that dropping the tree when the active file changes
+   * -- which the old global connection did on every switch -- is felt.
+   */
+  #catalogs = new Map<string, CatalogCache>();
+
+  /**
+   * `connections` is the configured set, newest config wins: a file restored
+   * from storage that names a connection the config no longer declares is
+   * pointed back at the default, since its own id can only ever 404 at the
+   * proxy.
+   */
+  constructor(connections: { id: string }[], id: string = "default") {
     this.id = id;
-    this.connectionId = connectionId;
-    this.client = this.#createClient(connectionId);
-    this.catalog = new CatalogCache(this.client);
+    this.#connectionIds = new Set(connections.map((c) => c.id));
+    this.defaultConnectionId = connections[0]?.id ?? "";
     this.#restoreFiles();
+  }
+
+  #knownConnection(connectionId: string | undefined): string {
+    return connectionId && this.#connectionIds.has(connectionId)
+      ? connectionId
+      : this.defaultConnectionId;
   }
 
   #createClient(connectionId: string): Trino {
     return Trino.create({ server: `/api/trino/${connectionId}` });
   }
 
-  setConnection(connectionId: string) {
-    this.connectionId = connectionId;
-    this.client = this.#createClient(connectionId);
-    this.catalog = new CatalogCache(this.client);
+  catalogFor(connectionId: string): CatalogCache {
+    let cache = this.#catalogs.get(connectionId);
+    if (!cache) {
+      cache = new CatalogCache(this.#createClient(connectionId));
+      this.#catalogs.set(connectionId, cache);
+    }
+    return cache;
+  }
+
+  /** The connection the active document runs against. */
+  get connectionId(): string {
+    return this.#knownConnection(this.activeFile?.connectionId);
+  }
+
+  /** The schema of the active document's connection. */
+  get catalog(): CatalogCache {
+    return this.catalogFor(this.connectionId);
+  }
+
+  setFileConnection(file: SqlFile, connectionId: string) {
+    const next = this.#knownConnection(connectionId);
+    if (file.connectionId === next) return;
+    file.connectionId = next;
+    this.persist();
   }
 
   #restoreFiles() {
     const stored = loadFiles(this.id);
     if (stored.files.length > 0) {
-      this.files = stored.files.map((f) => new SqlFile(f.id, f.name, f.content));
+      this.files = stored.files.map(
+        (f) => new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId))
+      );
     } else {
       const legacy = legacyEditorContent(this.id);
-      this.files = [new SqlFile(crypto.randomUUID(), "scratch.sql", legacy ?? "")];
+      this.files = [
+        new SqlFile(crypto.randomUUID(), "scratch.sql", legacy ?? "", this.defaultConnectionId)
+      ];
       if (legacy != null) clearLegacyEditor(this.id);
     }
     this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
@@ -242,20 +291,28 @@ export class Workspace {
   persist() {
     saveFiles(
       this.id,
-      this.files.map((f) => ({ id: f.id, name: f.name, content: f.content })),
+      this.files.map((f) => ({
+        id: f.id,
+        name: f.name,
+        content: f.content,
+        connectionId: f.connectionId
+      })),
       this.activeFile?.id
     );
   }
 
   openFile(file: SqlFile) {
     this.activeFile = file;
+    // Which document you are in is part of the workspace now that the file
+    // list is a switcher rather than something on screen to re-pick.
+    this.persist();
   }
 
   createFile() {
     const names = new Set(this.files.map((f) => f.name));
     let n = 1;
     while (names.has(`query-${n}.sql`)) n++;
-    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`);
+    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`, "", this.connectionId);
     this.files.unshift(file);
     this.activeFile = file;
     this.persist();
@@ -269,7 +326,9 @@ export class Workspace {
     // The file's results go with it — stop anything still running.
     for (const result of file.results) result.discard();
     if (this.files.length === 0) {
-      this.files.push(new SqlFile(crypto.randomUUID(), "scratch.sql"));
+      this.files.push(
+        new SqlFile(crypto.randomUUID(), "scratch.sql", "", this.defaultConnectionId)
+      );
     }
     if (this.activeFile === file) {
       this.activeFile = this.files[0];
@@ -290,7 +349,12 @@ export class Workspace {
     if (!file) return;
     // One client per run: the Trino client keeps mutable session header state
     // (prepared statements), which is not safe to share across concurrent runs.
-    const result = new Result(this.#createClient(this.connectionId), sql, startLine, anchorId);
+    const result = new Result(
+      this.#createClient(this.#knownConnection(file.connectionId)),
+      sql,
+      startLine,
+      anchorId
+    );
     file.addResult(result, replacesId);
     void result.execute();
   }

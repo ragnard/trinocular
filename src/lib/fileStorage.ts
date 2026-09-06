@@ -2,6 +2,8 @@ export interface StoredFile {
   id: string;
   name: string;
   content: string;
+  /** Absent in files stored before connections became per-file. */
+  connectionId?: string;
 }
 
 interface StoredState {

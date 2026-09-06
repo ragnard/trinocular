@@ -3,8 +3,7 @@
   import { Workspace } from "$lib/State.svelte";
   import { page } from "$app/state";
 
-  const defaultConnectionId = page.data.connections?.[0]?.id ?? "";
-  let workspace = $state(new Workspace(defaultConnectionId));
+  let workspace = $state(new Workspace(page.data.connections ?? []));
 </script>
 
 <Application bind:workspace />

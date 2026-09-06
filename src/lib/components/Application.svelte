@@ -10,11 +10,18 @@
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
-  import Menu from "./Menu.svelte";
+  import DocumentHeader from "./DocumentHeader.svelte";
+  import FileSwitcher from "./FileSwitcher.svelte";
+  import SchemaBrowser from "./SchemaBrowser.svelte";
+  import { page } from "$app/state";
 
   let { workspace = $bindable() }: { workspace: Workspace } = $props();
 
   let selection: Selection | null = $state(null);
+  let switcherOpen = $state(false);
+
+  let connections: { id: string; name: string }[] = $derived(page.data.connections ?? []);
+  let connectionId = $derived(workspace.connectionId);
 
   let theme: "light" | "dark" = $state("light");
   let manualOverride = $state(false);
@@ -42,12 +49,14 @@
     theme = theme === "light" ? "dark" : "light";
   }
 
+  // One delegate per connection, swapped when the active document points
+  // somewhere else, so completions describe the cluster it actually runs on.
   const metadataProvider = new DelegatingMetadataProvider(
     new TrinoMetadataProvider(workspace.catalog)
   );
 
   $effect(() => {
-    metadataProvider.delegate = new TrinoMetadataProvider(workspace.catalog);
+    metadataProvider.delegate = new TrinoMetadataProvider(workspace.catalogFor(connectionId));
   });
 
   let activeResult: ResultModel | null = $derived(workspace.activeFile?.activeResult ?? null);
@@ -103,8 +112,8 @@
   }
 </script>
 
-{#snippet menu()}
-  <div class="menu"><Menu {workspace} {theme} onToggleTheme={toggleTheme} /></div>
+{#snippet browser()}
+  <div class="browser"><SchemaBrowser {workspace} {theme} onToggleTheme={toggleTheme} /></div>
 {/snippet}
 
 {#snippet dataviewer()}
@@ -134,6 +143,7 @@
       onshowresult={handleShowResult}
       oncancelresult={handleCancelResult}
       onchange={handleEditorChange}
+      onquickopen={() => (switcherOpen = true)}
       {theme}
     />
   </div>
@@ -151,6 +161,18 @@
   </div>
 {/snippet}
 
+<!-- Monaco owns this chord while the editor has focus and handles it there;
+     this catches it everywhere else, and keeps the browser's print dialog out
+     of it either way. Opening an open switcher is a no-op. -->
+<svelte:window
+  onkeydown={(e) => {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      switcherOpen = true;
+    }
+  }}
+/>
+
 <main>
   <div class="workspace">
     <SplitPane
@@ -161,7 +183,7 @@
       --color="var(--border-dark)"
       --border-width="2px"
       --thickness="20px"
-      a={menu}
+      a={browser}
     >
       {#snippet b()}
         <SplitPane
@@ -175,22 +197,35 @@
           b={dataviewer}
         >
           {#snippet a()}
-            <SplitPane
-              type="vertical"
-              min="10%"
-              max="90%"
-              pos="33%"
-              --color="var(--border-dark)"
-              --border-width="2px"
-              --thickness="20px"
-              a={editor}
-              b={results}
-            ></SplitPane>
+            <div class="document">
+              <DocumentHeader
+                {workspace}
+                {connections}
+                onquickopen={() => (switcherOpen = true)}
+              />
+              <div class="document-body">
+                <SplitPane
+                  type="vertical"
+                  min="10%"
+                  max="90%"
+                  pos="33%"
+                  --color="var(--border-dark)"
+                  --border-width="2px"
+                  --thickness="20px"
+                  a={editor}
+                  b={results}
+                ></SplitPane>
+              </div>
+            </div>
           {/snippet}
         </SplitPane>
       {/snippet}
     </SplitPane>
   </div>
+
+  {#if switcherOpen}
+    <FileSwitcher {workspace} {connections} onclose={() => (switcherOpen = false)} />
+  {/if}
 </main>
 
 <style>
@@ -207,8 +242,20 @@
     /* font-family: '';*/
   }
 
-  .menu {
+  .browser {
     background-color: var(--bg-1);
+  }
+
+  .document {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .document-body {
+    flex: 1;
+    min-height: 0;
   }
 
   .workspace {

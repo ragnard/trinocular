@@ -16,26 +16,21 @@
 
   interface Props {
     nodes: TreeNode[];
-    onexpand?: (node: TreeNode) => void;
+    /**
+     * Which branches are open — the whole truth, owned by the caller. It lives
+     * outside this component because a filter rebuilds `nodes`, and with it
+     * these component instances; state kept in here would be lost on every
+     * filter and clear. Keeping it the only input to `isOpen` is also what
+     * stops the chevron from lying: whatever it draws, clicking changes.
+     */
+    expanded: Set<string>;
+    ontoggle: (node: TreeNode) => void;
     onclick?: (node: TreeNode) => void;
     icon?: Snippet<[TreeNode]>;
     depth?: number;
   }
 
-  let { nodes, onexpand, onclick, icon, depth = 0 }: Props = $props();
-
-  let expanded = $state(new Set<string>());
-
-  function toggle(node: TreeNode) {
-    const next = new Set(expanded);
-    if (next.has(node.id)) {
-      next.delete(node.id);
-    } else {
-      next.add(node.id);
-      onexpand?.(node);
-    }
-    expanded = next;
-  }
+  let { nodes, expanded, ontoggle, onclick, icon, depth = 0 }: Props = $props();
 </script>
 
 <ul class="tree" class:nested={depth > 0}>
@@ -53,7 +48,7 @@
           {/if}
         </button>
       {:else}
-        <button class="label branch-label" onclick={() => toggle(node)}>
+        <button class="label branch-label" onclick={() => ontoggle(node)}>
           {#if node.loading}
             <LoaderCircle size={12} class="spin" />
           {:else}
@@ -68,9 +63,9 @@
         {#if isOpen && node.children && node.children.length > 0}
           <TreeView
             nodes={node.children}
-            {onexpand}
+            {expanded}
+            {ontoggle}
             {onclick}
-            {icon}
             depth={depth + 1}
           />
         {/if}
@@ -106,7 +101,6 @@
     color: inherit;
     cursor: pointer;
     font: inherit;
-    font-size: var(--font);
     text-align: left;
     border-radius: 3px;
     white-space: nowrap;
@@ -114,17 +108,10 @@
     :global(svg) {
       flex-shrink: 0;
     }
-    /* overflow: hidden;
-       text-overflow: ellipsis; */
   }
 
   .label:hover {
     background-color: var(--bg-focus);
-  }
-
-  .node-label {
-    /* overflow: hidden;
-       text-overflow: ellipsis; */
   }
 
   .node-detail {

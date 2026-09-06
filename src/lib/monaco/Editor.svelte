@@ -42,6 +42,8 @@
     onshowresult?: (result: Result) => void;
     oncancelresult?: (result: Result) => void;
     onchange?: (content: string) => void;
+    /** Cmd/Ctrl+P, forwarded from inside the editor where it is swallowed. */
+    onquickopen?: () => void;
     theme?: "light" | "dark";
   }
 
@@ -55,6 +57,7 @@
     onshowresult,
     oncancelresult,
     onchange,
+    onquickopen,
     theme = "light"
   }: Props = $props();
 
@@ -660,6 +663,13 @@
       // Every edit can move a statement, so the strips are always re-synced.
       syncToolbars();
       onchange?.(model.getValue());
+    });
+
+    editor.addAction({
+      id: "trino.switchFile",
+      label: "Switch File",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
+      run: () => onquickopen?.()
     });
 
     editor.addAction({
