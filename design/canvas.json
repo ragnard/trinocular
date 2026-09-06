@@ -1,0 +1,55 @@
+{
+  "artboards": [
+    { "file": "Current.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Today" },
+    { "file": "Main.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "A — Rail" },
+    { "file": "Cards.dc.html", "x": 0, "y": 1180, "w": 1440, "h": 900, "title": "B — Cards" },
+    { "file": "AppBar.dc.html", "x": 1560, "y": 1180, "w": 1440, "h": 900, "title": "C — App bar" },
+    { "file": "Inspector.dc.html", "x": 0, "y": 2360, "w": 1240, "h": 1080, "title": "Inspector states (direction A)" },
+    { "file": "System.dc.html", "x": 1400, "y": 2360, "w": 1180, "h": 1120, "title": "The shared system" }
+  ],
+  "annotations": [
+    {
+      "id": "how-to-read",
+      "x": 0,
+      "y": -150,
+      "w": 620,
+      "text": "Today, drawn from the real stylesheets at 1440x900.\nThe yellow boxes are the three pane headers at their actual heights: 112 / 40 / 38 px. The results pane has no header at all, so the editor and the table just butt into each other."
+    },
+    {
+      "id": "dir-a",
+      "x": 1560,
+      "y": -150,
+      "w": 620,
+      "text": "A - RAIL. One 36 px band across the whole top, so the three headers finally line up. Brand and user drop to a 26 px status bar. The inspector leaves the layout entirely: a selected cell is one line under the table, Cmd+I opens it over the results. Cheapest on pixels, most IDE-like."
+    },
+    {
+      "id": "dir-b",
+      "x": 0,
+      "y": 1000,
+      "w": 620,
+      "text": "B - CARDS. Panes become cards on a recessed ground with 8 px gutters - the loosest of the three, and the only one that costs real estate (about 24 px each way). The inspector is a mode of the results pane: Table / Row detail, so the row gets the full width and fields land in three columns. Warm neutral palette."
+    },
+    {
+      "id": "dir-c",
+      "x": 1560,
+      "y": 1000,
+      "w": 620,
+      "text": "C - APP BAR. One global bar carries file, connection and identity, so the panes below need no headers at all and are told apart by tone rather than rules. The quietest of the three. The inspector keeps its place on the right but collapses to a 44 px rail until you want it."
+    },
+    {
+      "id": "insp",
+      "x": 0,
+      "y": 2220,
+      "w": 620,
+      "text": "The three states behind direction A. Nothing selected: nothing shown. One cell: one 30 px line. Cmd+I: 460 px over the table, full height. Drag it wider when a JSON or struct value needs the room."
+    },
+    {
+      "id": "sys",
+      "x": 1400,
+      "y": 2220,
+      "w": 620,
+      "text": "Two text sizes, four heights, one radius, one icon size, one accent with four jobs. All three directions are built from exactly this - swapping between them changes layout, not vocabulary."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

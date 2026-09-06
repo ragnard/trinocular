@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Current tokens, resolved from the app's oklch relative colors -------- */
+    .now-dark{
+      --bg-0:#1e1e1e; --bg-1:#262626; --bg-2:#2e2e2e; --bg-focus:#454545;
+      --text-0:#c4c4c4; --text-2:#767676;
+      --border:#414141; --border-dark:#303030;
+      --accent:#4da6ff; --accent-bg:rgba(77,166,255,.15); --error:#f47067;
+    }
+    .now-light{
+      --bg-0:#ffffff; --bg-1:#f0f0f0; --bg-2:#f5f5f5; --bg-focus:#d8d8d8;
+      --text-0:#000000; --text-2:#999999;
+      --border:#e0e0e0; --border-dark:#cccccc;
+      --accent:#0e65eb; --accent-bg:rgba(14,101,235,.12); --error:#cf222e;
+    }
+    /* Proposed tokens: one monotonic elevation ramp, same meaning in both --- */
+    .dark{
+      --s0:#1e1e1e; --s1:#252527; --s2:#2e2e31; --s3:#3a3a3e;
+      --line:#303033; --line-strong:#3f3f44;
+      --fg:#cfcfd2; --fg-2:#96969c; --fg-3:#6e6e75;
+      --accent:#4da6ff; --accent-fg:#0d1a26;
+      --accent-bg:rgba(77,166,255,.16); --accent-line:rgba(77,166,255,.55);
+      --ok:#5ec9a8; --warn:#e2b341; --error:#f47067; --error-bg:rgba(244,112,103,.13);
+      --kw:#569cd6; --str:#ce9178; --num:#b5cea8; --fn:#dcdcaa; --id:#9cdcfe; --cmt:#6a9955;
+      --shadow:0 10px 30px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+    }
+    .light{
+      --s0:#ffffff; --s1:#f7f7f8; --s2:#eeeef1; --s3:#e3e3e8;
+      --line:#e8e8ec; --line-strong:#d6d6dc;
+      --fg:#1f2024; --fg-2:#6b6c74; --fg-3:#8f9099;
+      --accent:#0e65eb; --accent-fg:#ffffff;
+      --accent-bg:rgba(14,101,235,.10); --accent-line:rgba(14,101,235,.45);
+      --ok:#1a7f5a; --warn:#9a6700; --error:#cf222e; --error-bg:rgba(207,34,46,.09);
+      --kw:#0000c0; --str:#a31515; --num:#098658; --fn:#795e26; --id:#0b5c8a; --cmt:#3a8a3a;
+      --shadow:0 10px 28px rgba(15,18,25,.14), 0 2px 6px rgba(15,18,25,.07);
+    }
+    /* Warm variant used by the Cards direction */
+    .warm{
+      --s0:#fdfcfb; --s1:#f6f4f1; --s2:#edeae5; --s3:#e2ded7;
+      --line:#eae7e2; --line-strong:#d9d5ce;
+      --fg:#25231f; --fg-2:#6d6960; --fg-3:#938e84;
+      --accent:#1f6feb; --accent-fg:#ffffff;
+      --accent-bg:rgba(31,111,235,.10); --accent-line:rgba(31,111,235,.4);
+      --ok:#1a7f5a; --warn:#9a6700; --error:#c0392b; --error-bg:rgba(192,57,43,.09);
+      --kw:#1d4ed8; --str:#9a3412; --num:#0f766e; --fn:#7c5a12; --id:#0f5d80; --cmt:#6b8f5f;
+      --shadow:0 12px 32px rgba(60,50,35,.10), 0 2px 6px rgba(60,50,35,.06);
+    }
+
+    *{box-sizing:border-box;margin:0}
+    body{
+      margin:0;
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+      font-size:13px; line-height:20px;
+      -webkit-font-smoothing:antialiased;
+    }
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:var(--accent);text-decoration:underline}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+    .ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+    .ic12{width:12px;height:12px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .ic16{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+    .meta{font-size:11px;line-height:16px}
+    .caps{font-size:11px;line-height:16px;letter-spacing:.055em;text-transform:uppercase;font-weight:600}
+    .num{font-variant-numeric:tabular-nums}
+    .row{display:flex;align-items:center}
+    .ell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  </style>
+</helmet>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h6"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 9v12"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3.5 6h.01"/><path d="M3.5 12h.01"/><path d="M3.5 18h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-rows" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-pig" viewBox="0 0 24 24"><path d="M4 12a7 6 0 0 1 7-6h3a7 6 0 0 1 7 6c0 3.3-3.1 6-7 6h-3l-3 3v-3.6A6 6 0 0 1 4 12Z"/><circle cx="16" cy="12" r="1.6"/><path d="M14.4 12h3.2"/></symbol>
+</svg>
+
+<div class="now-dark" style="position:relative;width:1440px;height:900px;background:var(--bg-0);color:var(--text-0);font-size:16px;line-height:1;display:grid;grid-template-columns:360px 2px 1fr">
+
+  <!-- ============ schema browser (left) ============ -->
+  <div style="background:var(--bg-1);display:flex;flex-direction:column;min-height:0">
+    <div style="padding:9.6px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:6.4px;font-weight:700">
+        <span style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--bg-0);display:inline-flex;align-items:center;justify-content:center;font-size:16px">&#128055;</span>
+        Oink
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6.4px;margin:9.6px 12px 5.6px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-0);color:var(--text-2)">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <span style="flex:1;padding:5.6px 0;font-size:16px;color:var(--text-2)">Filter&hellip;</span>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6.4px 14.4px 8px;color:var(--text-2);font-size:13.6px">
+      <span style="font-weight:700;text-transform:uppercase">Schema</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><svg class="ic12"><use href="#i-db"/></svg>analytics-prod</span>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow:hidden;padding:0 12px 12px">
+      <div style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px"><svg class="ic16" style="transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-db"/></svg>tpch</div>
+      <div style="padding-left:12px">
+        <div style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-box"/></svg>sf1</div>
+        <div style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px"><svg class="ic16" style="transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-box"/></svg>sf100</div>
+        <div style="padding-left:12px">
+          <div style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-table"/></svg>customer</div>
+          <div style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px;background:var(--bg-focus)"><svg class="ic16" style="transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-table"/></svg>lineitem</div>
+          <div style="padding-left:12px">
+            <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16" style="opacity:0"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-type"/></svg>orderkey<span style="color:var(--text-2);font-size:13.6px;margin-left:4px">bigint</span></div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16" style="opacity:0"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-type"/></svg>partkey<span style="color:var(--text-2);font-size:13.6px;margin-left:4px">bigint</span></div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16" style="opacity:0"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-type"/></svg>extendedprice<span style="color:var(--text-2);font-size:13.6px;margin-left:4px">double</span></div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16" style="opacity:0"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-type"/></svg>discount<span style="color:var(--text-2);font-size:13.6px;margin-left:4px">double</span></div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16" style="opacity:0"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-type"/></svg>shipdate<span style="color:var(--text-2);font-size:13.6px;margin-left:4px">date</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-table"/></svg>orders</div>
+          <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-table"/></svg>nation</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-box"/></svg>tiny</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-db"/></svg>iceberg</div>
+      <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-db"/></svg>hive</div>
+      <div style="display:flex;align-items:center;gap:4px;padding:4px"><svg class="ic16"><use href="#i-right"/></svg><svg class="ic16"><use href="#i-db"/></svg>system</div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding:9.6px 16px;display:flex;align-items:center;gap:8px">
+      <span style="border:1px solid var(--border);border-radius:4px;padding:3.2px 6.4px;display:inline-flex;color:var(--text-2)"><svg class="ic16"><use href="#i-moon"/></svg></span>
+      <span style="font-size:13.6px;color:var(--text-2)">r.dahlen@gmail.com</span>
+    </div>
+  </div>
+
+  <div style="background:var(--border-dark)"></div>
+
+  <!-- ============ right of first split ============ -->
+  <div style="display:grid;grid-template-columns:1fr 2px 268px;min-width:0">
+
+    <!-- document -->
+    <div style="display:flex;flex-direction:column;min-width:0;min-height:0">
+      <!-- document header : 40px -->
+      <div style="height:40px;display:flex;align-items:center;gap:4px;padding:0 12px;background:var(--bg-1);border-bottom:1px solid var(--border);flex:none">
+        <span style="display:inline-flex;align-items:center;gap:5.6px;padding:4px 7.2px;border-radius:4px;font-size:13.6px;font-weight:600"><svg class="ic" style="color:var(--text-2)"><use href="#i-file"/></svg>revenue-by-nation.sql<svg class="ic12" style="color:var(--text-2)"><use href="#i-down"/></svg></span>
+        <span style="width:1px;height:16px;background:var(--border);margin:0 4px"></span>
+        <span style="display:inline-flex;align-items:center;gap:5.6px;padding:4px 7.2px;border-radius:4px;font-size:13.6px"><svg class="ic" style="color:var(--text-2)"><use href="#i-db"/></svg>analytics-prod<svg class="ic12" style="color:var(--text-2)"><use href="#i-down"/></svg></span>
+        <span style="flex:1"></span>
+        <span style="display:inline-flex;align-items:center;gap:6.4px;font-size:13.6px;color:var(--text-2)"><kbd style="border:1px solid var(--border);border-radius:3px;background:var(--bg-0);padding:.05em .35em;font:inherit;font-size:11.56px">&#8984;P</kbd>Switch file</span>
+      </div>
+
+      <!-- editor : 263px -->
+      <div style="height:263px;background:var(--bg-0);overflow:hidden;flex:none;position:relative">
+        <div class="mono" style="font-size:14px;line-height:19px;padding:8px 0">
+          <div style="color:var(--text-2);padding-left:18px;font-size:13px">&#9654; Run&nbsp;&nbsp;&nbsp;&nbsp;&#9776; Results&nbsp;&nbsp;&nbsp;&nbsp;200 rows</div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">1</span><span><span style="color:#569cd6">select</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">2</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#9cdcfe">n</span>.<span style="color:#9cdcfe">name</span> <span style="color:#569cd6">as</span> <span style="color:#9cdcfe">nation</span>,</span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">3</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#dcdcaa">count</span>(<span style="color:#569cd6">distinct</span> <span style="color:#9cdcfe">o</span>.<span style="color:#9cdcfe">orderkey</span>) <span style="color:#569cd6">as</span> <span style="color:#9cdcfe">orders</span>,</span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">4</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#dcdcaa">sum</span>(<span style="color:#9cdcfe">l</span>.<span style="color:#9cdcfe">extendedprice</span> * (<span style="color:#b5cea8">1</span> - <span style="color:#9cdcfe">l</span>.<span style="color:#9cdcfe">discount</span>)) <span style="color:#569cd6">as</span> <span style="color:#9cdcfe">revenue</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">5</span><span><span style="color:#569cd6">from</span> <span style="color:#9cdcfe">tpch</span>.<span style="color:#9cdcfe">sf100</span>.<span style="color:#9cdcfe">lineitem</span> <span style="color:#9cdcfe">l</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">6</span><span><span style="color:#569cd6">join</span> <span style="color:#9cdcfe">tpch</span>.<span style="color:#9cdcfe">sf100</span>.<span style="color:#9cdcfe">orders</span> <span style="color:#9cdcfe">o</span> <span style="color:#569cd6">on</span> <span style="color:#9cdcfe">o</span>.<span style="color:#9cdcfe">orderkey</span> = <span style="color:#9cdcfe">l</span>.<span style="color:#9cdcfe">orderkey</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">7</span><span><span style="color:#569cd6">join</span> <span style="color:#9cdcfe">tpch</span>.<span style="color:#9cdcfe">sf100</span>.<span style="color:#9cdcfe">customer</span> <span style="color:#9cdcfe">c</span> <span style="color:#569cd6">on</span> <span style="color:#9cdcfe">c</span>.<span style="color:#9cdcfe">custkey</span> = <span style="color:#9cdcfe">o</span>.<span style="color:#9cdcfe">custkey</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">8</span><span><span style="color:#569cd6">join</span> <span style="color:#9cdcfe">tpch</span>.<span style="color:#9cdcfe">sf100</span>.<span style="color:#9cdcfe">nation</span> <span style="color:#9cdcfe">n</span> <span style="color:#569cd6">on</span> <span style="color:#9cdcfe">n</span>.<span style="color:#9cdcfe">nationkey</span> = <span style="color:#9cdcfe">c</span>.<span style="color:#9cdcfe">nationkey</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">9</span><span><span style="color:#569cd6">where</span> <span style="color:#9cdcfe">o</span>.<span style="color:#9cdcfe">orderdate</span> &gt;= <span style="color:#569cd6">date</span> <span style="color:#ce9178">'1995-01-01'</span></span></div>
+          <div style="display:flex"><span style="width:44px;text-align:right;padding-right:14px;color:#5a5a5a">10</span><span><span style="color:#569cd6">group by</span> <span style="color:#b5cea8">1</span> <span style="color:#569cd6">order by</span> <span style="color:#9cdcfe">revenue</span> <span style="color:#569cd6">desc</span>;</span></div>
+        </div>
+      </div>
+
+      <div style="height:2px;background:var(--border-dark);flex:none"></div>
+
+      <!-- results : no header at all -->
+      <div style="flex:1;min-height:0;overflow:hidden;background:var(--bg-0)">
+        <table style="border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%">
+          <tr>
+            <th style="width:60px;background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 8px"></th>
+            <th style="width:230px;background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 8px;text-align:left"><div style="padding:6.4px 3.2px"><div style="font-size:13.6px;text-transform:uppercase">nation</div><div style="font-size:13.6px;color:var(--text-2)">varchar(25)</div></div></th>
+            <th style="width:150px;background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 8px;text-align:left"><div style="padding:6.4px 3.2px"><div style="font-size:13.6px;text-transform:uppercase">orders</div><div style="font-size:13.6px;color:var(--text-2)">bigint</div></div></th>
+            <th style="width:190px;background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 8px;text-align:left"><div style="padding:6.4px 3.2px"><div style="font-size:13.6px;text-transform:uppercase">revenue</div><div style="font-size:13.6px;color:var(--text-2)">double</div></div></th>
+            <th style="background:var(--bg-1);border-bottom:1px solid var(--border)"></th>
+          </tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">1</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">ARGENTINA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">598 412</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 048 217 445.31</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">2</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">BRAZIL</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">601 077</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 087 445 021.08</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">3</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 0 0 9999px var(--accent-bg);outline:2px solid var(--accent);outline-offset:-2px">CANADA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 288</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 070 154 776.62</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">4</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">CHINA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">599 940</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 065 000 021.14</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">5</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">EGYPT</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 116</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 059 116 774.02</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">6</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">ETHIOPIA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">598 850</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 042 771 010.55</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">7</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">FRANCE</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 464</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 072 458 991.37</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">8</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">GERMANY</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">601 300</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 088 010 447.90</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">INDIA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 002</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 061 004 118.73</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">10</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">INDONESIA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">599 731</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 056 999 210.47</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">11</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">IRAN</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">598 104</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 037 811 006.29</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">12</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">IRAQ</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 899</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 077 001 552.11</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">13</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">JAPAN</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 774</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 074 116 220.85</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">14</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">JORDAN</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">599 210</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 051 447 903.64</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="height:28px;padding:0 8px;font-size:12px;text-align:right;color:var(--text-2);background:var(--bg-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border)">15</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">KENYA</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">600 550</td><td style="height:28px;padding:0 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">9 069 220 774.19</td><td style="border-bottom:1px solid var(--border)"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div style="background:var(--border-dark)"></div>
+
+    <!-- data viewer -->
+    <div style="background:var(--bg-0);overflow:hidden;min-width:0">
+      <table style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0">
+        <tr>
+          <th style="width:50%;padding:4px 8px;border-bottom:1px solid var(--border-dark);text-align:left;background:var(--bg-1);font-size:13.6px"><div style="display:flex;align-items:center;gap:8px"><span>Field</span><span style="flex:1;min-width:0;padding:5.6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-0);color:var(--text-2);font-weight:400">Filter...</span></div></th>
+          <th style="width:50%;padding:4px 8px;border-bottom:1px solid var(--border-dark);text-align:left;background:var(--bg-1);font-size:13.6px"><div style="display:flex;align-items:center;gap:8px"><span>Value</span><span style="flex:1;min-width:0;padding:5.6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-0);color:var(--text-2);font-weight:400">Filter...</span></div></th>
+        </tr>
+        <tr><td style="padding:6px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">nation</td><td style="padding:6px;border-bottom:1px solid var(--border);word-break:break-all">CANADA</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">orders</td><td style="padding:6px;border-bottom:1px solid var(--border);word-break:break-all">600288</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">revenue</td><td style="padding:6px;border-bottom:1px solid var(--border);word-break:break-all">9070154776.62</td></tr>
+      </table>
+      <div style="padding:40px 12px;color:var(--text-2);text-align:center;font-size:13.6px">&hellip;the rest of this 268&nbsp;px column stays empty most of the day</div>
+    </div>
+  </div>
+
+  <!-- ---- annotation pins ---- -->
+  <div style="position:absolute;left:0;top:0;width:360px;height:112px;border:1px dashed #e2b341;background:rgba(226,179,65,.07);pointer-events:none"></div>
+  <div style="position:absolute;left:362px;top:0;width:810px;height:40px;border:1px dashed #e2b341;background:rgba(226,179,65,.07);pointer-events:none"></div>
+  <div style="position:absolute;left:1174px;top:0;width:266px;height:38px;border:1px dashed #e2b341;background:rgba(226,179,65,.07);pointer-events:none"></div>
+
+  <div class="meta" style="position:absolute;left:16px;top:120px;color:#e2b341;font-weight:600">112 px of chrome</div>
+  <div class="meta" style="position:absolute;left:378px;top:46px;color:#e2b341;font-weight:600">40 px</div>
+  <div class="meta" style="position:absolute;left:1186px;top:44px;color:#e2b341;font-weight:600">38 px</div>
+
+  <div class="meta" style="position:absolute;left:378px;top:322px;color:#e2b341;font-weight:600">results pane has no header &mdash; the editor and the table just butt together</div>
+</div>
+
+</x-dc>
+</body>
+</html>
