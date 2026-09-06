@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-0: #1e1e1e; --bg-1: #252525; --bg-2: #2c2c2c; --bg-focus: #464646;
+      --text-0: #c4c4c4; --text-1: #bababa; --text-2: #747474;
+      --border: #414141; --border-dark: #2f2f2f;
+      --accent: #4da6ff; --accent-bg: rgba(77, 166, 255, 0.15);
+      --accent-bg-subtle: rgba(77, 166, 255, 0.08);
+      --font: system-ui, sans-serif;
+      --font-mono: "Iosevka SS08", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --font-sm: 0.85em;
+    }
+    body { margin: 0; background: var(--bg-0); color: var(--text-0); font-family: var(--font); font-size: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #7dbcff; text-decoration: underline; }
+    svg { display: block; }
+
+    .iv { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+    .iv th { width: 50%; padding: 0.25em 0.5em; border-bottom: 1px solid var(--border-dark);
+             text-align: left; background: var(--bg-1); font-size: var(--font-sm); }
+    .iv td { padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13.6px; }
+    .iv td.field { color: var(--text-2); border-right: 1px solid var(--border);
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .iv td.value { word-break: break-all; font-family: var(--font-mono); font-size: 12.5px; }
+    .iv tr.row-header td { background: var(--bg-1); font-weight: 600; font-size: var(--font-sm);
+                           color: var(--text-2); border-bottom: 1px solid var(--border-dark); font-family: var(--font); }
+    .nan { color: var(--text-2); font-style: italic; }
+    .hov { outline: 1px solid var(--accent); outline-offset: -1px; position: relative; }
+    .acts { position: absolute; top: 2px; right: 2px; display: flex; gap: 2px; padding: 1px; border-radius: 3px; }
+    .acts span { display: inline-flex; align-items: center; color: var(--text-2); line-height: 1;
+                 padding: 3px; border-radius: 3px; background: var(--bg-0); border: 1px solid var(--border); }
+    .filter { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 4px;
+              padding: 0.15em 0.4em; color: var(--text-2); font-weight: normal; }
+  </style>
+</helmet>
+
+<div style="width: 360px; height: 760px; background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- breadcrumb: the one thing the pane needs that the data table doesn't already give -->
+  <div style="height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px; box-sizing: border-box;
+              background: var(--bg-1); border-bottom: 1px solid var(--border-dark); flex: none;
+              font-size: var(--font-sm); color: var(--text-2);">
+    <span>Fragment 2</span>
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    <span style="color: var(--text-0);">TableScan</span>
+    <span style="font-family: var(--font-mono); font-size: 11.5px;">#0</span>
+    <span style="flex: 1;"></span>
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+  </div>
+
+  <div style="flex: 1; overflow: hidden;">
+    <table class="iv">
+      <tr>
+        <th><div style="display: flex; align-items: center; gap: 0.5em;"><span class="filter">Field</span></div></th>
+        <th><div style="display: flex; align-items: center; gap: 0.5em;"><span class="filter">Value</span></div></th>
+      </tr>
+
+      <tr><td class="field">name</td><td class="value">TableScan</td></tr>
+      <tr><td class="field">id</td><td class="value">0</td></tr>
+      <tr><td class="field">fragment</td><td class="value">2</td></tr>
+
+      <tr class="row-header"><td colspan="2">descriptor</td></tr>
+      <tr>
+        <td class="field">table</td>
+        <td class="value hov">tpch:tiny:nation
+          <span class="acts">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>
+          </span>
+        </td>
+      </tr>
+
+      <tr class="row-header"><td colspan="2">outputs</td></tr>
+      <tr><td class="field">regionkey</td><td class="value">bigint</td></tr>
+
+      <tr class="row-header"><td colspan="2">details</td></tr>
+      <tr><td class="field">0</td><td class="value">regionkey := tpch:regionkey</td></tr>
+
+      <tr class="row-header"><td colspan="2">estimates</td></tr>
+      <tr><td class="field">outputRowCount</td><td class="value">25</td></tr>
+      <tr><td class="field">outputSizeInBytes</td><td class="value">225 B</td></tr>
+      <tr><td class="field">cpuCost</td><td class="value">225</td></tr>
+      <tr><td class="field">memoryCost</td><td class="value">0</td></tr>
+      <tr><td class="field">networkCost</td><td class="value">0</td></tr>
+    </table>
+
+    <div style="border-top: 1px solid var(--border-dark); margin-top: 18px; padding: 14px 10px;">
+      <div style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px;">
+        Why this pane, unchanged
+      </div>
+      <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5;">
+        A plan node is already field-and-value shaped:
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">descriptor</span> is a string map,
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">outputs</span> is symbol → type,
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">details</span> and
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">estimates</span> are flat.
+        That is exactly what <span style="font-family: var(--font-mono); font-size: 12.5px;">DataViewer</span>
+        renders for a selected cell today — same
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">row-header</span> groups, same
+        field/value split, same hover copy button, same italic grey for a missing value.
+      </div>
+      <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5; margin-top: 12px;">
+        So selecting a node in any of the plan views feeds the pane that is already there, and the whole
+        node-detail problem costs a breadcrumb and a close button.
+      </div>
+      <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5; margin-top: 12px;">
+        Open question: the pane is currently driven by a table
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">Selection</span>. Feeding it from a
+        plan node means widening that contract, or giving the pane a second source.
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

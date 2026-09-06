@@ -1,0 +1,334 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-0: #1e1e1e; --bg-1: #252525; --bg-2: #2c2c2c; --bg-focus: #464646;
+      --text-0: #c4c4c4; --text-1: #bababa; --text-2: #747474;
+      --border: #414141; --border-dark: #2f2f2f;
+      --accent: #4da6ff; --accent-bg: rgba(77, 166, 255, 0.15);
+      --accent-bg-subtle: rgba(77, 166, 255, 0.08);
+      --error: #f47067;
+      --font: system-ui, sans-serif;
+      --font-mono: "Iosevka SS08", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --font-sm: 0.85em;
+    }
+    body { margin: 0; background: var(--bg-0); color: var(--text-0); font-family: var(--font); font-size: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #7dbcff; text-decoration: underline; }
+    svg { display: block; }
+
+    /* --- menu (Menu.svelte) --- */
+    .sum { display: flex; align-items: center; margin-bottom: 1em; color: var(--text-2); }
+    .sum .title { font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; }
+    .sum .fill { flex: 1; }
+    .det { margin-bottom: 2em; margin-left: 0.25em; }
+    .file { display: flex; align-items: center; padding: 0.25em; margin: 0 -0.25em; border-radius: 4px; }
+    .file.active { background: var(--bg-focus); }
+    .tree { display: flex; align-items: center; gap: 0.35em; padding: 0.15em 0; color: var(--text-0); }
+
+    /* --- editor (monaco, trino-dark) --- */
+    .ln { color: #858585; font-family: var(--font-mono); font-size: 16px; line-height: 22px;
+          width: 44px; text-align: right; padding-right: 12px; box-sizing: border-box; }
+    .ln.cur { color: #c6c6c6; }
+    .code { font-family: var(--font-mono); font-size: 16px; line-height: 22px; white-space: pre; }
+    .kw { color: #569cd6; } .id { color: #9cdcfe; } .num { color: #b5cea8; }
+    .cm { color: #6a9955; } .op { color: #d4d4d4; }
+
+    /* Statement toolbar: 18px band, 14px text, colour --text-2 (Editor.svelte) */
+    .bar { display: flex; align-items: center; height: 18px; font-size: 14px; color: var(--text-2); }
+    .bar .action { display: inline-flex; align-items: center; gap: 0.35em; }
+    .bar .action + .action { margin-left: 1em; }
+
+    /* --- plan graph --- */
+    .frag { background: var(--bg-1); border: 1px solid var(--border); border-radius: 4px; }
+    .fhead { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 8px;
+             box-sizing: border-box; border-bottom: 1px solid var(--border-dark); }
+    .fname { font-size: 13.6px; font-weight: 600; color: var(--text-0); }
+    .badge { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2);
+             border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; line-height: 15px; }
+    .node { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 8px;
+            box-sizing: border-box; }
+    .node .nm { font-size: 13.6px; }
+    .node .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); }
+    .node .fill { flex: 1; }
+    .node.sel { background: var(--accent-bg); outline: 1px solid var(--accent); outline-offset: -1px; }
+    .node .ic { color: var(--text-2); }
+    .node.sel .ic { color: var(--accent); }
+
+    /* --- inspector (DataViewer.svelte) --- */
+    .iv { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+    .iv th { width: 50%; padding: 0.25em 0.5em; border-bottom: 1px solid var(--border-dark);
+             text-align: left; background: var(--bg-1); font-size: var(--font-sm); }
+    .iv td { padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top;
+             font-size: 13.6px; }
+    .iv td.field { color: var(--text-2); border-right: 1px solid var(--border);
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .iv td.value { word-break: break-all; font-family: var(--font-mono); font-size: 12.5px; }
+    .iv tr.row-header td { background: var(--bg-1); font-weight: 600; font-size: var(--font-sm);
+                           color: var(--text-2); border-bottom: 1px solid var(--border-dark);
+                           font-family: var(--font); }
+    .nan { color: var(--text-2); font-style: italic; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; background: var(--bg-0); overflow: hidden;">
+
+  <!-- ============ menu pane (360) ============ -->
+  <div style="width: 360px; display: flex; flex-direction: column;">
+    <div style="padding: 0.6em 1em; border-bottom: 1px solid var(--border);">
+      <div style="display: flex; align-items: center; gap: 0.4em; font-weight: bold;">
+        <span style="background: var(--bg-0); border-radius: 50%; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; width: 2em; height: 2em;">🐷</span>
+        Oink
+      </div>
+    </div>
+
+    <div style="flex: 1; padding: 1em; overflow: hidden;">
+      <div class="sum">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg); margin-right: 0.25em;"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="title">Connection</span>
+        <span class="fill"></span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div class="det">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.35em 0.5em; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-0); box-sizing: border-box;">
+          <span>local</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-2);"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="sum">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg); margin-right: 0.25em;"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="title">Files</span>
+        <span class="fill"></span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      </div>
+      <div class="det">
+        <div class="file active"><span style="flex: 1;">regions.sql</span></div>
+        <div class="file"><span style="flex: 1;">scratch.sql</span></div>
+      </div>
+
+      <div class="sum">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg); margin-right: 0.25em;"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="title">Browse</span>
+        <span class="fill"></span>
+      </div>
+      <div class="det">
+        <div class="tree">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg); color: var(--text-2);"><path d="m9 18 6-6-6-6"/></svg>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-2);"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
+          <span>tpch</span>
+        </div>
+        <div class="tree" style="padding-left: 1.4em;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg); color: var(--text-2);"><path d="m9 18 6-6-6-6"/></svg>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-2);"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          <span>tiny</span>
+        </div>
+        <div class="tree" style="padding-left: 3.2em;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-2);"><path d="M12 3v18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+          <span>nation</span>
+        </div>
+        <div class="tree" style="padding-left: 3.2em;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-2);"><path d="M12 3v18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+          <span>region</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid var(--border); padding: 0.6em 1em; display: flex; align-items: center; gap: 0.5em;">
+      <span style="border: 1px solid var(--border); border-radius: 4px; padding: 0.2em 0.4em; display: flex; align-items: center; color: var(--text-2);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+      </span>
+      <span style="font-size: var(--font-sm); color: var(--text-2);">r.dahlen</span>
+    </div>
+  </div>
+
+  <div style="width: 2px; background: var(--border-dark);"></div>
+
+  <!-- ============ editor + results (808) ============ -->
+  <div style="width: 808px; display: flex; flex-direction: column;">
+
+    <!-- editor pane -->
+    <div style="height: 297px; background: #1e1e1e; padding-top: 6px; box-sizing: border-box; overflow: hidden;">
+      <div style="display: flex;">
+        <div class="ln">1</div>
+        <div class="code"><span class="cm">-- rows per region</span></div>
+      </div>
+      <div style="display: flex;">
+        <div style="width: 56px;"></div>
+        <div class="bar">
+          <span class="action" style="color: var(--accent);">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            Run
+          </span>
+          <span class="action">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+            Explain
+          </span>
+          <span class="action">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            Results · 5 rows · 0.31s
+          </span>
+          <span class="action" style="color: var(--accent);">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+            Plan · 3 fragments
+          </span>
+        </div>
+      </div>
+      <div style="display: flex;">
+        <div class="ln cur">2</div>
+        <div class="code"><span class="kw">SELECT</span> <span class="id">regionkey</span><span class="op">,</span> <span class="id">count</span><span class="op">(*)</span></div>
+      </div>
+      <div style="display: flex;">
+        <div class="ln">3</div>
+        <div class="code"><span class="kw">FROM</span> <span class="id">nation</span></div>
+      </div>
+      <div style="display: flex;">
+        <div class="ln">4</div>
+        <div class="code"><span class="kw">GROUP BY</span> <span class="num">1</span></div>
+      </div>
+    </div>
+
+    <div style="height: 2px; background: var(--border-dark);"></div>
+
+    <!-- results pane -->
+    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+
+      <!-- results header: new for explain results -->
+      <div style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
+                  box-sizing: border-box; background: var(--bg-1); border-bottom: 1px solid var(--border-dark);">
+        <span style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2);">Plan</span>
+        <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);">TYPE DISTRIBUTED, FORMAT JSON</span>
+        <span style="flex: 1;"></span>
+        <span style="display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: var(--font-sm);">
+          <span style="padding: 1px 9px; background: var(--accent-bg); color: var(--accent);">Graph</span>
+          <span style="padding: 1px 9px; border-left: 1px solid var(--border); color: var(--text-2);">Tree</span>
+          <span style="padding: 1px 9px; border-left: 1px solid var(--border); color: var(--text-2);">JSON</span>
+        </span>
+        <span style="color: var(--text-2);">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+        </span>
+        <span style="color: var(--text-2);">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        </span>
+      </div>
+
+      <!-- graph canvas -->
+      <div style="flex: 1; position: relative; overflow: hidden;">
+
+        <!-- edges, drawn under the cards -->
+        <svg width="808" height="240" viewBox="0 0 808 240" style="position: absolute; left: 0; top: 0;" fill="none" stroke="var(--text-2)" stroke-width="1.5">
+          <path d="M238 117 C 262 117, 270 57, 290 57"/>
+          <polygon points="294,57 286,53 286,61" fill="var(--text-2)" stroke="none"/>
+          <path d="M512 147 C 536 147, 544 57, 564 57"/>
+          <polygon points="568,57 560,53 560,61" fill="var(--text-2)" stroke="none"/>
+        </svg>
+        <div style="position: absolute; left: 244px; top: 68px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); border-bottom: 1px dotted var(--text-2);">HASH [regionkey]</div>
+        <div style="position: absolute; left: 522px; top: 78px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); border-bottom: 1px dotted var(--text-2);">SINGLE</div>
+
+        <!-- Fragment 2 (SOURCE) -->
+        <div class="frag" style="position: absolute; left: 20px; top: 16px; width: 218px;">
+          <div class="fhead"><span class="fname">Fragment 2</span><span class="badge">Source</span></div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></span>
+            <span class="nm">TableScan</span><span class="fill"></span><span class="meta">25 rows</span>
+          </div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg></span>
+            <span class="nm">Aggregate</span><span class="badge">Partial</span>
+          </div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg></span>
+            <span class="nm">Project</span><span class="fill"></span><span class="meta">$hashvalue_1</span>
+          </div>
+        </div>
+
+        <!-- Fragment 1 (HASH) -->
+        <div class="frag" style="position: absolute; left: 294px; top: 16px; width: 218px;">
+          <div class="fhead"><span class="fname">Fragment 1</span><span class="badge">Hash</span></div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></span>
+            <span class="nm">RemoteSource</span><span class="fill"></span><span class="meta">← 2</span>
+          </div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg></span>
+            <span class="nm">Project</span>
+          </div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg></span>
+            <span class="nm">LocalExchange</span><span class="badge">Single</span>
+          </div>
+          <div class="node sel">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg></span>
+            <span class="nm">Aggregate</span><span class="badge" style="color: var(--accent); border-color: var(--accent);">Final</span>
+          </div>
+        </div>
+
+        <!-- Fragment 0 (SINGLE) -->
+        <div class="frag" style="position: absolute; left: 568px; top: 16px; width: 218px;">
+          <div class="fhead"><span class="fname">Fragment 0</span><span class="badge">Single</span></div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></span>
+            <span class="nm">RemoteSource</span><span class="fill"></span><span class="meta">← 1</span>
+          </div>
+          <div class="node">
+            <span class="ic"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></span>
+            <span class="nm">Output</span><span class="fill"></span><span class="meta">regionkey, _col1</span>
+          </div>
+        </div>
+
+        <!-- summary strip -->
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 24px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; border-top: 1px solid var(--border-dark); background: var(--bg-1); font-size: 11.5px; color: var(--text-2); font-family: var(--font-mono);">
+          <span>3 fragments</span><span>·</span><span>9 nodes</span><span>·</span><span>estimates for 1 of 9</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="width: 2px; background: var(--border-dark);"></div>
+
+  <!-- ============ inspector pane (268) ============ -->
+  <div style="width: 268px; overflow: hidden;">
+    <table class="iv">
+      <tr>
+        <th>
+          <div style="display: flex; align-items: center; gap: 0.5em;">
+            <span style="flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 4px; padding: 0.15em 0.4em; color: var(--text-2); font-weight: normal;">Field</span>
+          </div>
+        </th>
+        <th>
+          <div style="display: flex; align-items: center; gap: 0.5em;">
+            <span style="flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 4px; padding: 0.15em 0.4em; color: var(--text-2); font-weight: normal;">Value</span>
+          </div>
+        </th>
+      </tr>
+      <tr class="row-header"><td colspan="2">Aggregate · node 4 · fragment 1</td></tr>
+      <tr><td class="field">name</td><td class="value">Aggregate</td></tr>
+      <tr><td class="field">id</td><td class="value">4</td></tr>
+      <tr class="row-header"><td colspan="2">descriptor</td></tr>
+      <tr><td class="field">type</td><td class="value">FINAL</td></tr>
+      <tr><td class="field">keys</td><td class="value">[regionkey]</td></tr>
+      <tr><td class="field">hash</td><td class="value">[]</td></tr>
+      <tr class="row-header"><td colspan="2">outputs</td></tr>
+      <tr><td class="field">regionkey</td><td class="value">bigint</td></tr>
+      <tr><td class="field">count</td><td class="value">bigint</td></tr>
+      <tr class="row-header"><td colspan="2">details</td></tr>
+      <tr><td class="field">0</td><td class="value">count := count("count_0")</td></tr>
+      <tr class="row-header"><td colspan="2">estimates</td></tr>
+      <tr><td class="field">outputRowCount</td><td class="value nan">NaN</td></tr>
+      <tr><td class="field">outputSizeInBytes</td><td class="value nan">NaN</td></tr>
+      <tr><td class="field">cpuCost</td><td class="value nan">NaN</td></tr>
+      <tr><td class="field">memoryCost</td><td class="value nan">NaN</td></tr>
+      <tr><td class="field">networkCost</td><td class="value nan">NaN</td></tr>
+    </table>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

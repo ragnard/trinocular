@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-0: #1e1e1e; --bg-1: #252525; --bg-2: #2c2c2c;
+      --text-0: #c4c4c4; --text-1: #bababa; --text-2: #747474;
+      --border: #414141; --border-dark: #2f2f2f;
+      --accent: #4da6ff; --accent-bg: rgba(77, 166, 255, 0.15);
+      --error: #f47067;
+      --font: system-ui, sans-serif;
+      --font-mono: "Iosevka SS08", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --font-sm: 0.85em;
+    }
+    body { margin: 0; background: var(--bg-0); color: var(--text-0); font-family: var(--font); font-size: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #7dbcff; text-decoration: underline; }
+    svg { display: block; }
+
+    /* Editor.svelte: 18px band, 14px text, --text-2, 1em between actions, 0.35em icon gap */
+    .bar { display: flex; align-items: center; height: 18px; font-size: 14px; color: var(--text-2); }
+    .bar .action { display: inline-flex; align-items: center; gap: 0.35em; }
+    .bar .action + .action { margin-left: 1em; }
+    .bar .failed { color: var(--error); }
+    .cap { font-size: 11.5px; color: var(--text-2); font-family: var(--font-mono); }
+    .state { display: flex; flex-direction: column; gap: 5px; }
+  </style>
+</helmet>
+
+<div style="width: 760px; height: 360px; background: var(--bg-0); padding: 18px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+
+  <div>
+    <div style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2);">Statement toolbar</div>
+    <div style="font-size: 13.6px; color: var(--text-1); margin-top: 6px; line-height: 1.45;">
+      One more action in the strip <span style="font-family: var(--font-mono); font-size: 12.5px;">Editor.svelte</span> already draws.
+      A plan is a result: it hangs off the same anchor, gets its own status action, and is cancelled the same way.
+    </div>
+  </div>
+
+  <div class="state">
+    <div class="cap">never run</div>
+    <div class="bar">
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Explain
+      </span>
+    </div>
+  </div>
+
+  <div class="state">
+    <div class="cap">explain in flight — cancelled through the same DELETE /v1/query/{id}</div>
+    <div class="bar">
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Explain
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        Explaining…
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        Cancel
+      </span>
+    </div>
+  </div>
+
+  <div class="state">
+    <div class="cap">both a run and a plan on the same statement — two status actions, not one that replaces the other</div>
+    <div class="bar">
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Explain
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        Results · 5 rows · 0.31s
+      </span>
+      <span class="action" style="color: var(--accent);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Plan · 3 fragments
+      </span>
+    </div>
+  </div>
+
+  <div class="state">
+    <div class="cap">a plan can fail on its own — bad column, missing table — reusing .status.failed</div>
+    <div class="bar">
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run
+      </span>
+      <span class="action">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Explain
+      </span>
+      <span class="action failed">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Plan · error
+      </span>
+    </div>
+  </div>
+
+  <div style="border-top: 1px solid var(--border-dark); padding-top: 12px; font-size: 13.6px; color: var(--text-1); line-height: 1.45;">
+    Worth deciding early: whether <span style="font-family: var(--font-mono); font-size: 12.5px;">Explain</span> is a
+    second action in the strip, or a modifier on Run (ctrl-click / a shortcut) that keeps the strip at two items.
+    The four-item strip above is the widest it gets, and it still fits above a short statement.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

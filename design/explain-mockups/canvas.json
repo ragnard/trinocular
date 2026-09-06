@@ -1,0 +1,43 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "In the IDE — Option A" },
+    { "file": "DirectionA.dc.html", "x": 0, "y": 1040, "w": 940, "h": 660, "title": "Option A · fragment graph" },
+    { "file": "DirectionB.dc.html", "x": 1020, "y": 1040, "w": 940, "h": 660, "title": "Option B · plan tree" },
+    { "file": "DirectionC.dc.html", "x": 2040, "y": 1040, "w": 940, "h": 660, "title": "Option C · cardinality lens" },
+    { "file": "JsonView.dc.html", "x": 0, "y": 1820, "w": 940, "h": 660, "title": "JSON tab · the escape hatch" },
+    { "file": "LightTheme.dc.html", "x": 1020, "y": 1820, "w": 940, "h": 660, "title": "Option A in light theme" },
+    { "file": "Inspector.dc.html", "x": 2040, "y": 1820, "w": 360, "h": 760, "title": "Node inspector · right pane" },
+    { "file": "Toolbar.dc.html", "x": 0, "y": 2700, "w": 760, "h": 360, "title": "Statement toolbar states" }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": -380,
+      "y": 0,
+      "w": 340,
+      "text": "EXPLAIN (TYPE DISTRIBUTED, FORMAT JSON) in Trinette.\n\nAll of it drawn on the query from the Trino docs — SELECT regionkey, count(*) FROM nation GROUP BY 1 — with the exact node ids, descriptors, details and estimates from that document. Nothing invented except where a caption says so.\n\nChrome is lifted from the real components: style.css tokens, the trino-dark monaco theme, the 18px toolbar band, DataViewer's field/value table."
+    },
+    {
+      "id": "json-gap",
+      "x": -380,
+      "y": 320,
+      "w": 340,
+      "text": "The gap to know about before building any of this:\n\nThe JSON form gives you the per-fragment node trees and nothing else. The fragment header the text plan prints — Fragment 1 [HASH], the output partitioning, the output layout — is not in the document.\n\nEverything shown with a dotted underline comes from there. Options: run the text EXPLAIN alongside, infer the partitioning from the $hashvalue projections, or drop the badges."
+    },
+    {
+      "id": "directions",
+      "x": -380,
+      "y": 1040,
+      "w": 340,
+      "text": "Three directions, same data, same size, each with its own case and its own cost.\n\nA — fragments as boxes, dataflow left to right. The distribution is the picture.\n\nB — one continuous tree, plan order, fragments spliced at the RemoteSource. Cheap, familiar, scrolls.\n\nC — every node as a bar. Answers the real question, but the docs example has NaN for 8 of 9 nodes, which is shown rather than hidden."
+    },
+    {
+      "id": "build-order",
+      "x": -380,
+      "y": 1820,
+      "w": 340,
+      "text": "If it were mine to build:\n\n1. JSON tab. An afternoon, and it makes everything after it a rendering choice over data already on the client.\n\n2. Option B. A TreeView and rows, no layout engine, and it is the view that survives a wide plan.\n\n3. Option A as a second tab once B proves the parsing.\n\n4. C as a column in B, not a view of its own.\n\nThe inspector is free either way — the pane already renders field/value pairs."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

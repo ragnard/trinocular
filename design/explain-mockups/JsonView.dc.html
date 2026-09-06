@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-0: #1e1e1e; --bg-1: #252525; --bg-2: #2c2c2c; --bg-focus: #464646;
+      --text-0: #c4c4c4; --text-1: #bababa; --text-2: #747474;
+      --border: #414141; --border-dark: #2f2f2f;
+      --accent: #4da6ff; --accent-bg: rgba(77, 166, 255, 0.15);
+      --accent-bg-subtle: rgba(77, 166, 255, 0.08);
+      --font: system-ui, sans-serif;
+      --font-mono: "Iosevka SS08", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --font-sm: 0.85em;
+    }
+    body { margin: 0; background: var(--bg-0); color: var(--text-0); font-family: var(--font); font-size: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #7dbcff; text-decoration: underline; }
+    svg { display: block; }
+
+    .tabs { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: var(--font-sm); }
+    .tabs span { padding: 1px 9px; color: var(--text-2); }
+    .tabs span + span { border-left: 1px solid var(--border); }
+    .tabs span.on { background: var(--accent-bg); color: var(--accent); }
+
+    .l { display: flex; height: 20px; align-items: center; }
+    .l .n { width: 46px; flex: none; text-align: right; padding-right: 10px; box-sizing: border-box;
+            color: #858585; font-family: var(--font-mono); font-size: 13px; }
+    .l .f { width: 16px; flex: none; color: var(--text-2); }
+    .l .c { font-family: var(--font-mono); font-size: 13px; white-space: pre; }
+    .l.sel { background: var(--accent-bg); }
+    .k { color: #9cdcfe; } .s { color: #ce9178; } .p { color: #d4d4d4; } .num { color: #b5cea8; }
+    .fold { background: var(--bg-2); border: 1px solid var(--border); border-radius: 3px;
+            color: var(--text-2); font-size: 11px; padding: 0 5px; margin: 0 3px; }
+  </style>
+</helmet>
+
+<div style="width: 940px; height: 660px; background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 10px; box-sizing: border-box;
+              background: var(--bg-1); border-bottom: 1px solid var(--border-dark); flex: none;">
+    <span style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2);">Plan</span>
+    <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);">TYPE DISTRIBUTED, FORMAT JSON</span>
+    <span style="flex: 1;"></span>
+    <span class="tabs"><span>Graph</span><span>Tree</span><span>Cost</span><span class="on">JSON</span></span>
+    <span style="display: flex; align-items: center; gap: 0.35em; font-size: var(--font-sm); color: var(--text-2);">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      Copy
+    </span>
+  </div>
+
+  <div style="padding: 6px 14px 8px; font-size: var(--font-sm); color: var(--text-2); flex: none;">
+    The escape hatch · read-only monaco, folded to fragments, selection kept in step with the other tabs
+  </div>
+
+  <div style="flex: none; padding-bottom: 6px;">
+    <div class="l"><span class="n">1</span><span class="f"></span><span class="c"><span class="p">{</span></span></div>
+    <div class="l"><span class="n">2</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg);"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">  <span class="k">"0"</span> <span class="p">: {</span></span></div>
+    <div class="l"><span class="n">3</span><span class="f"></span><span class="c">     <span class="k">"id"</span> <span class="p">:</span> <span class="s">"9"</span><span class="p">,</span></span></div>
+    <div class="l"><span class="n">4</span><span class="f"></span><span class="c">     <span class="k">"name"</span> <span class="p">:</span> <span class="s">"Output"</span><span class="p">,</span></span></div>
+    <div class="l"><span class="n">5</span><span class="f"></span><span class="c">     <span class="k">"descriptor"</span> <span class="p">: {</span> <span class="k">"columnNames"</span> <span class="p">:</span> <span class="s">"[regionkey, _col1]"</span> <span class="p">},</span></span></div>
+    <div class="l"><span class="n">6</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"outputs"</span> <span class="p">: [</span></span><span class="fold">2 symbols</span><span class="c"><span class="p">],</span></span></div>
+    <div class="l"><span class="n">7</span><span class="f"></span><span class="c">     <span class="k">"details"</span> <span class="p">: [</span> <span class="s">"_col1 := count"</span> <span class="p">],</span></span></div>
+    <div class="l"><span class="n">8</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"estimates"</span> <span class="p">: [</span></span><span class="fold">all NaN</span><span class="c"><span class="p">],</span></span></div>
+    <div class="l"><span class="n">9</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"children"</span> <span class="p">: [</span></span><span class="fold">RemoteSource #145</span><span class="c"><span class="p">]</span></span></div>
+    <div class="l"><span class="n">10</span><span class="f"></span><span class="c">  <span class="p">},</span></span></div>
+    <div class="l"><span class="n">11</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg);"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">  <span class="k">"1"</span> <span class="p">: {</span></span></div>
+    <div class="l sel"><span class="n">12</span><span class="f"></span><span class="c">     <span class="k">"id"</span> <span class="p">:</span> <span class="s">"4"</span><span class="p">,</span></span></div>
+    <div class="l sel"><span class="n">13</span><span class="f"></span><span class="c">     <span class="k">"name"</span> <span class="p">:</span> <span class="s">"Aggregate"</span><span class="p">,</span></span></div>
+    <div class="l sel"><span class="n">14</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg);"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"descriptor"</span> <span class="p">: {</span></span></div>
+    <div class="l sel"><span class="n">15</span><span class="f"></span><span class="c">        <span class="k">"type"</span> <span class="p">:</span> <span class="s">"FINAL"</span><span class="p">,</span></span></div>
+    <div class="l sel"><span class="n">16</span><span class="f"></span><span class="c">        <span class="k">"keys"</span> <span class="p">:</span> <span class="s">"[regionkey]"</span><span class="p">,</span></span></div>
+    <div class="l sel"><span class="n">17</span><span class="f"></span><span class="c">        <span class="k">"hash"</span> <span class="p">:</span> <span class="s">"[]"</span></span></div>
+    <div class="l sel"><span class="n">18</span><span class="f"></span><span class="c">     <span class="p">},</span></span></div>
+    <div class="l sel"><span class="n">19</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"outputs"</span> <span class="p">: [</span></span><span class="fold">2 symbols</span><span class="c"><span class="p">],</span></span></div>
+    <div class="l sel"><span class="n">20</span><span class="f"></span><span class="c">     <span class="k">"details"</span> <span class="p">: [</span> <span class="s">"count := count(\"count_0\")"</span> <span class="p">],</span></span></div>
+    <div class="l sel"><span class="n">21</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"estimates"</span> <span class="p">: [</span></span><span class="fold">all NaN</span><span class="c"><span class="p">],</span></span></div>
+    <div class="l sel"><span class="n">22</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">     <span class="k">"children"</span> <span class="p">: [</span></span><span class="fold">LocalExchange #194 → Project #227 → RemoteSource #200</span><span class="c"><span class="p">]</span></span></div>
+    <div class="l"><span class="n">23</span><span class="f"></span><span class="c">  <span class="p">},</span></span></div>
+    <div class="l"><span class="n">24</span><span class="f"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="c">  <span class="k">"2"</span> <span class="p">: {</span></span><span class="fold">Project #226 → Aggregate #198 → TableScan #0</span><span class="c"><span class="p">}</span></span></div>
+    <div class="l"><span class="n">25</span><span class="f"></span><span class="c"><span class="p">}</span></span></div>
+  </div>
+
+  <div style="flex: 1;"></div>
+
+  <div style="padding: 12px 14px 16px; border-top: 1px solid var(--border-dark); display: flex; gap: 24px; flex: none;">
+    <div style="width: 434px;">
+      <div style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2); margin-bottom: 8px;">Why keep it</div>
+      <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5;">
+        It is the whole feature in an afternoon — the statement already runs, the response already
+        comes back, and a read-only monaco already exists in the app. Ship this first, and every
+        richer view becomes a rendering choice over data you already have on the client.
+      </div>
+    </div>
+    <div style="width: 434px;">
+      <div style="font-size: var(--font-sm); font-weight: bold; text-transform: uppercase; color: var(--text-2); margin-bottom: 8px;">And keep it after</div>
+      <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5;">
+        Any renderer will drop fields it does not understand, and Trino adds node kinds between
+        releases. A raw tab means an unrecognised plan is still readable, and it is the thing people
+        paste into an issue.
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
