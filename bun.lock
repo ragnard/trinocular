@@ -7,7 +7,7 @@
       "dependencies": {
         "@lucide/svelte": "^1.7.0",
         "monaco-editor": "^0.55.1",
-        "monaco-language-trino": "file:packages/monaco-language-trino",
+        "monaco-language-trino": "workspace:*",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -23,6 +23,22 @@
         "svelte-check": "^4.4.6",
         "typescript": "^5.9.3",
         "vite": "^8.0.3",
+      },
+    },
+    "packages/monaco-language-trino": {
+      "name": "monaco-language-trino",
+      "dependencies": {
+        "antlr4-c3": "^3.4.4",
+        "antlr4ng": "^3.0.16",
+      },
+      "devDependencies": {
+        "antlr-ng": "^1.0.10",
+        "monaco-editor": "^0.55.1",
+        "typescript": "^5.9.3",
+        "vite": "^7.1.11",
+      },
+      "peerDependencies": {
+        "monaco-editor": ">=0.30.0",
       },
     },
   },
@@ -323,7 +339,7 @@
 
     "monaco-editor": ["monaco-editor@0.55.1", "", { "dependencies": { "dompurify": "3.2.7", "marked": "14.0.0" } }, "sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A=="],
 
-    "monaco-language-trino": ["monaco-language-trino@file:packages/monaco-language-trino", { "dependencies": { "antlr4-c3": "^3.4.4", "antlr4ng": "^3.0.16" }, "devDependencies": { "antlr-ng": "^1.0.10", "monaco-editor": "^0.55.1", "typescript": "^5.9.3", "vite": "^7.1.11" }, "peerDependencies": { "monaco-editor": ">=0.30.0" } }],
+    "monaco-language-trino": ["monaco-language-trino@workspace:packages/monaco-language-trino"],
 
     "mri": ["mri@1.2.0", "", {}, "sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA=="],
 

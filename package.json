@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -14,7 +15,7 @@
   "dependencies": {
     "@lucide/svelte": "^1.7.0",
     "monaco-editor": "^0.55.1",
-    "monaco-language-trino": "file:packages/monaco-language-trino",
+    "monaco-language-trino": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

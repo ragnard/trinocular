@@ -9,7 +9,7 @@ A web-based SQL query IDE for the Trino distributed query engine. Users write SQ
 ## Commands
 
 ```bash
-bun install              # Install dependencies (uses bun workspaces)
+bun install              # Install dependencies (bun workspaces; packages/* are symlinked)
 bun run dev              # Dev server on port 5173
 bun run build            # Production build (SvelteKit node adapter)
 bun run check            # Type-check with svelte-check
@@ -51,7 +51,11 @@ Monaco Editor → runStatement() → Trino client (fetch, one per run) → serve
 
 ### Monaco language package
 
-`packages/monaco-language-trino/` is a workspace package providing Trino SQL support: ANTLR-generated parser (SqlBase.g4), completion, semantic tokens, diagnostics, folding, and statement splitting. Imported as `monaco-language-trino`.
+`packages/monaco-language-trino/` is a bun workspace package providing Trino SQL support: ANTLR-generated parser (SqlBase.g4), completion, semantic tokens, diagnostics, folding, and statement splitting. Imported as `monaco-language-trino`.
+
+**The app consumes this package's TypeScript source, not a build.** Its `exports` point at `src/index.ts`, the workspace makes `node_modules/monaco-language-trino` a symlink to `packages/`, and `optimizeDeps.exclude` in `vite.config.ts` keeps vite from pre-bundling it. So an edit under `packages/` is live immediately — no `build:lib`, no `bun install`, no clearing `node_modules/.vite`. Each of those was previously a way for the running app to silently keep executing stale code, which is easy to miss because the app fails by rendering nothing rather than erroring. `bun run check` now type-checks the package source along with the app, so drift shows up there too.
+
+`build:lib` still exists for publishing the package standalone, but nothing in this repo consumes `dist/`. `build:grammar` regenerates the parser and then runs `fix:generated`, which restores the type-only `ParseTreeListener` import that the app's `verbatimModuleSyntax` requires and antlr-ng does not emit.
 
 ## Key conventions
 

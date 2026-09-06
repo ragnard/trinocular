@@ -4,7 +4,7 @@ import { CodeCompletionCore } from 'antlr4-c3';
 import { SqlBaseLexer } from '../parser/SqlBaseLexer';
 import { SqlBaseParser } from '../parser/SqlBaseParser';
 import { keywordMap } from './trinoKeywordMap';
-import { MetadataProvider } from './metadataProvider';
+import type { MetadataProvider } from './metadataProvider';
 import type { DocumentParseService } from './documentParseService';
 
 // Built-in Trino type names. These are parsed as identifiers (not keywords)
