@@ -98,10 +98,10 @@
   <symbol id="i-pig" viewBox="0 0 24 24"><path d="M4 12a7 6 0 0 1 7-6h3a7 6 0 0 1 7 6c0 3.3-3.1 6-7 6h-3l-3 3v-3.6A6 6 0 0 1 4 12Z"/><circle cx="16" cy="12" r="1.6"/><path d="M14.4 12h3.2"/></symbol>
 </svg>
 
-<div class="light" style="width:1180px;height:1120px;background:var(--s0);color:var(--fg);padding:32px 36px">
+<div class="light" style="width:1180px;height:1200px;background:var(--s0);color:var(--fg);padding:32px 36px">
 
   <div style="font-size:13px;font-weight:600;margin-bottom:4px">The small system underneath all three directions</div>
-  <div style="color:var(--fg-2);max-width:820px;margin-bottom:26px">Two text sizes, one radius, four control heights, one icon size, one accent. Everything on the artboards is built out of exactly this &mdash; if something needs a fifth size it is a sign the thing is doing two jobs.</div>
+  <div style="color:var(--fg-2);max-width:820px;margin-bottom:26px">Two text sizes, four heights, three radii, one icon size, one accent with four jobs. Everything on the artboards is built out of exactly this &mdash; if something needs a fifth height or a third text size it is a sign the thing is doing two jobs.</div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 44px;align-items:start">
 
@@ -137,7 +137,7 @@
         <div class="caps" style="color:var(--fg-3);margin-bottom:10px">Heights &mdash; four, and they stack</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <div class="row" style="gap:12px"><div class="row" style="width:210px;height:36px;background:var(--s1);border:1px solid var(--line-strong);border-radius:6px;padding:0 10px;color:var(--fg-2)">rail</div><span class="mono meta" style="color:var(--fg-3)">36 px</span><span class="meta" style="color:var(--fg-3)">every pane header, identically</span></div>
-          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:30px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 10px;color:var(--fg-2)">table row</div><span class="mono meta" style="color:var(--fg-3)">30 px</span><span class="meta" style="color:var(--fg-3)">was 28 &mdash; 2 px is the whole "looser"</span></div>
+          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:30px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 12px;color:var(--fg-2)">table row &amp; header</div><span class="mono meta" style="color:var(--fg-3)">30 px</span><span class="meta" style="color:var(--fg-3)">was 28 &mdash; 2 px is the whole "looser"</span></div>
           <div class="row" style="gap:12px"><div class="row" style="width:210px;height:26px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 10px;color:var(--fg-2)">tree row</div><span class="mono meta" style="color:var(--fg-3)">26 px</span><span class="meta" style="color:var(--fg-3)">hover fills the whole row</span></div>
           <div class="row" style="gap:12px"><div class="row" style="width:210px;height:24px;background:var(--s2);border-radius:6px;padding:0 10px;color:var(--fg-2)">control</div><span class="mono meta" style="color:var(--fg-3)">24 px</span><span class="meta" style="color:var(--fg-3)">chips, buttons, inputs inside a rail</span></div>
         </div>
@@ -148,25 +148,29 @@
         <div>
           <div class="caps" style="color:var(--fg-3);margin-bottom:10px">Space</div>
           <div style="display:flex;flex-direction:column;gap:7px">
-            <div class="row" style="gap:10px"><div style="width:4px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">4 &mdash; icon to label</span></div>
+            <div class="row" style="gap:10px"><div style="width:6px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">6 &mdash; icon to label</span></div>
             <div class="row" style="gap:10px"><div style="width:8px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">8 &mdash; inside a control</span></div>
-            <div class="row" style="gap:10px"><div style="width:12px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">12 &mdash; rail padding</span></div>
+            <div class="row" style="gap:10px"><div style="width:12px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">12 &mdash; rail and cell padding</span></div>
             <div class="row" style="gap:10px"><div style="width:16px;height:14px;background:var(--accent);opacity:.85"></div><span class="mono meta" style="color:var(--fg-3)">16 &mdash; pane padding</span></div>
           </div>
         </div>
         <div>
           <div class="caps" style="color:var(--fg-3);margin-bottom:10px">Radius</div>
-          <div class="row" style="gap:14px">
+          <div class="row" style="gap:12px;align-items:flex-end">
             <div style="text-align:center">
-              <div style="width:52px;height:40px;background:var(--s2);border-radius:6px"></div>
-              <div class="mono meta" style="color:var(--fg-3);margin-top:6px">6 px</div>
+              <div style="width:56px;height:44px;background:var(--s2);border-radius:8px"></div>
+              <div class="mono meta" style="color:var(--fg-3);margin-top:6px">8 &mdash; panels</div>
             </div>
             <div style="text-align:center">
-              <div style="width:34px;height:20px;background:var(--s2);border-radius:4px;margin-top:20px"></div>
-              <div class="mono meta" style="color:var(--fg-3);margin-top:6px">4 px &mdash; kbd only</div>
+              <div style="width:44px;height:30px;background:var(--s2);border-radius:6px"></div>
+              <div class="mono meta" style="color:var(--fg-3);margin-top:6px">6 &mdash; controls</div>
+            </div>
+            <div style="text-align:center">
+              <div style="width:30px;height:18px;background:var(--s2);border-radius:4px"></div>
+              <div class="mono meta" style="color:var(--fg-3);margin-top:6px">4 &mdash; kbd</div>
             </div>
           </div>
-          <div class="meta" style="color:var(--fg-3);margin-top:10px">Today 3, 4 and 6 px are all in use, sometimes touching.</div>
+          <div class="meta" style="color:var(--fg-3);margin-top:10px">Nested, largest outside: a 6&nbsp;px chip never sits inside a 4&nbsp;px box. Today 3, 4 and 6 px are all in use, sometimes touching.</div>
         </div>
       </div>
 
@@ -174,10 +178,14 @@
       <div>
         <div class="caps" style="color:var(--fg-3);margin-bottom:10px">Icons &mdash; 14 px, one weight, <span style="text-transform:none;letter-spacing:0;font-weight:400">always <span class="mono">--fg-3</span> until they mean something</span></div>
         <div class="row" style="gap:16px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;color:var(--fg-3)">
-          <svg class="ic"><use href="#i-search"/></svg><svg class="ic"><use href="#i-db"/></svg><svg class="ic"><use href="#i-box"/></svg><svg class="ic"><use href="#i-table"/></svg><svg class="ic"><use href="#i-type"/></svg><svg class="ic"><use href="#i-file"/></svg><svg class="ic"><use href="#i-right"/></svg><svg class="ic"><use href="#i-play"/></svg><svg class="ic"><use href="#i-list"/></svg><svg class="ic"><use href="#i-panel"/></svg><svg class="ic"><use href="#i-dl"/></svg><svg class="ic"><use href="#i-copy"/></svg><svg class="ic"><use href="#i-x"/></svg><svg class="ic"><use href="#i-moon"/></svg>
+          <svg class="ic"><use href="#i-search"/></svg><svg class="ic"><use href="#i-db"/></svg><svg class="ic"><use href="#i-box"/></svg><svg class="ic"><use href="#i-table"/></svg><svg class="ic"><use href="#i-type"/></svg><svg class="ic"><use href="#i-file"/></svg><svg class="ic"><use href="#i-play"/></svg><svg class="ic"><use href="#i-list"/></svg><svg class="ic"><use href="#i-panel"/></svg><svg class="ic"><use href="#i-dl"/></svg><svg class="ic"><use href="#i-copy"/></svg><svg class="ic"><use href="#i-x"/></svg><svg class="ic"><use href="#i-moon"/></svg>
           <span style="flex:1"></span>
           <svg class="ic" style="color:var(--accent)"><use href="#i-play"/></svg>
           <svg class="ic" style="color:var(--error)"><use href="#i-warn"/></svg>
+        </div>
+        <div class="row" style="gap:12px;margin-top:8px;padding:8px 14px;border:1px solid var(--line);border-radius:8px;color:var(--fg-3)">
+          <svg class="ic12"><use href="#i-right"/></svg><svg class="ic12"><use href="#i-down"/></svg>
+          <span class="meta">12 px &mdash; the one exception: chevrons, which are pure direction and read heavy at 14</span>
         </div>
         <div class="meta" style="color:var(--fg-3);margin-top:8px">Today: 12, 13, 14 and 16 px in the same row of chrome.</div>
       </div>
@@ -210,10 +218,10 @@
       <div>
         <div class="caps" style="color:var(--fg-3);margin-bottom:10px">The accent has a budget &mdash; four jobs, no others</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="row" style="gap:10px;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;border-radius:4px;background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent-line)"></span><span class="meta" style="color:var(--fg-2)">selected cell / row</span></div>
-          <div class="row" style="gap:10px;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;border-radius:4px;border:1px solid var(--accent);box-shadow:0 0 0 2px var(--accent-bg)"></span><span class="meta" style="color:var(--fg-2)">focus ring</span></div>
-          <div class="row" style="gap:10px;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent)"><svg class="ic12"><use href="#i-play"/></svg></span><span class="meta" style="color:var(--fg-2)">the running statement</span></div>
-          <div class="row" style="gap:10px;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent);text-decoration:underline">a</span><span class="meta" style="color:var(--fg-2)">links (Details &rarr; Trino UI)</span></div>
+          <div class="row" style="gap:10px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;border-radius:4px;background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent-line)"></span><span class="meta" style="color:var(--fg-2)">selected cell / row</span></div>
+          <div class="row" style="gap:10px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;border-radius:4px;border:1px solid var(--accent);box-shadow:0 0 0 2px var(--accent-bg)"></span><span class="meta" style="color:var(--fg-2)">focus ring</span></div>
+          <div class="row" style="gap:10px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent)"><svg class="ic12"><use href="#i-play"/></svg></span><span class="meta" style="color:var(--fg-2)">the running statement</span></div>
+          <div class="row" style="gap:10px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:6px"><span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent);text-decoration:underline">a</span><span class="meta" style="color:var(--fg-2)">links (Details &rarr; Trino UI)</span></div>
         </div>
         <div class="row" style="gap:10px;margin-top:10px">
           <span class="row" style="gap:7px;height:26px;padding:0 10px;border-radius:6px;background:var(--error-bg);color:var(--error)"><svg class="ic12"><use href="#i-warn"/></svg><span class="meta">failed &middot; cancelled</span></span>
@@ -241,10 +249,10 @@
             <div class="meta" style="color:var(--fg-3);margin-bottom:6px">proposed &mdash; hairlines and alignment do it</div>
             <div style="border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--s0)">
               <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px">
-                <tr><th style="width:36px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);height:34px"></th><th style="background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);text-align:left;padding:0 10px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">nation</span><span class="meta" style="color:var(--fg-3)">varchar</span></div></th><th style="width:96px;background:var(--s1);border-bottom:1px solid var(--line-strong);text-align:left;padding:0 10px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">orders</span><span class="meta" style="color:var(--fg-3)">bigint</span></div></th></tr>
-                <tr><td class="meta num" style="height:30px;padding:0 10px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">1</td><td style="height:30px;padding:0 10px;border-bottom:1px solid var(--line)">ARGENTINA</td><td class="num" style="height:30px;padding:0 10px;text-align:right;border-bottom:1px solid var(--line)">598412</td></tr>
-                <tr><td class="meta num" style="height:30px;padding:0 10px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">2</td><td style="height:30px;padding:0 10px;border-bottom:1px solid var(--line)">BRAZIL</td><td class="num" style="height:30px;padding:0 10px;text-align:right;border-bottom:1px solid var(--line)">601077</td></tr>
-                <tr><td class="meta num" style="height:30px;padding:0 10px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">3</td><td style="height:30px;padding:0 10px;border-bottom:1px solid var(--line)">CANADA</td><td class="num" style="height:30px;padding:0 10px;text-align:right;border-bottom:1px solid var(--line)">600288</td></tr>
+                <tr><th style="width:36px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);height:30px"></th><th style="background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);text-align:left;padding:0 12px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">nation</span><span class="meta" style="color:var(--fg-3)">varchar</span></div></th><th style="width:96px;background:var(--s1);border-bottom:1px solid var(--line-strong);text-align:left;padding:0 12px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">orders</span><span class="meta" style="color:var(--fg-3)">bigint</span></div></th></tr>
+                <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">1</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">ARGENTINA</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">598412</td></tr>
+                <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">2</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">BRAZIL</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">601077</td></tr>
+                <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">3</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">CANADA</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">600288</td></tr>
               </table>
             </div>
           </div>

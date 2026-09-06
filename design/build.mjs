@@ -18,29 +18,37 @@ const DATA = [
   ["INDONESIA", "599731", "60077", "9056999210.47", "7.49"],
   ["IRAN", "598104", "59810", "9037811006.29", "7.52"],
   ["IRAQ", "600899", "60188", "9077001552.11", "7.46"],
-  ["JAPAN", "600774", "60002", "9074116220.85", "7.50"]
+  ["JAPAN", "600774", "60002", "9074116220.85", "7.50"],
+  ["JORDAN", "599210", "60041", "9051447903.64", "7.53"],
+  ["KENYA", "600550", "59918", "9069220774.19", "7.48"],
+  ["MOROCCO", "599402", "60155", "9053118447.02", "7.51"],
+  ["MOZAMBIQUE", "601011", "60003", "9081447220.36", "7.49"]
 ];
 
 // Proposed table: horizontal hairlines only, numerics right-aligned + tabular.
-function rows({ h = 30, selected = 2, widths = [200, 130, 140, 190, 150] }) {
-  return DATA.map(([nation, orders, customers, revenue, days], i) => {
-    const cell = (v, align, sel) =>
-      `<td style="height:${h}px;padding:0 10px;border-bottom:1px solid var(--line);text-align:${align}` +
-      (align === "right" ? ";font-variant-numeric:tabular-nums" : "") +
-      (sel ? ";background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent-line)" : "") +
-      `">${v}</td>`;
-    return (
-      `<tr>` +
-      `<td class="meta num" style="height:${h}px;padding:0 10px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">${i + 1}</td>` +
-      cell(nation, "left", false) +
-      cell(orders, "right", false) +
-      cell(customers, "right", false) +
-      cell(revenue, "right", i === selected) +
-      cell(days, "right", false) +
-      `<td style="border-bottom:1px solid var(--line)"></td>` +
-      `</tr>`
-    );
-  }).join("\n");
+// One row height (30) and one cell padding (12) across every artboard.
+function rows({ count = 12, selected = 2 } = {}) {
+  const h = 30;
+  return DATA.slice(0, count)
+    .map(([nation, orders, customers, revenue, days], i) => {
+      const cell = (v, align, sel) =>
+        `<td style="height:${h}px;padding:0 12px;border-bottom:1px solid var(--line);text-align:${align}` +
+        (align === "right" ? ";font-variant-numeric:tabular-nums" : "") +
+        (sel ? ";background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent-line)" : "") +
+        `">${v}</td>`;
+      return (
+        `<tr>` +
+        `<td class="meta num" style="height:${h}px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">${i + 1}</td>` +
+        cell(nation, "left", false) +
+        cell(orders, "right", false) +
+        cell(customers, "right", false) +
+        cell(revenue, "right", i === selected) +
+        cell(days, "right", false) +
+        `<td style="border-bottom:1px solid var(--line)"></td>` +
+        `</tr>`
+      );
+    })
+    .join("\n");
 }
 
 const build = (name, bodyFile, replacements = {}) => {
@@ -51,8 +59,8 @@ const build = (name, bodyFile, replacements = {}) => {
 };
 
 build("Current.dc.html", "_body_current.part");
-build("Main.dc.html", "_body_main.part", { "<!--ROWS-->": rows({}) });
-build("Cards.dc.html", "_body_cards.part", { "<!--ROWS-->": rows({ h: 32, selected: 2, widths: [] }) });
-build("AppBar.dc.html", "_body_appbar.part", { "<!--ROWS-->": rows({ h: 32, selected: 2 }) });
+build("Main.dc.html", "_body_main.part", { "<!--ROWS-->": rows({ count: 12 }) });
+build("Cards.dc.html", "_body_cards.part", { "<!--ROWS-->": "" });
+build("AppBar.dc.html", "_body_appbar.part", { "<!--ROWS-->": rows({ count: 15 }) });
 build("Inspector.dc.html", "_body_inspector.part");
 build("System.dc.html", "_body_system.part");
