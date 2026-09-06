@@ -73,6 +73,20 @@
     { collection: monaco.editor.IEditorDecorationsCollection; model: monaco.editor.ITextModel }
   >();
 
+  /**
+   * An anchor must not swallow what is typed beside it. Monaco's default
+   * stickiness extends a decoration over text inserted at either of its edges,
+   * so pressing Enter at the end of a statement and writing the next one grew
+   * the first statement's anchor across both — and the new, never-run
+   * statement came up already wearing its neighbour's result, "Run" and
+   * "Results" side by side. Edits *inside* the statement still move and
+   * stretch the anchor, which is what keeps a result attached to its
+   * statement while it is being rewritten.
+   */
+  const ANCHOR_DECORATION: monaco.editor.IModelDecorationOptions = {
+    stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+  };
+
   // Redraw the statement toolbars when a result changes state (running ->
   // finished / failed / cancelling). Reading the fields is what subscribes
   // this effect to them; the redraw itself is a textContent write.
@@ -289,7 +303,7 @@
       const anchorId = crypto.randomUUID();
       anchors.set(anchorId, {
         collection: editor.createDecorationsCollection([
-          { range, options: {} }
+          { range, options: ANCHOR_DECORATION }
         ]),
         model
       });
@@ -623,7 +637,7 @@
     const replacesId = resultAtRange(model, range, false)?.id;
     const anchorId = crypto.randomUUID();
     anchors.set(anchorId, {
-      collection: editor.createDecorationsCollection([{ range, options: {} }]),
+      collection: editor.createDecorationsCollection([{ range, options: ANCHOR_DECORATION }]),
       model
     });
     onexecutesql(sql, startLine, anchorId, replacesId);
