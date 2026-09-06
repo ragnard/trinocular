@@ -1,8 +1,5 @@
 
 import { ErrorNode, ParserRuleContext, TerminalNode } from "antlr4ng";
-// ParseTreeListener is an interface, so it needs a type-only import under the
-// app's verbatimModuleSyntax. Reapplied automatically by `fix:generated`,
-// which build:grammar runs — see this package's package.json.
 import type { ParseTreeListener } from "antlr4ng";
 
 
