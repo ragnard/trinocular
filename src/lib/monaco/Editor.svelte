@@ -249,28 +249,21 @@
 
   /**
    * The result anchored over `range`, if any — the one question every caller
-   * that maps between editor positions and results needs answered.
-   *
-   * `liveOnly` skips results whose tracked range has collapsed: the statement
-   * they belonged to was erased, so they must not be claimed by whatever gets
-   * written at that position next. Only `runRange` passes false, so that a
-   * lens click arriving a render behind the model still replaces the result
-   * its statement owns rather than opening a second one beside it.
+   * that maps between editor positions and results needs answered. A result
+   * whose anchor collapsed is dropped by the change listener as the edit
+   * lands, so every result still in the file has a live anchor by the time
+   * anyone asks.
    */
   function resultAtRange(
     model: monaco.editor.ITextModel,
-    range: monaco.IRange,
-    liveOnly = true
+    range: monaco.IRange
   ): Result | undefined {
     const owner = fileOfModel.get(model);
     if (!owner) return undefined;
     for (const result of owner.results) {
-      if (!result.anchorId) continue;
       const entry = anchors.get(result.anchorId);
       if (!entry || entry.model !== model) continue;
-      const ranges = entry.collection.getRanges();
-      if (liveOnly && isCollapsed(ranges)) continue;
-      if (ranges.some((r) => rangesOverlap(r, range))) return result;
+      if (entry.collection.getRanges().some((r) => rangesOverlap(r, range))) return result;
     }
     return undefined;
   }
@@ -280,38 +273,6 @@
     statement: Statement
   ): Result | undefined {
     return resultAtRange(model, statementRange(model, statement));
-  }
-
-  /**
-   * Gives detached results (statement erased) a fresh anchor when a statement
-   * with the exact same text appears again — e.g. the statement was cut and
-   * pasted elsewhere in the file. Returns true if anything was reattached.
-   */
-  function reattachDetached(model: monaco.editor.ITextModel, owner: SqlFile): boolean {
-    const detached = owner.results.filter((r) => !r.anchorId);
-    if (detached.length === 0 || !editor) return false;
-    let reattached = false;
-    for (const statement of statementsOf(model)) {
-      if (detached.length === 0) break;
-      // If this statement already has an active, non-collapsed anchor, skip it.
-      const range = statementRange(model, statement);
-      if (resultAtRange(model, range)) continue;
-
-      const sql = statement.text.trim();
-      const match = detached.find((r) => r.sql === sql);
-      if (!match) continue;
-      const anchorId = crypto.randomUUID();
-      anchors.set(anchorId, {
-        collection: editor.createDecorationsCollection([
-          { range, options: ANCHOR_DECORATION }
-        ]),
-        model
-      });
-      match.anchorId = anchorId;
-      detached.splice(detached.indexOf(match), 1);
-      reattached = true;
-    }
-    return reattached;
   }
 
   /** The icon and text the status button carries in a given result state. */
@@ -634,7 +595,7 @@
     const owner = fileOfModel.get(model);
     if (!owner) return;
     // Re-running a statement replaces its previous result.
-    const replacesId = resultAtRange(model, range, false)?.id;
+    const replacesId = resultAtRange(model, range)?.id;
     const anchorId = crypto.randomUUID();
     anchors.set(anchorId, {
       collection: editor.createDecorationsCollection([{ range, options: ANCHOR_DECORATION }]),
@@ -682,8 +643,8 @@
       const owner = fileOfModel.get(model);
       if (owner) {
         owner.content = model.getValue();
-        // Erasing a statement collapses its tracked range — detach the result
-        // so it can neither be shown nor attach to replacement statements.
+        // Erasing a statement collapses its tracked range, which is the end of
+        // its result: dropping it also stops a query that is still running.
         const dead = owner.results.filter((result) => {
           const entry = anchors.get(result.anchorId);
           return entry?.model === model && isCollapsed(entry.collection.getRanges());
@@ -693,11 +654,8 @@
             anchors.get(result.anchorId)?.collection.clear();
             anchors.delete(result.anchorId);
           }
-          owner.detachResults(dead);
+          owner.dropResults(dead);
         }
-        // A pasted-back statement has the same text it was erased with —
-        // reattach its result. Exact text match, same rule the toolbar uses.
-        reattachDetached(model, owner);
       }
       // Every edit can move a statement, so the strips are always re-synced.
       syncToolbars();

@@ -13,8 +13,9 @@ const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
  * The result of one statement execution. The editor plants a hidden Monaco
  * decoration on the statement's range at run time (`anchorId`); decorations
  * track the text through edits, so the result stays associated with "its"
- * statement even after the statement is changed. Re-running replaces the
- * result (see `SqlFile.addResult`).
+ * statement even after the statement is changed. Erasing the statement drops
+ * the result (see `SqlFile.dropResults`), re-running replaces it (see
+ * `SqlFile.addResult`).
  */
 export class Result {
   client: Trino;
@@ -168,34 +169,26 @@ export class SqlFile {
       if (index !== -1) this.results.splice(index, 1)[0].discard();
     }
     this.results.unshift(result);
+    // `results` is newest-first, so the oldest goes off the tail.
     while (this.results.length > MAX_RESULTS_PER_FILE) {
-      // Prefer evicting detached results (statement erased, not pasted back)
-      // over live ones. `results` is newest-first, so scan from the tail.
-      let oldestDetached = -1;
-      for (let i = this.results.length - 1; i > 0; i--) {
-        if (!this.results[i].anchorId) {
-          oldestDetached = i;
-          break;
-        }
-      }
-      const at = oldestDetached !== -1 ? oldestDetached : this.results.length - 1;
-      this.results.splice(at, 1)[0].discard();
+      this.results.pop()!.discard();
     }
     this.activeResult = result;
   }
 
   /**
-   * Detaches results whose statement was erased (the editor reports their
-   * tracked range collapsed): the result becomes invisible and cannot match
-   * by anchor, but stays in the list so pasting the same statement text back
-   * can reattach it (exact text match in the editor). Detached results carry
-   * an empty `anchorId` and are evicted first.
+   * Drops results whose statement was erased (the editor reports their tracked
+   * range collapsed). The statement they belonged to is gone and results are
+   * never matched to statements by text, so there is nothing left for them to
+   * come back to: cutting a statement loses its result, and pasting it
+   * elsewhere starts from an empty strip.
    */
-  detachResults(dead: Result[]) {
+  dropResults(dead: Result[]) {
     for (const result of dead) {
-      result.anchorId = "";
+      const index = this.results.indexOf(result);
+      if (index !== -1) this.results.splice(index, 1)[0].discard();
     }
-    if (this.activeResult && dead.some((r) => r.id === this.activeResult?.id)) {
+    if (this.activeResult && dead.includes(this.activeResult)) {
       this.activeResult = null;
     }
   }
