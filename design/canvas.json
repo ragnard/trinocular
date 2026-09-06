@@ -4,7 +4,7 @@
     { "file": "Main.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "A — Rail" },
     { "file": "Cards.dc.html", "x": 0, "y": 1180, "w": 1440, "h": 900, "title": "B — Cards" },
     { "file": "AppBar.dc.html", "x": 1560, "y": 1180, "w": 1440, "h": 900, "title": "C — App bar" },
-    { "file": "Inspector.dc.html", "x": 0, "y": 2360, "w": 1240, "h": 1140, "title": "Inspector states (direction A)" },
+    { "file": "Inspector.dc.html", "x": 0, "y": 2360, "w": 1240, "h": 1140, "title": "Inspector states" },
     { "file": "System.dc.html", "x": 1400, "y": 2360, "w": 1180, "h": 1200, "title": "The shared system" }
   ],
   "annotations": [
@@ -20,35 +20,35 @@
       "x": 1560,
       "y": -150,
       "w": 620,
-      "text": "A - RAIL. One 36 px band across the whole top, so the three headers finally line up. Brand and user drop to a 26 px status bar. The inspector leaves the layout entirely: a selected cell is one line under the table, Cmd+I opens it over the results. Cheapest on pixels, most IDE-like."
+      "text": "A - RAIL. One 36 px band across the whole top, so the three headers line up. Brand and user drop to a 26 px status bar.\nThe inspector is a region of the RESULTS pane: it slides in from the right, keeps the table beside it, and shares a draggable divider. Its height is the table's height, so the selection and its documents scroll in step. Cheapest on pixels."
     },
     {
       "id": "dir-b",
       "x": 0,
       "y": 1000,
       "w": 620,
-      "text": "B - CARDS. Panes become cards on a recessed ground with 8 px gutters - the loosest of the three, and the only one that costs real estate (about 24 px each way). The inspector is a mode of the results pane: Table / Row detail, so the row gets the full width and fields land in three columns. Warm neutral palette."
+      "text": "B - CARDS. Panes become cards on a recessed ground with 8 px gutters - the loosest of the three, and the only one that costs real estate (about 24 px each way). Warm neutral palette.\nThe inspector is its own card at FULL WINDOW HEIGHT, sliding in beside the editor and results together. Same block selection as A, but five documents fit at once instead of two and a half."
     },
     {
       "id": "dir-c",
       "x": 1560,
       "y": 1000,
       "w": 620,
-      "text": "C - APP BAR. One global bar carries file, connection and identity, so the panes below need no headers at all and are told apart by tone rather than rules. The quietest of the three. The inspector keeps its place on the right but collapses to a 44 px rail until you want it."
+      "text": "C - APP BAR. Unchanged from the first round apart from the shared system. One global bar carries file, connection and identity, so the panes below need no headers at all and are told apart by tone rather than rules. The quietest of the three. Kept here as the third option; its inspector still collapses to a 44 px rail."
     },
     {
       "id": "insp",
       "x": 0,
       "y": 2220,
       "w": 620,
-      "text": "The three states behind direction A. Nothing selected: nothing shown. One cell: one 30 px line. Cmd+I: 460 px over the table, full height. Drag it wider when a JSON or struct value needs the room."
+      "text": "The three states, using A's geometry. Closed: the table has the whole pane. One cell: one document, one field. A block - three rows across four columns: three documents, structs flattened to dotted paths (top_customer.name), and a value that gets its own block. The strip under the table always carries the anchor cell in full, whatever its column width."
     },
     {
       "id": "sys",
       "x": 1400,
       "y": 2220,
       "w": 620,
-      "text": "Two text sizes, four heights, three radii, one icon size, one accent with four jobs. All three directions are built from exactly this - swapping between them changes layout, not vocabulary."
+      "text": "Two text sizes, four heights, three radii, one icon size, one accent with four jobs. All three directions are built from exactly this - swapping between them changes layout, not vocabulary.\nThe column header keeps its two lines: name over type. The before/after at the bottom right is now only about the cell rules."
     }
   ],
   "launch": { "view": "canvas" }

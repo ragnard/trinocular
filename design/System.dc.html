@@ -122,7 +122,7 @@
           </div>
           <div style="display:grid;grid-template-columns:1fr 190px;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:baseline">
             <div class="caps">Meta caps &mdash; 11&nbsp;px / 16</div>
-            <div class="meta" style="color:var(--fg-3)">column names, section labels</div>
+            <div class="meta" style="color:var(--fg-3)">section labels, row headers</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 190px;gap:12px;padding:12px 14px;align-items:baseline">
             <div class="meta" style="color:var(--fg-3)">meta 11&nbsp;px &mdash; types, row numbers, hints, &#8984;P</div>
@@ -136,8 +136,8 @@
       <div>
         <div class="caps" style="color:var(--fg-3);margin-bottom:10px">Heights &mdash; four, and they stack</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:36px;background:var(--s1);border:1px solid var(--line-strong);border-radius:6px;padding:0 10px;color:var(--fg-2)">rail</div><span class="mono meta" style="color:var(--fg-3)">36 px</span><span class="meta" style="color:var(--fg-3)">every pane header, identically</span></div>
-          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:30px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 12px;color:var(--fg-2)">table row &amp; header</div><span class="mono meta" style="color:var(--fg-3)">30 px</span><span class="meta" style="color:var(--fg-3)">was 28 &mdash; 2 px is the whole "looser"</span></div>
+          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:36px;background:var(--s1);border:1px solid var(--line-strong);border-radius:6px;padding:0 10px;color:var(--fg-2)">rail &amp; table header</div><span class="mono meta" style="color:var(--fg-3)">36 px</span><span class="meta" style="color:var(--fg-3)">every pane header, identically</span></div>
+          <div class="row" style="gap:12px"><div class="row" style="width:210px;height:30px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 12px;color:var(--fg-2)">table row</div><span class="mono meta" style="color:var(--fg-3)">30 px</span><span class="meta" style="color:var(--fg-3)">was 28 &mdash; 2 px is the whole "looser"</span></div>
           <div class="row" style="gap:12px"><div class="row" style="width:210px;height:26px;background:var(--s0);border:1px solid var(--line);border-radius:6px;padding:0 10px;color:var(--fg-2)">tree row</div><span class="mono meta" style="color:var(--fg-3)">26 px</span><span class="meta" style="color:var(--fg-3)">hover fills the whole row</span></div>
           <div class="row" style="gap:12px"><div class="row" style="width:210px;height:24px;background:var(--s2);border-radius:6px;padding:0 10px;color:var(--fg-2)">control</div><span class="mono meta" style="color:var(--fg-3)">24 px</span><span class="meta" style="color:var(--fg-3)">chips, buttons, inputs inside a rail</span></div>
         </div>
@@ -249,7 +249,7 @@
             <div class="meta" style="color:var(--fg-3);margin-bottom:6px">proposed &mdash; hairlines and alignment do it</div>
             <div style="border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--s0)">
               <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px">
-                <tr><th style="width:36px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);height:30px"></th><th style="background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);text-align:left;padding:0 12px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">nation</span><span class="meta" style="color:var(--fg-3)">varchar</span></div></th><th style="width:96px;background:var(--s1);border-bottom:1px solid var(--line-strong);text-align:left;padding:0 12px"><div class="row" style="gap:8px"><span class="caps" style="flex:1">orders</span><span class="meta" style="color:var(--fg-3)">bigint</span></div></th></tr>
+                <tr style="height:36px"><th style="width:36px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line)"></th><th style="background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);text-align:left;padding:0 12px;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">avg_days_order_to_ship</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">double</div></th><th style="width:96px;background:var(--s1);border-bottom:1px solid var(--line-strong);text-align:left;padding:0 12px;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">orders</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">bigint</div></th></tr>
                 <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">1</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">ARGENTINA</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">598412</td></tr>
                 <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">2</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">BRAZIL</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">601077</td></tr>
                 <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">3</td><td style="height:30px;padding:0 12px;border-bottom:1px solid var(--line)">CANADA</td><td class="num" style="height:30px;padding:0 12px;text-align:right;border-bottom:1px solid var(--line)">600288</td></tr>
@@ -257,7 +257,7 @@
             </div>
           </div>
         </div>
-        <div class="meta" style="color:var(--fg-3);margin-top:10px;line-height:17px">Column tracking survives: the header keeps its separators, numerics are right-aligned and tabular, and the row-number gutter still anchors the left edge. Header goes to one line &mdash; name left, type right &mdash; which also buys back 10&nbsp;px.</div>
+        <div class="meta" style="color:var(--fg-3);margin-top:10px;line-height:17px">Column tracking survives: the header keeps its separators, numerics are right-aligned and tabular, and the row-number gutter still anchors the left edge. The header stays two lines &mdash; name over type &mdash; because a column is routinely named far wider than anything in it; stacking buys those characters back without paying for them in table width.</div>
       </div>
     </div>
   </div>
