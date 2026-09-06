@@ -4,10 +4,10 @@
     { "file": "DirectionA.dc.html", "x": 0, "y": 1040, "w": 940, "h": 660, "title": "Option A · fragment graph" },
     { "file": "DirectionB.dc.html", "x": 1020, "y": 1040, "w": 940, "h": 660, "title": "Option B · plan tree" },
     { "file": "DirectionC.dc.html", "x": 2040, "y": 1040, "w": 940, "h": 660, "title": "Option C · cardinality lens" },
-    { "file": "JsonView.dc.html", "x": 0, "y": 1820, "w": 940, "h": 660, "title": "JSON tab · the escape hatch" },
+    { "file": "JsonView.dc.html", "x": 0, "y": 1820, "w": 940, "h": 760, "title": "JSON tab · the escape hatch" },
     { "file": "LightTheme.dc.html", "x": 1020, "y": 1820, "w": 940, "h": 660, "title": "Option A in light theme" },
-    { "file": "Inspector.dc.html", "x": 2040, "y": 1820, "w": 360, "h": 760, "title": "Node inspector · right pane" },
-    { "file": "Toolbar.dc.html", "x": 0, "y": 2700, "w": 760, "h": 360, "title": "Statement toolbar states" }
+    { "file": "Inspector.dc.html", "x": 2040, "y": 1820, "w": 360, "h": 980, "title": "Node inspector · right pane" },
+    { "file": "Toolbar.dc.html", "x": 0, "y": 2700, "w": 760, "h": 460, "title": "Statement toolbar states" }
   ],
   "annotations": [
     {

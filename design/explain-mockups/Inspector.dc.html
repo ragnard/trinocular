@@ -42,7 +42,7 @@
   </style>
 </helmet>
 
-<div style="width: 360px; height: 760px; background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden;">
+<div style="width: 360px; height: 980px; background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden;">
 
   <!-- breadcrumb: the one thing the pane needs that the data table doesn't already give -->
   <div style="height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px; box-sizing: border-box;
@@ -98,13 +98,12 @@
       <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5;">
         A plan node is already field-and-value shaped:
         <span style="font-family: var(--font-mono); font-size: 12.5px;">descriptor</span> is a string map,
-        <span style="font-family: var(--font-mono); font-size: 12.5px;">outputs</span> is symbol → type,
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">outputs</span> is symbol → type, and
         <span style="font-family: var(--font-mono); font-size: 12.5px;">details</span> and
-        <span style="font-family: var(--font-mono); font-size: 12.5px;">estimates</span> are flat.
-        That is exactly what <span style="font-family: var(--font-mono); font-size: 12.5px;">DataViewer</span>
-        renders for a selected cell today — same
-        <span style="font-family: var(--font-mono); font-size: 12.5px;">row-header</span> groups, same
-        field/value split, same hover copy button, same italic grey for a missing value.
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">estimates</span> are flat — which is
+        what this pane renders today. Same groups, same field/value split, same hover copy button, and
+        <span style="font-family: var(--font-mono); font-size: 12.5px;">NaN</span> lands on the italic grey
+        already used for a null.
       </div>
       <div style="font-size: 13.6px; color: var(--text-1); line-height: 1.5; margin-top: 12px;">
         So selecting a node in any of the plan views feeds the pane that is already there, and the whole
