@@ -20,7 +20,7 @@
     padding: 32px;
     text-align: center;
     font-family: var(--font, sans-serif);
-    color: var(--text-0);
+    color: var(--fg);
   }
 
   h1 {
@@ -29,13 +29,13 @@
   }
 
   p {
-    color: var(--text-1);
+    color: var(--fg-2);
     margin-bottom: 16px;
   }
 
   .request-id {
-    font-size: var(--font-sm);
-    color: var(--text-2);
+    font-size: var(--text-sm);
+    color: var(--fg-3);
   }
 
   .request-id code {

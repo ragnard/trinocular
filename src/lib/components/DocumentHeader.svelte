@@ -64,7 +64,7 @@
   }}
 />
 
-<div class="header">
+<div class="rail">
   <!-- Clicking anywhere else dismisses an open menu; the backdrop only exists
        while one is open, so it never eats a click otherwise. -->
   {#if open}
@@ -77,9 +77,9 @@
   {/if}
 
   <div class="anchor">
-    <button class="chip file" class:active={open === "file"} onclick={() => toggle("file")}>
+    <button class="chip file" aria-pressed={open === "file"} onclick={() => toggle("file")}>
       <FileText size={14} />
-      <span class="label">{file?.name ?? "No file"}</span>
+      <span class="ell">{file?.name ?? "No file"}</span>
       <ChevronDown size={12} />
     </button>
     {#if open === "file"}
@@ -98,12 +98,12 @@
   <div class="anchor">
     <button
       class="chip"
-      class:active={open === "connection"}
+      aria-pressed={open === "connection"}
       onclick={() => toggle("connection")}
       title="The Trino cluster this document runs against"
     >
       <Database size={14} />
-      <span class="label">{connectionName}</span>
+      <span class="ell">{connectionName}</span>
       <ChevronDown size={12} />
     </button>
     {#if open === "connection"}
@@ -127,21 +127,16 @@
 
   <span class="fill"></span>
 
-  <button class="hint" onclick={onquickopen}>
+  <button class="chip" onclick={onquickopen}>
     <kbd>&#8984;P</kbd>
     Switch file
   </button>
 </div>
 
 <style>
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 0.25em;
-    padding: 0 0.75em;
-    height: 2.5em;
-    background: var(--bg-1);
-    border-bottom: 1px solid var(--border);
+  .rail {
+    position: relative;
+    gap: 2px;
   }
 
   .backdrop {
@@ -156,46 +151,24 @@
   }
 
   .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35em;
     max-width: 22em;
-    padding: 0.25em 0.45em;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-0);
-    font: inherit;
-    font-size: var(--font-sm);
-    cursor: pointer;
   }
 
+  /* The file is the noun; the connection is its address. */
   .chip.file {
+    color: var(--fg);
     font-weight: 600;
   }
 
   .chip :global(svg) {
-    color: var(--text-2);
-    flex: none;
-  }
-
-  .chip:hover,
-  .chip.active {
-    background: var(--bg-2);
-  }
-
-  .chip .label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: var(--fg-3);
   }
 
   .rule {
     width: 1px;
-    height: 1em;
-    background: var(--border);
-    margin: 0 0.25em;
+    height: 16px;
+    margin: 0 8px;
+    background: var(--line-strong);
   }
 
   .fill {
@@ -205,14 +178,14 @@
   .menu {
     position: absolute;
     z-index: 11;
-    top: calc(100% + 0.35em);
+    top: calc(100% + 6px);
     left: 0;
     min-width: 12em;
-    padding: 0.25em 0;
-    background: var(--bg-1);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 4px 0;
+    background: var(--s2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
   }
 
   .menu.wide {
@@ -222,18 +195,18 @@
   .menu button {
     display: block;
     width: 100%;
-    padding: 0.4em 0.75em;
+    height: var(--h-tree);
+    padding: 0 12px;
     border: none;
     background: transparent;
-    color: var(--text-0);
+    color: var(--fg);
     font: inherit;
-    font-size: var(--font-sm);
     text-align: left;
     cursor: pointer;
   }
 
   .menu button:hover {
-    background: var(--bg-focus);
+    background: var(--s3);
   }
 
   .menu button.selected {
@@ -246,39 +219,14 @@
 
   .separator {
     height: 1px;
-    margin: 0.25em 0;
-    background: var(--border);
+    margin: 4px 0;
+    background: var(--line-strong);
   }
 
   .note {
-    padding: 0.4em 0.75em 0.25em;
-    color: var(--text-2);
-    font-size: var(--font-sm);
-    line-height: 1.4;
-  }
-
-  .hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4em;
-    border: none;
-    background: transparent;
-    color: var(--text-2);
-    font: inherit;
-    font-size: var(--font-sm);
-    cursor: pointer;
-  }
-
-  .hint:hover {
-    color: var(--text-0);
-  }
-
-  kbd {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    background: var(--bg-0);
-    padding: 0.05em 0.35em;
-    font: inherit;
-    font-size: 0.85em;
+    padding: 4px 12px 6px;
+    color: var(--fg-3);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
   }
 </style>

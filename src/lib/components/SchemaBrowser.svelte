@@ -1,20 +1,16 @@
 <script lang="ts">
   import type { Workspace } from "$lib/State.svelte";
   import type { TreeNode } from "./TreeView.svelte";
-  import { Box, Database, Moon, Search, Sun, Table, Type } from "@lucide/svelte";
-  import Logo from "./Logo.svelte";
+  import { Box, Database, Search, Table, Type } from "@lucide/svelte";
   import TreeView from "./TreeView.svelte";
   import { page } from "$app/state";
 
   interface Props {
     workspace: Workspace;
-    theme: "light" | "dark";
-    onToggleTheme: () => void;
   }
 
-  let { workspace, theme, onToggleTheme }: Props = $props();
+  let { workspace }: Props = $props();
 
-  let userId = $derived(page.data.userId);
   let connectionName = $derived(
     page.data.connections?.find((c: { id: string }) => c.id === workspace.connectionId)?.name ||
       workspace.connectionId ||
@@ -182,21 +178,26 @@
 </script>
 
 <div class="browser">
-  <div class="top">
-    <div class="brand"><Logo /> Oink</div>
-  </div>
-
-  <div class="filter">
+  <!-- The filter IS the header. It used to be a third stacked row under a
+       brand and a section label, which is how this pane ended up 112px of
+       chrome deep against the document header's 40. -->
+  <div class="rail">
     <Search size={14} />
-    <input type="text" placeholder="Filter&hellip;" bind:value={filter} spellcheck="false" />
+    <input
+      type="text"
+      placeholder="Filter&hellip;"
+      bind:value={filter}
+      spellcheck="false"
+      aria-label="Filter schema"
+    />
   </div>
 
-  <div class="scope">
-    <span class="title">Schema</span>
-    <span class="connection" title="The connection this document runs against">
-      <Database size={12} />
-      {connectionName}
-    </span>
+  <!-- Says what the tree is. The connection also appears in the document
+       header, where it says what the file runs on; sitting on one band the
+       two read as the same fact rather than a repetition. -->
+  <div class="scope meta">
+    <Database size={12} />
+    <span class="ell">{connectionName}</span>
   </div>
 
   <div class="tree">
@@ -204,13 +205,13 @@
       {#snippet icon(node)}
         {@const depth = node.id.split(".").length}
         {#if depth === 1}
-          <Database size={16} />
+          <Database size={14} />
         {:else if depth === 2}
-          <Box size={16} />
+          <Box size={14} />
         {:else if depth === 3}
-          <Table size={16} />
-        {:else if depth === 4}
-          <Type size={16} />
+          <Table size={14} />
+        {:else}
+          <Type size={14} />
         {/if}
       {/snippet}
     </TreeView>
@@ -223,17 +224,6 @@
       </div>
     {/if}
   </div>
-
-  <div class="bottom">
-    <button class="theme-toggle" onclick={onToggleTheme} title="Toggle dark mode">
-      {#if theme === "light"}
-        <Moon size={16} />
-      {:else}
-        <Sun size={16} />
-      {/if}
-    </button>
-    <div class="user">{userId}</div>
-  </div>
 </div>
 
 <style>
@@ -241,117 +231,59 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    background: var(--s1);
   }
 
-  .top {
-    padding: 0.6em 1em;
-    border-bottom: 1px solid var(--border);
+  /* The rail keeps the pane's own surface, so the filter reads as the pane's
+     header rather than a control sitting on one. */
+  .rail {
+    background: transparent;
+    color: var(--fg-3);
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.4em;
-    font-weight: bold;
+  .rail:focus-within {
+    color: var(--accent);
   }
 
-  .filter {
-    display: flex;
-    align-items: center;
-    gap: 0.4em;
-    margin: 0.6em 0.75em 0.35em;
-    padding: 0 0.5em;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-0);
-    color: var(--text-2);
-  }
-
-  .filter:focus-within {
-    border-color: var(--accent);
-  }
-
-  .filter input {
+  .rail input {
     flex: 1;
     min-width: 0;
+    height: auto;
+    padding: 0;
     border: none;
+    border-radius: 0;
     background: transparent;
-    color: var(--text-0);
-    padding: 0.35em 0;
-    font: inherit;
+    color: var(--fg);
   }
 
-  .filter input:focus {
+  .rail input:focus-visible {
     outline: none;
   }
 
   .scope {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5em;
-    padding: 0.4em 0.9em 0.5em;
-    color: var(--text-2);
-    font-size: var(--font-sm);
-  }
-
-  .scope .title {
-    font-weight: bold;
-    text-transform: uppercase;
-  }
-
-  .scope .connection {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    gap: 6px;
+    flex: none;
+    height: var(--h-tree);
+    padding: 0 12px;
   }
 
   .tree {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 0 0.75em 0.75em;
+    padding: 0 8px 8px;
   }
 
   .hint {
-    padding: 0.5em 0.25em;
-    color: var(--text-2);
-    font-size: var(--font-sm);
+    padding: 8px;
+    color: var(--fg-3);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
   }
 
   .hint.error {
     color: var(--error);
-  }
-
-  .bottom {
-    border-top: 1px solid var(--border);
-    padding: 0.6em 1em;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5em;
-  }
-
-  .theme-toggle {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    padding: 0.2em 0.4em;
-    display: flex;
-    align-items: center;
-    color: var(--text-2);
-  }
-
-  .user {
-    font-size: var(--font-sm);
-    color: var(--text-2);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 </style>

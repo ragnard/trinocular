@@ -3,10 +3,13 @@
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
   import { onMount } from "svelte";
+  import { Moon, Sun } from "@lucide/svelte";
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
   import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
 
   import { SplitPane } from "./split-pane";
+  import type { Length } from "./split-pane/types";
+  import Logo from "./Logo.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
@@ -22,6 +25,30 @@
 
   let connections: { id: string; name: string }[] = $derived(page.data.connections ?? []);
   let connectionId = $derived(workspace.connectionId);
+  let userId = $derived(page.data.userId);
+
+  /**
+   * The inspector is a pane of the window, not a region of the results: it
+   * reads whatever is selected, at full height, so a block selection is a
+   * stack of whole documents rather than a peephole. Closed, it costs
+   * nothing — the strip under the table already carries the anchor cell.
+   *
+   * "100%" is how SplitPane says "no second pane", divider included, so the
+   * toggle is just a remembered position.
+   */
+  const INSPECTOR_DEFAULT: Length = "66%";
+  let inspectorPos: Length = $state("100%");
+  let lastInspectorPos: Length = INSPECTOR_DEFAULT;
+  let inspectorOpen = $derived(inspectorPos !== "100%");
+
+  function toggleInspector() {
+    if (inspectorPos === "100%") {
+      inspectorPos = lastInspectorPos;
+    } else {
+      lastInspectorPos = inspectorPos;
+      inspectorPos = "100%";
+    }
+  }
 
   let theme: "light" | "dark" = $state("light");
   let manualOverride = $state(false);
@@ -75,127 +102,98 @@
       }
     ];
   });
+
   let saveTimer: ReturnType<typeof setTimeout>;
   function handleEditorChange() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => workspace.persist(), 500);
   }
 
-  function handleExecuteSql(sql: string, startLine: number, anchorId: string, replacesId?: string) {
-    workspace.run(sql, startLine, anchorId, replacesId);
-  }
-
-  function handleShowResult(result: ResultModel) {
-    workspace.showResult(result);
-  }
-
-  function handleCancelResult(result: ResultModel) {
-    workspace.cancel(result);
-  }
-
   const decoder = new TextDecoder("utf-8", { fatal: true });
 
   function decodeBinary(bytes: Uint8Array): string {
     try {
-      let text = decoder.decode(bytes);
-
+      const text = decoder.decode(bytes);
       if (text.startsWith('{"')) {
         try {
-          let json = JSON.parse(text);
-          return JSON.stringify(json, null, 2);
-        } catch (error) {}
+          return JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          // Not JSON after all; the decoded text is still the better answer.
+        }
       }
       return text;
-    } catch (error) {
-      return "0x" + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      return "0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
     }
   }
 </script>
 
 {#snippet browser()}
-  <div class="browser"><SchemaBrowser {workspace} {theme} onToggleTheme={toggleTheme} /></div>
+  <SchemaBrowser {workspace} />
 {/snippet}
 
-{#snippet dataviewer()}
-  <div class="data-viewer">
-    <DataViewer {selection}>
-      {#snippet formatValue(field, value)}
-        {#if value === "null"}
-          <span>[null]</span>
-        {:else if field.dataType === "binary"}
-          <pre>{decodeBinary(value)}</pre>
-        {:else}
-          <span>{value}</span>
-        {/if}
-      {/snippet}
-    </DataViewer>
-  </div>
+{#snippet inspector()}
+  <DataViewer {selection} onclose={toggleInspector}>
+    {#snippet formatValue(field, value)}
+      {#if field.dataType === "binary"}
+        <pre>{decodeBinary(value)}</pre>
+      {:else if value === null || value === undefined}
+        {"null"}
+      {:else}
+        {typeof value === "object" ? JSON.stringify(value) : value}
+      {/if}
+    {/snippet}
+  </DataViewer>
 {/snippet}
 
 {#snippet editor()}
-  <div class="editor">
-    <Editor
-      file={workspace.activeFile}
-      files={workspace.files}
-      {metadataProvider}
-      markers={editorMarkers}
-      onexecutesql={handleExecuteSql}
-      onshowresult={handleShowResult}
-      oncancelresult={handleCancelResult}
-      onchange={handleEditorChange}
-      onquickopen={() => (switcherOpen = true)}
-      {theme}
-    />
-  </div>
+  <Editor
+    file={workspace.activeFile}
+    files={workspace.files}
+    {metadataProvider}
+    markers={editorMarkers}
+    onexecutesql={(sql, startLine, anchorId, replacesId) =>
+      workspace.run(sql, startLine, anchorId, replacesId)}
+    onshowresult={(result) => workspace.showResult(result)}
+    oncancelresult={(result) => workspace.cancel(result)}
+    onchange={handleEditorChange}
+    onquickopen={() => (switcherOpen = true)}
+    ontoggleinspector={toggleInspector}
+    {theme}
+  />
 {/snippet}
 
 {#snippet results()}
-  <div class="results">
-    {#if activeResult}
-      <Result result={activeResult} bind:selection />
-    {:else}
-      <div class="no-query">
-        <span>Run a statement to see results here</span>
-      </div>
-    {/if}
-  </div>
+  <Result
+    result={activeResult}
+    bind:selection
+    {inspectorOpen}
+    onToggleInspector={toggleInspector}
+  />
 {/snippet}
 
-<!-- Monaco owns this chord while the editor has focus and handles it there;
-     this catches it everywhere else, and keeps the browser's print dialog out
-     of it either way. Opening an open switcher is a no-op. -->
+<!-- Monaco owns these chords while the editor has focus and handles them
+     there; this catches them everywhere else, and keeps the browser's print
+     dialog out of Cmd+P either way. -->
 <svelte:window
   onkeydown={(e) => {
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+    const key = e.key.toLowerCase();
+    if (key === "p") {
       e.preventDefault();
       switcherOpen = true;
+    } else if (key === "i") {
+      e.preventDefault();
+      toggleInspector();
     }
   }}
 />
 
 <main>
   <div class="workspace">
-    <SplitPane
-      type="horizontal"
-      min="10%"
-      max="90%"
-      pos="25%"
-      --color="var(--border-dark)"
-      --border-width="2px"
-      --thickness="20px"
-      a={browser}
-    >
+    <SplitPane type="horizontal" min="180px" max="40%" pos="19%" a={browser}>
       {#snippet b()}
-        <SplitPane
-          type="horizontal"
-          min="10%"
-          max="90%"
-          pos="75%"
-          --color="var(--border-dark)"
-          --border-width="2px"
-          --thickness="20px"
-          b={dataviewer}
-        >
+        <SplitPane type="horizontal" min="35%" max="100%" bind:pos={inspectorPos} b={inspector}>
           {#snippet a()}
             <div class="document">
               <DocumentHeader
@@ -204,17 +202,7 @@
                 onquickopen={() => (switcherOpen = true)}
               />
               <div class="document-body">
-                <SplitPane
-                  type="vertical"
-                  min="10%"
-                  max="90%"
-                  pos="33%"
-                  --color="var(--border-dark)"
-                  --border-width="2px"
-                  --thickness="20px"
-                  a={editor}
-                  b={results}
-                ></SplitPane>
+                <SplitPane type="vertical" min="10%" max="90%" pos="38%" a={editor} b={results} />
               </div>
             </div>
           {/snippet}
@@ -222,6 +210,19 @@
       {/snippet}
     </SplitPane>
   </div>
+
+  <!-- Brand and identity live here rather than bracketing the schema tree,
+       which is what let that pane's header become one line. -->
+  <footer>
+    <Logo />
+    <span>Oink</span>
+    <span class="fill"></span>
+    <span class="ell user">{userId}</span>
+    <span class="rule"></span>
+    <button class="chip square" onclick={toggleTheme} title="Toggle dark mode">
+      {#if theme === "light"}<Moon size={12} />{:else}<Sun size={12} />{/if}
+    </button>
+  </footer>
 
   {#if switcherOpen}
     <FileSwitcher {workspace} {connections} onclose={() => (switcherOpen = false)} />
@@ -232,18 +233,15 @@
   main {
     display: flex;
     flex-direction: column;
-    height: 100vh;
     width: 100vw;
-    background-color: var(--bg-0);
+    height: 100vh;
+    background: var(--s0);
   }
 
-  pre {
-    white-space: pre-line;
-    /* font-family: '';*/
-  }
-
-  .browser {
-    background-color: var(--bg-1);
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .document {
@@ -258,21 +256,40 @@
     min-height: 0;
   }
 
-  .workspace {
-    min-height: 0;
-    overflow: hidden;
-    flex: 1;
-  }
-
-  .results {
+  footer {
     display: flex;
-  }
-
-  .no-query {
-    display: flex;
-    flex: 1;
     align-items: center;
-    justify-content: center;
-    height: 100%;
+    gap: 8px;
+    flex: none;
+    height: 26px;
+    padding: 0 6px 0 12px;
+    background: var(--s1);
+    border-top: 1px solid var(--line-strong);
+    color: var(--fg-3);
+    font-size: var(--text-sm);
+  }
+
+  footer .fill {
+    flex: 1;
+  }
+
+  .user {
+    max-width: 24em;
+  }
+
+  .rule {
+    width: 1px;
+    height: 12px;
+    background: var(--line-strong);
+  }
+
+  footer .chip {
+    height: 20px;
+    width: 20px;
+  }
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
   }
 </style>

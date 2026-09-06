@@ -1,74 +1,202 @@
+/*
+ * The whole visual system: two text sizes, four heights, three radii, one
+ * icon size, one accent. If something here needs a fifth height or a third
+ * text size, that is a sign the thing being built is doing two jobs.
+ *
+ * Surfaces are one monotonic ramp — s0 is the page, and every step is one
+ * level nearer the viewer. The ramp means the SAME thing in both themes,
+ * which the old --bg-1/--bg-2 and --border/--border-dark pairs did not: each
+ * of those swapped which one was stronger when the theme flipped, so a
+ * component tuned in one theme was guessing in the other.
+ */
 :root {
-    --bg-0: #ffffff;
-    --bg-1: oklch(from var(--bg-0) calc(l - 0.045) c h);
-    --bg-2: oklch(from var(--bg-0) calc(l - 0.03) c h);
-    --bg-focus: oklch(from var(--bg-0) calc(l - 0.12) c h);
-    --text-0: #000000;
-    --text-1: oklch(from var(--text-0) calc(l + 0.28) c h);
-    --text-2: oklch(from var(--text-0) calc(l + 0.60) c h);
-    --border: oklch(from var(--bg-0) calc(l - 0.09) c h);
-    --border-dark: oklch(from var(--bg-0) calc(l - 0.15) c h);
-    --accent: #0e65eb;
-    --accent-bg: rgba(14, 101, 235, 0.12);
-    --accent-bg-subtle: rgba(14, 101, 235, 0.06);
-    --error: #cf222e;
-    --error-bg: rgba(207, 34, 46, 0.10);
-    color-scheme: light;
-    /* --font: 'Iosevka Aile'; */
-    /* --font-mono: 'Iosevka SS08'; */
-    --font: sans-serif;
-    --font-mono: monospace;
-    --font-sm: 0.85em;
+  color-scheme: light;
+
+  --s0: #ffffff; /* page, editor, table body */
+  --s1: #f7f7f8; /* panes, rails, table header */
+  --s2: #eeeef1; /* hover, menus, popovers */
+  --s3: #e3e3e8; /* pressed, active */
+
+  --line: #e8e8ec; /* hairline inside a surface */
+  --line-strong: #d6d6dc; /* divider between surfaces */
+
+  --fg: #1f2024; /* body text */
+  --fg-2: #6b6c74; /* secondary text, field names */
+  --fg-3: #8f9099; /* icons at rest, types, row numbers, hints */
+
+  --accent: #0e65eb;
+  --accent-bg: rgba(14, 101, 235, 0.1);
+  --accent-line: rgba(14, 101, 235, 0.45);
+
+  --ok: #1a7f5a;
+  --error: #cf222e;
+
+  --shadow: 0 10px 28px rgba(15, 18, 25, 0.14), 0 2px 6px rgba(15, 18, 25, 0.07);
 }
 
 :root[data-theme="dark"] {
-    --bg-0: #1e1e1e;
-    --bg-1: oklch(from var(--bg-0) calc(l + 0.03) c h);
-    --bg-2: oklch(from var(--bg-0) calc(l + 0.06) c h);
-    --bg-focus: oklch(from var(--bg-0) calc(l + 0.16) c h);
-    --text-0: #c4c4c4;
-    --text-1: oklch(from var(--text-0) calc(l - 0.03) c h);
-    --text-2: oklch(from var(--text-0) calc(l - 0.26) c h);
-    --border: oklch(from var(--bg-0) calc(l + 0.14) c h);
-    --border-dark: oklch(from var(--bg-0) calc(l + 0.07) c h);
-    --accent: #4da6ff;
-    --accent-bg: rgba(77, 166, 255, 0.15);
-    --accent-bg-subtle: rgba(77, 166, 255, 0.08);
-    --error: #f47067;
-    --error-bg: rgba(244, 112, 103, 0.12);
-    color-scheme: dark;
+  color-scheme: dark;
+
+  --s0: #1e1e1e;
+  --s1: #252527;
+  --s2: #2e2e31;
+  --s3: #3a3a3e;
+
+  --line: #303033;
+  --line-strong: #3f3f44;
+
+  --fg: #cfcfd2;
+  --fg-2: #96969c;
+  --fg-3: #6e6e75;
+
+  --accent: #4da6ff;
+  --accent-bg: rgba(77, 166, 255, 0.16);
+  --accent-line: rgba(77, 166, 255, 0.55);
+
+  --ok: #5ec9a8;
+  --error: #f47067;
+
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+:root {
+  /* --font: 'Iosevka Aile'; */
+  /* --font-mono: 'Iosevka SS08'; */
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Two text sizes. There is no third. */
+  --text: 13px;
+  --leading: 20px;
+  --text-sm: 11px;
+  --leading-sm: 16px;
+
+  /* Four heights, and they stack. */
+  --h-rail: 36px; /* every pane header, and the table header row */
+  --h-row: 30px; /* table row */
+  --h-tree: 26px; /* tree row, menu item */
+  --h-ctl: 24px; /* chips, buttons, inputs inside a rail */
+
+  /* Three radii, nested largest outside. */
+  --r-panel: 8px;
+  --r: 6px;
+  --r-kbd: 4px;
+
+  /* One spacing scale: 6 icon-to-label, 8 inside a control, 12 rail and cell
+     padding, 16 pane padding. Used literally; no token indirection earns its
+     keep for four numbers. */
 }
 
 html {
-    font-family: var(--font);
-    background-color: var(--bg-0);
-    color: var(--text-0);
+  font: var(--text) / var(--leading) var(--font);
+  background-color: var(--s0);
+  color: var(--fg);
 }
 
-pre {
-    font-family: var(--font);
+/* --- The handful of primitives every pane repeats ------------------------ */
+
+/* The 36px band across the top of every pane. */
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: var(--h-rail);
+  padding: 0 12px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--line-strong);
 }
 
+/* Anything clickable that lives in a rail: chips, toggles, icon buttons. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-ctl);
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  cursor: pointer;
+}
 
-input[type="text"],
-select {
-    padding: 0.35em 0.5em;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-0);
-    color: inherit;
+.chip:hover {
+  background: var(--s2);
+  color: var(--fg);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.chip.square {
+  width: var(--h-ctl);
+  padding: 0;
+  justify-content: center;
+  color: var(--fg-3);
+}
+
+.chip svg {
+  flex: none;
+}
+
+.meta {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--fg-3);
+}
+
+.ell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+kbd {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-kbd);
+  background: var(--s0);
+  padding: 1px 5px;
+  font: var(--text-sm) / 1 var(--font);
 }
 
 input[type="text"] {
-    appearance: none;
+  appearance: none;
+  height: var(--h-ctl);
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--s0);
+  color: inherit;
+}
+
+input[type="text"]:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .spin {
-    animation: spin 0.6s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
 }

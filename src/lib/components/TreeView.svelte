@@ -82,8 +82,8 @@
     padding: 0;
   }
 
-  .tree :global(.tree) {
-    padding-left: 0.75em;
+  .tree.nested {
+    padding-left: 14px;
   }
 
   .node {
@@ -94,37 +94,46 @@
   .label {
     display: flex;
     align-items: center;
-    gap: 0.25em;
-    padding: 0.25em 0.25em;
+    gap: 6px;
     width: 100%;
+    height: var(--h-tree);
+    padding: 0 8px;
     border: none;
+    border-radius: var(--r);
     background: transparent;
     color: inherit;
-    cursor: pointer;
     font: inherit;
     text-align: left;
-    border-radius: 3px;
     white-space: nowrap;
-
-    :global(svg) {
-      flex-shrink: 0;
-    }
+    cursor: pointer;
   }
 
   .label:hover {
-    background-color: var(--bg-focus);
+    background: var(--s2);
+  }
+
+  /* Icons are furniture until they mean something. */
+  .label :global(svg) {
+    flex: none;
+    color: var(--fg-3);
+  }
+
+  .node-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-detail {
-    color: var(--text-2);
-    font-size: var(--font-sm);
-    margin-left: 0.25em;
-    flex-shrink: 0;
+    flex: none;
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--fg-3);
+    font-size: var(--text-sm);
   }
 
   :global(.toggle) {
-    flex-shrink: 0;
-    transition: transform 0.15s ease;
+    transition: transform 0.12s ease;
   }
 
   :global(.toggle.open) {

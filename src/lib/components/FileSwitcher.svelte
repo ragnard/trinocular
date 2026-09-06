@@ -120,7 +120,7 @@
           onclick={() => choose(i)}
           onmouseenter={() => (index = i)}
         >
-          <FileText size={16} />
+          <FileText size={14} />
           <span class="name">{file.name}</span>
           <span class="connection"><Database size={12} />{connectionName(file)}</span>
         </button>
@@ -133,7 +133,7 @@
         onclick={() => choose(matches.length)}
         onmouseenter={() => (index = matches.length)}
       >
-        <Plus size={16} />
+        <Plus size={14} />
         <span class="name">New file</span>
       </button>
     </div>
@@ -157,72 +157,80 @@
   }
 
   .palette {
-    margin-top: 7em;
-    width: min(35em, calc(100vw - 2em));
-    height: fit-content;
-    max-height: calc(100vh - 12em);
     display: flex;
     flex-direction: column;
-    background: var(--bg-1);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    width: min(36em, calc(100vw - 32px));
+    height: fit-content;
+    max-height: calc(100vh - 180px);
+    margin-top: 96px;
     overflow: hidden;
+    background: var(--s1);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-panel);
+    box-shadow: var(--shadow);
   }
 
   .query {
-    padding: 0.5em 0.75em;
-    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex: none;
+    height: var(--h-rail);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line-strong);
   }
 
   .query input {
     width: 100%;
+    height: auto;
+    padding: 0;
     border: none;
+    border-radius: 0;
     background: transparent;
-    color: var(--text-0);
-    font: inherit;
-    padding: 0.25em 0;
+    color: var(--fg);
   }
 
-  .query input:focus {
+  .query input:focus-visible {
     outline: none;
   }
 
   .list {
     flex: 1;
     min-height: 0;
+    padding: 4px 0;
     overflow: auto;
-    padding: 0.25em 0;
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 8px;
     width: 100%;
-    padding: 0.4em 0.9em;
+    height: var(--h-row);
+    padding: 0 12px;
     border: none;
     background: transparent;
-    color: var(--text-0);
+    color: var(--fg);
     font: inherit;
     text-align: left;
     cursor: pointer;
   }
 
   .row :global(svg) {
-    color: var(--text-2);
     flex: none;
+    color: var(--fg-3);
   }
 
   .row.selected {
-    background: var(--bg-focus);
+    background: var(--accent-bg);
+  }
+
+  .row.selected :global(svg) {
+    color: var(--accent);
   }
 
   .row.new {
-    border-top: 1px solid var(--border);
-    margin-top: 0.25em;
-    padding-top: 0.5em;
-    color: var(--text-2);
+    margin-top: 4px;
+    border-top: 1px solid var(--line);
+    color: var(--fg-2);
   }
 
   .name {
@@ -236,34 +244,27 @@
   .connection {
     display: inline-flex;
     align-items: center;
-    gap: 0.25em;
+    gap: 4px;
     flex: none;
-    color: var(--text-2);
-    font-size: var(--font-sm);
+    color: var(--fg-3);
+    font-size: var(--text-sm);
   }
 
   .hints {
     display: flex;
-    gap: 1em;
-    padding: 0.4em 0.9em;
-    border-top: 1px solid var(--border);
-    background: var(--bg-0);
-    color: var(--text-2);
-    font-size: var(--font-sm);
+    gap: 16px;
+    flex: none;
+    height: var(--h-tree);
+    align-items: center;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+    color: var(--fg-3);
+    font-size: var(--text-sm);
   }
 
   .hints span {
     display: inline-flex;
     align-items: center;
-    gap: 0.3em;
-  }
-
-  kbd {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    background: var(--bg-1);
-    padding: 0.05em 0.35em;
-    font: inherit;
-    font-size: 0.85em;
+    gap: 4px;
   }
 </style>

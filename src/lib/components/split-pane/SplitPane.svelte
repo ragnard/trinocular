@@ -124,8 +124,10 @@
 
 <style>
   svelte-split-pane {
-    --sp-thickness: var(--thickness, 8px);
-    --sp-color: var(--color, transparent);
+    /* A 1px rule with a 12px grab area around it: the line is chrome, the
+       target is not. */
+    --sp-thickness: var(--thickness, 12px);
+    --sp-color: var(--color, var(--line-strong));
     --sp-border-width: var(--border-width, 1px);
     display: grid;
     position: relative;

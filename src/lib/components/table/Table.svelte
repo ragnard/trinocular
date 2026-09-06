@@ -10,12 +10,14 @@
   } from "./types";
   import { defaultCell } from "./snippets.svelte";
 
-  const DEFAULT_ROW_HEIGHT = 28;
+  const DEFAULT_ROW_HEIGHT = 30;
+  /** The header is a rail, like every other pane header in the app. */
+  const HEADER_HEIGHT = 36;
   const DEFAULT_BUFFER_ROWS = 5;
   const DEFAULT_COLUMN_WIDTH = 150;
   const MIN_COLUMN_WIDTH = 50;
   const DEFAULT_SPACER_MIN_WIDTH = 100;
-  const ROW_NUMBER_WIDTH = 60;
+  const ROW_NUMBER_WIDTH = 52;
 
   const identity: ValueConverter = (value) => value;
 
@@ -62,6 +64,8 @@
   const defaultCellRenderer: CellRendererLookup = () => defaultCell;
   let cellRenderer = $derived(cellRendererProp ?? defaultCellRenderer);
   let resolvedRenderers = $derived(schema?.fields?.map((f) => cellRenderer(f)) ?? []);
+  // Every numeric Trino type maps to "integer" (see trino/table.ts).
+  let numeric = $derived(schema?.fields?.map((f) => f.dataType === "integer") ?? []);
 
   let startIndex = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows));
   let endIndex = $derived(
@@ -91,13 +95,13 @@
     };
   });
 
+  /**
+   * Tints the gutter for every row the selection touches, not only in
+   * whole-row mode: it is what ties a document in the inspector back to the
+   * row it came from.
+   */
   function isRowNumSelected(row: number) {
-    return (
-      rowSelection &&
-      selectionRect !== null &&
-      row >= selectionRect.minRow &&
-      row <= selectionRect.maxRow
-    );
+    return selectionRect !== null && row >= selectionRect.minRow && row <= selectionRect.maxRow;
   }
 
   function cellFlags(row: number, col: number) {
@@ -241,7 +245,7 @@
   function scrollActiveIntoView() {
     if (!active || !scrollContainer) return;
 
-    const headerHeight = rowHeight;
+    const headerHeight = HEADER_HEIGHT;
 
     const rowTop = active.row * rowHeight;
     const rowBottom = rowTop + rowHeight;
@@ -316,6 +320,7 @@
     const s = schema;
     const r = rows;
     const vc = valueConverter;
+    const cell = active;
     selection = {
       minRow, maxRow, minCol, maxCol,
       getData() {
@@ -326,6 +331,13 @@
             fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
           );
         return { fields, rows: selectedRows };
+      },
+      getActive() {
+        if (!cell) return null;
+        const field = s.fields[cell.col];
+        const row = r[cell.row];
+        if (!field || !row) return null;
+        return { field, value: vc(row[cell.col], field, cell.col) };
       }
     };
   });
@@ -372,10 +384,10 @@
         <col class="spacer-col" />
       </colgroup>
       <thead>
-        <tr style:height="{rowHeight}px">
+        <tr style:height="{HEADER_HEIGHT}px">
           <th class="row-num"></th>
           {#each schema.fields as field, colIdx}
-            <th>
+            <th class:numeric={numeric[colIdx]}>
               {#if header}
                 {@render header(field)}
               {:else}
@@ -395,7 +407,7 @@
         <tbody>
           <tr>
             <td colspan={colCount} class="empty-cell">
-              <div class="empty-state" style:top="{rowHeight}px">
+              <div class="empty-state" style:top="{HEADER_HEIGHT}px">
                 {#if empty}
                   {@render empty()}
                 {:else}
@@ -420,7 +432,10 @@
               {#each row as cell, colIdx}
                 {@const flags = cellFlags(absRow, colIdx)}
                 {@const renderCell = resolvedRenderers[colIdx]}
-                <td class:selected={flags.selected} class:active={flags.isActive}
+                <td
+                  class:numeric={numeric[colIdx]}
+                  class:selected={flags.selected}
+                  class:active={flags.isActive}
                   >{@render renderCell(
                     schema.fields[colIdx],
                     valueConverter(cell, schema.fields[colIdx], colIdx)
@@ -447,13 +462,24 @@
 {/if}
 
 <style>
+  /* Hairlines run one way only. Vertical rules turned every cell into a box;
+     column tracking is carried instead by the header's separators, the
+     row-number gutter, and right-aligned tabular numerics. */
   .table-container {
-    overflow: auto;
-    height: 100%;
-    width: 100%;
-    flex: 1;
-    min-height: 0;
     position: relative;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .table-container:focus {
+    outline: none;
+  }
+
+  .table-container.dragging {
+    user-select: none;
   }
 
   table {
@@ -466,73 +492,86 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    background: var(--table-header-bg, lightgray);
-    white-space: nowrap;
+    padding: 0 12px;
+    background: var(--s1);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-strong);
     text-align: left;
-    padding: 0.25em 0.5em;
+    vertical-align: middle;
+    font-weight: 400;
     overflow: hidden;
-    text-overflow: ellipsis;
-    border-right: 1px solid var(--table-cell-border, lightgray);
-    border-bottom: 1px solid var(--table-cell-border, lightgray);
   }
 
   th.row-num {
     left: 0;
     z-index: 4;
+    padding: 0;
   }
 
   td {
-    padding: 0 8px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--s0);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-right: 1px solid var(--table-cell-border, lightgray);
-    border-bottom: 1px solid var(--table-cell-border, lightgray);
-    background: var(--table-bg, white);
   }
 
   td.row-num {
     position: sticky;
     left: 0;
     z-index: 2;
-    background: var(--table-row-num-bg, lightgray);
-    color: var(--table-row-num-color, gray);
+    background: var(--s1);
+    border-right: 1px solid var(--line);
+    color: var(--fg-3);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
     text-align: right;
-    font-size: 0.75em;
   }
 
-  tr[aria-hidden="true"] td {
-    padding: 0;
+  th.numeric,
+  td.numeric {
+    text-align: right;
   }
 
-  .table-container:focus {
-    outline: none;
-  }
-
-  .table-container.dragging {
-    user-select: none;
+  td.numeric {
+    font-variant-numeric: tabular-nums;
   }
 
   td.selected {
-    box-shadow: inset 0 0 0 9999px var(--table-selected-bg, lightblue);
+    background: var(--accent-bg);
   }
 
+  td.row-num.selected {
+    background: var(--accent-bg);
+    color: var(--accent);
+  }
+
+  /* One inset ring, not a 2px outline: at 30px rows a heavy ring on the
+     active cell reads as a second grid. */
   td.active {
-    box-shadow: inset 0 0 0 9999px var(--table-selected-bg, lightblue);
-    outline: 2px solid var(--table-active-outline, blue);
-    outline-offset: -2px;
+    background: var(--accent-bg);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
   }
 
+  tr[aria-hidden="true"] td,
   th.spacer,
   td.spacer {
     padding: 0;
+  }
+
+  th.spacer {
+    border-right: none;
+  }
+
+  td.spacer {
     pointer-events: none;
   }
 
   .resize-handle {
     position: absolute;
-    right: 0;
     top: 0;
+    right: 0;
     width: 6px;
     height: 100%;
     cursor: col-resize;
@@ -540,28 +579,27 @@
   }
 
   .resize-handle:hover {
-    background: rgba(0, 0, 0, 0.1);
-  }
-
-  .empty-cell {
-    border: none;
-    padding: 0;
-    height: 100%;
-  }
-
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    inset: 0;
-    top: 0;
+    background: var(--accent-line);
   }
 
   .resize-overlay {
     position: fixed;
     inset: 0;
-    cursor: col-resize;
     z-index: 9999;
+    cursor: col-resize;
+  }
+
+  .empty-cell {
+    height: 100%;
+    padding: 0;
+    border: none;
+  }
+
+  .empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 </style>
