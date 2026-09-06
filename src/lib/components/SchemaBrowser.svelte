@@ -44,14 +44,10 @@
   let browseOpen = $derived(openByConnection[connectionId] ?? NO_IDS);
 
   /**
-   * A filter runs with its own open-set, seeded with the branches that have to
-   * be open to show the matches. It is separate from `browseOpen` because the
-   * two want opposite things: filtering for "hive" should show you the catalog
-   * named hive, not the three thousand tables you happened to have open under
-   * it. Clearing the filter drops it and browsing resumes where it was.
+   * Toggles made while a filter is up, which have to be able to shut a branch
+   * the filter itself opened. Dropped when the filter clears.
    */
-  let filterOpen = $state(new Set<string>());
-  let open = $derived(filtering ? filterOpen : browseOpen);
+  let filterOverride = $state(new Map<string, boolean>());
 
   let nodes: TreeNode[] = $derived.by(() => {
     const cache = workspace.catalog;
@@ -85,10 +81,11 @@
    * on every keystroke. Expanding a branch is still the only thing that
    * fetches; this just hides what does not match.
    *
-   * A node kept on its own name keeps all its children and stays shut, so the
-   * keystroke costs one row and opening it shows the real contents. A node
-   * kept only because something beneath it matched is recorded in `ancestors`
-   * and opened, since it is on screen to place the match.
+   * A node kept on its own name keeps its children whole — whatever you had
+   * open under it stays open, which is the point: filtering for a schema you
+   * are working in should not collapse the table you were reading. A node kept
+   * only because something beneath it matched is recorded in `ancestors` and
+   * forced open, since it is on screen to place the match.
    */
   function prune(nodes: TreeNode[], needle: string, ancestors: Set<string>): TreeNode[] {
     const kept: TreeNode[] = [];
@@ -113,20 +110,27 @@
   });
   let visible: TreeNode[] = $derived(pruned.nodes);
 
-  // Merged rather than assigned, so a branch opened by hand while the filter
-  // is up survives the rebuild that a finished fetch causes.
-  $effect(() => {
-    const ancestors = pruned.ancestors;
-    for (const id of ancestors) {
-      if (!filterOpen.has(id)) {
-        filterOpen = new Set([...filterOpen, ...ancestors]);
-        return;
-      }
+  /**
+   * Filtering does not decide what is open — you did. A branch is open because
+   * you had it open, plus the ones holding a match on screen, minus anything
+   * you have since clicked shut. So filtering never reveals a subtree you had
+   * collapsed (it cannot paint three thousand rows you were not already
+   * looking at), and everything you *had* expanded under a match stays where
+   * it was.
+   */
+  let open: Set<string> = $derived.by(() => {
+    if (!filtering) return browseOpen;
+    const ids = new Set(browseOpen);
+    for (const id of pruned.ancestors) ids.add(id);
+    for (const [id, isOpen] of filterOverride) {
+      if (isOpen) ids.add(id);
+      else ids.delete(id);
     }
+    return ids;
   });
 
   $effect(() => {
-    if (!filtering) filterOpen = new Set();
+    if (!filtering) filterOverride = new Map();
   });
 
   /**
@@ -135,13 +139,17 @@
    * it has one, so re-opening a branch costs nothing.
    */
   function handleToggle(node: TreeNode) {
-    const next = new Set(open);
-    const opening = !next.has(node.id);
+    const opening = !open.has(node.id);
+
+    // Recorded against the browse state either way, so what you open or shut
+    // while filtering is still what you find when the filter clears.
+    const next = new Set(browseOpen);
     if (opening) next.add(node.id);
     else next.delete(node.id);
+    openByConnection = { ...openByConnection, [connectionId]: next };
 
-    if (filtering) filterOpen = next;
-    else openByConnection = { ...openByConnection, [connectionId]: next };
+    // A branch the filter is holding open needs the override to shut it.
+    if (filtering) filterOverride = new Map(filterOverride).set(node.id, opening);
 
     if (!opening) return;
 
