@@ -4,8 +4,8 @@
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType } from "$lib/trino/typeString";
-  import Spinner from "./Spinner.svelte";
   import { PanelRight, TriangleAlert } from "@lucide/svelte";
+  import QueryProgress from "./QueryProgress.svelte";
 
   interface Props {
     result: ResultModel | null;
@@ -22,6 +22,7 @@
     };
 
   let schema = $derived(toSchema(result?.schema));
+  let hasRows = $derived((result?.data?.length ?? 0) > 0);
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 </script>
@@ -59,7 +60,15 @@
       <p>{result.error.message}</p>
       <p class="meta">{result.error.errorName} &middot; {result.error.errorCode}</p>
     </div>
+  {:else if !hasRows && result.running}
+    <!-- No rows to look at yet, so the pane is free to show what the cluster is
+         actually doing. Once rows arrive the table takes over and progress
+         carries on in the strip above it. -->
+    <QueryProgress {result} />
   {:else if schema}
+    {#if result.running}
+      <QueryProgress {result} compact />
+    {/if}
     <Table {schema} rows={result.data} {valueConverter} bind:selection>
       {#snippet header(field)}
         <!-- Name over type: a column is routinely named far wider than
@@ -75,21 +84,15 @@
         </div>
       {/snippet}
       {#snippet empty()}
-        <div class="message">
-          {#if result?.queryState === "FINISHED"}
-            No data
-          {:else}
-            <Spinner />
-            <span class="soft">{result?.queryState?.toLowerCase() ?? "starting"}&hellip;</span>
-          {/if}
-        </div>
+        <!-- A running query with no rows is handled above by the progress
+             panel, so reaching the table's empty state means the query
+             settled without producing any. -->
+        <div class="message">No data</div>
       {/snippet}
     </Table>
   {:else}
-    <div class="message">
-      <Spinner />
-      <span class="soft">Starting query&hellip;</span>
-    </div>
+    <!-- Not running and no schema: the statement settled without columns. -->
+    <div class="message">No data</div>
   {/if}
 </div>
 

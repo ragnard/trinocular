@@ -5,9 +5,48 @@ import { loadFiles, saveFiles, legacyEditorContent, clearLegacyEditor } from "$l
 
 const MAX_RESULTS_PER_FILE = 10;
 
-export type State = "PLANNING" | "QUEUED" | "RUNNING" | "FINISHED" | "FAILED";
+export type State =
+  | "QUEUED"
+  | "WAITING_FOR_RESOURCES"
+  | "DISPATCHING"
+  | "PLANNING"
+  | "STARTING"
+  | "RUNNING"
+  | "FINISHING"
+  | "FINISHED"
+  | "FAILED";
 
 const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
+
+/**
+ * One reading of the query's split counts. Kept as a series, not just a latest
+ * value, because the split total is *discovered* while the query runs rather
+ * than known up front. A single snapshot cannot tell "half done" apart from
+ * "half done against a denominator that has doubled twice", which is what
+ * makes Trino's own `progressPercentage` misleading. Plotting the series shows
+ * the goalpost moving instead of hiding it.
+ */
+export type ProgressSample = {
+  /** Milliseconds since the run started. */
+  t: number;
+  completed: number;
+  running: number;
+  queued: number;
+  /** Splits Trino knows about so far; grows as more are scheduled. */
+  total: number;
+  rows: number;
+  bytes: number;
+};
+
+/**
+ * The history is bounded in samples, not in time: on reaching the cap every
+ * other sample is dropped and the sampling interval doubles, so a query that
+ * runs for an hour keeps the same shape at half the resolution rather than
+ * losing its beginning -- and the beginning, where split discovery happens, is
+ * the part worth keeping.
+ */
+const MAX_PROGRESS_SAMPLES = 240;
+const MIN_SAMPLE_INTERVAL_MS = 250;
 
 /**
  * The result of one statement execution. The editor plants a hidden Monaco
@@ -32,6 +71,11 @@ export class Result {
   stats?: QueryStats = $state.raw();
   warnings?: string[] = $state.raw();
   error?: QueryError = $state.raw();
+  /** Split counts over time; see `ProgressSample`. */
+  progress: ProgressSample[] = $state.raw([]);
+  #sampleInterval = MIN_SAMPLE_INTERVAL_MS;
+  #lastSampleAt = -Infinity;
+  #lastSampledState?: string;
   /** A cancel has been asked for; the query has not settled on it yet. */
   cancelRequested: boolean = $state(false);
   #cancelSent = false;
@@ -78,7 +122,10 @@ export class Result {
         if (this.#discarded) break;
         if (chunk.infoUri) this.infoUri = chunk.infoUri;
         if (chunk.columns) this.columns = chunk.columns;
-        if (chunk.stats) this.stats = chunk.stats;
+        if (chunk.stats) {
+          this.stats = chunk.stats;
+          this.#sample(chunk.stats);
+        }
         if (chunk.warnings) this.warnings = chunk.warnings;
         if (chunk.error) this.error = chunk.error;
 
@@ -100,6 +147,44 @@ export class Result {
         failureInfo: { type: "ClientError", message, suppressed: [], stack: [] },
       };
     }
+  }
+
+  /**
+   * Records one split-count reading. Trino answers a poll as soon as it has
+   * anything to say, so chunks arrive far faster than the picture changes;
+   * readings are thinned to `#sampleInterval`. A state change is always
+   * recorded whatever the interval says, so the series ends on the reading
+   * that says FINISHED -- otherwise a query that finishes just after a sample
+   * would draw as though it stopped short of done.
+   */
+  #sample(stats: QueryStats) {
+    const now = Date.now();
+    if (stats.state === this.#lastSampledState && now - this.#lastSampleAt < this.#sampleInterval) {
+      return;
+    }
+    this.#lastSampleAt = now;
+    this.#lastSampledState = stats.state;
+
+    let next = this.progress.concat({
+      t: now - this.startedAt,
+      completed: stats.completedSplits ?? 0,
+      running: stats.runningSplits ?? 0,
+      queued: stats.queuedSplits ?? 0,
+      total: stats.totalSplits ?? 0,
+      rows: stats.processedRows ?? 0,
+      bytes: stats.processedBytes ?? 0
+    });
+
+    if (next.length > MAX_PROGRESS_SAMPLES) {
+      // Halve the resolution, keeping the newest reading: it is the one the
+      // bars are drawn from.
+      const last = next[next.length - 1];
+      next = next.filter((_, i) => i % 2 === 0);
+      if (next[next.length - 1] !== last) next.push(last);
+      this.#sampleInterval *= 2;
+    }
+
+    this.progress = next;
   }
 
   /**
