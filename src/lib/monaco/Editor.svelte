@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
+  import { mount, onMount, unmount, untrack, type Component } from "svelte";
   import * as monaco from "monaco-editor";
+  import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
+  import Play from "@lucide/svelte/icons/play";
+  import Table from "@lucide/svelte/icons/table";
+  import X from "@lucide/svelte/icons/x";
   import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
   import {
     register,
@@ -292,12 +297,18 @@
     return reattached;
   }
 
-  function resultTitle(result: Result): string {
-    if (result.canceled) return "☰ Results · canceled";
-    if (result.error) return "☰ Results · error";
-    if (result.cancelling) return "⏳ Cancelling…";
-    if (result.running) return "⏳ Running…";
-    return `☰ Results · ${result.rowCount ?? 0} rows · ${result.elapsedTimeSeconds}s`;
+  /** The icon and text the status button carries in a given result state. */
+  function resultStatus(result: Result): { icon: IconComponent; text: string; spin: boolean } {
+    if (result.canceled) return { icon: CircleAlert, text: "Results · canceled", spin: false };
+    if (result.error) return { icon: CircleAlert, text: "Results · error", spin: false };
+    if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
+    if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
+    const rows = result.rowCount ?? 0;
+    return {
+      icon: Table,
+      text: `Results · ${rows} ${rows === 1 ? "row" : "rows"} · ${result.elapsedTimeSeconds}s`,
+      spin: false
+    };
   }
 
   function resultTooltip(result: Result): string | undefined {
@@ -308,7 +319,7 @@
 
   /* --- Statement toolbars -------------------------------------------------
    *
-   * The "▶ Run / status / ✕ Cancel" strip above each statement is drawn by
+   * The "Run / status / Cancel" strip above each statement is drawn by
    * this component rather than by a CodeLensProvider: a view zone opens the
    * band and a content widget fills it, which is how monaco builds its own
    * code lenses (contrib/codelens/browser/codelensWidget). What it leaves out
@@ -322,11 +333,47 @@
    * codicon in an escaped title string.
    */
 
+  type IconComponent = Component<{ size?: number }>;
+
+  /** Matches the 16px icons the sidebar uses. */
+  const ICON_SIZE = 16;
+
+  /**
+   * Lucide ships svelte components, not raw path data, and the toolbar is
+   * plain DOM — so each icon is its own little mounted component tree. The
+   * slot remembers what is mounted so a state change that does not change the
+   * icon (row count ticking up) does not remount it.
+   */
+  interface IconSlot {
+    host: HTMLElement;
+    current?: IconComponent;
+    instance?: Record<string, unknown>;
+  }
+
+  function setIcon(slot: IconSlot, icon: IconComponent): void {
+    if (slot.current === icon) return;
+    if (slot.instance) unmount(slot.instance);
+    slot.current = icon;
+    slot.instance = mount(icon, { target: slot.host, props: { size: ICON_SIZE } });
+  }
+
+  function clearIcon(slot: IconSlot): void {
+    if (slot.instance) unmount(slot.instance);
+    slot.instance = undefined;
+    slot.current = undefined;
+  }
+
+  interface ToolbarButton {
+    el: HTMLElement;
+    slot: IconSlot;
+    label: HTMLElement;
+  }
+
   interface StatementToolbar {
     node: HTMLElement;
-    run: HTMLElement;
-    status: HTMLElement;
-    cancel: HTMLElement;
+    run: ToolbarButton;
+    status: ToolbarButton;
+    cancel: ToolbarButton;
     widget: monaco.editor.IContentWidget;
     /** The zone object monaco holds: mutate it, then ask for a re-layout. */
     zone: monaco.editor.IViewZone;
@@ -357,19 +404,25 @@
     const node = document.createElement("div");
     node.className = "trinette-statement-toolbar";
 
-    const button = (className: string, text?: string) => {
+    const button = (className: string, icon: IconComponent | null, text?: string) => {
       const el = document.createElement("a");
       el.className = `action ${className}`;
       el.setAttribute("role", "button");
-      if (text) el.textContent = text;
-      return el;
+      const slot: IconSlot = { host: document.createElement("span") };
+      slot.host.className = "icon";
+      const label = document.createElement("span");
+      label.className = "label";
+      if (text) label.textContent = text;
+      el.append(slot.host, label);
+      if (icon) setIcon(slot, icon);
+      return { el, slot, label };
     };
 
-    const run = button("run", "▶ Run");
-    const status = button("status");
-    const cancel = button("cancel", "✕ Cancel");
-    cancel.title = "Cancel this query";
-    node.append(run, status, cancel);
+    const run = button("run", Play, "Run");
+    const status = button("status", null);
+    const cancel = button("cancel", X, "Cancel");
+    cancel.el.title = "Cancel this query";
+    node.append(run.el, status.el, cancel.el);
 
     const zone: monaco.editor.IViewZone = {
       afterLineNumber: 0,
@@ -395,16 +448,16 @@
     // The handlers read the toolbar's *current* statement and result, so a
     // strip that has been reused for a different statement still acts on the
     // right one.
-    run.addEventListener("click", () => {
+    run.el.addEventListener("click", () => {
       const model = editor?.getModel();
       if (!model || !toolbar.statement) return;
       const range = statementRange(model, toolbar.statement);
       runRange(model, range, toolbar.statement.text.trim(), range.startLineNumber);
     });
-    status.addEventListener("click", () => {
+    status.el.addEventListener("click", () => {
       if (toolbar.result) onshowresult?.(toolbar.result);
     });
-    cancel.addEventListener("click", () => {
+    cancel.el.addEventListener("click", () => {
       if (toolbar.result) oncancelresult?.(toolbar.result);
     });
 
@@ -443,26 +496,33 @@
       for (const toolbar of dead) {
         accessor.removeZone(toolbar.zoneId);
         editor?.removeContentWidget(toolbar.widget);
+        // Each icon is a mounted component tree of its own.
+        for (const button of [toolbar.run, toolbar.status, toolbar.cancel]) {
+          clearIcon(button.slot);
+        }
       }
     });
   }
 
   function renderToolbar(toolbar: StatementToolbar, result: Result | undefined): void {
     toolbar.result = result ?? null;
-    toolbar.status.hidden = !result;
-    toolbar.cancel.hidden = true;
+    toolbar.status.el.hidden = !result;
+    toolbar.cancel.el.hidden = true;
     if (!result) return;
 
-    toolbar.status.textContent = resultTitle(result);
+    const { icon, text, spin } = resultStatus(result);
+    setIcon(toolbar.status.slot, icon);
+    toolbar.status.slot.host.classList.toggle("spin", spin);
+    toolbar.status.label.textContent = text;
     // A cancelled query is reported by Trino as a USER_CANCELED failure, so
     // both it and a genuine error land on the same styling.
-    toolbar.status.classList.toggle("failed", Boolean(result.error));
+    toolbar.status.el.classList.toggle("failed", Boolean(result.error));
     const tooltip = resultTooltip(result);
-    if (tooltip) toolbar.status.title = tooltip;
-    else toolbar.status.removeAttribute("title");
+    if (tooltip) toolbar.status.el.title = tooltip;
+    else toolbar.status.el.removeAttribute("title");
     // Only offered while the cancel can still do something — once asked for,
     // the status beside it reads "Cancelling…" instead.
-    toolbar.cancel.hidden = !(result.running && !result.cancelling);
+    toolbar.cancel.el.hidden = !(result.running && !result.cancelling);
   }
 
   /**
@@ -655,13 +715,43 @@
     color: var(--text-2);
   }
 
+  /* `!important` because the `.action` rule below sets `display` at the same
+     specificity and comes later, which would otherwise un-hide the button. */
   :global(.monaco-editor .trinette-statement-toolbar [hidden]) {
-    display: none;
+    display: none !important;
   }
 
   :global(.monaco-editor .trinette-statement-toolbar .action) {
     cursor: pointer;
     user-select: none;
+    /* inline-flex, not inline: keeps the icon and its label on one baseline.
+       Only the widget's own root has its display forced by monaco. */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+
+  /* Lucide renders `stroke="currentColor"`, so the icons inherit the hover and
+     failed colours below without any extra rules. */
+  :global(.monaco-editor .trinette-statement-toolbar .icon) {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  :global(.monaco-editor .trinette-statement-toolbar .icon.spin svg) {
+    animation: trinette-spin 1s linear infinite;
+  }
+
+  @keyframes trinette-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.monaco-editor .trinette-statement-toolbar .icon.spin svg) {
+      animation: none;
+    }
   }
 
   :global(.monaco-editor .trinette-statement-toolbar .action + .action) {

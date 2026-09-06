@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
   import type { Snippet } from "svelte";
+  import { Copy } from "@lucide/svelte";
 
   interface Props {
     selection?: Selection | null;
@@ -130,7 +131,7 @@
               <td class="field" title={entry.key}>
                 {entry.key}
                 <div class="cell-actions">
-                  <button title="Copy field name" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(entry.key); }}>📋</button>
+                  <button title="Copy field name" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(entry.key); }}><Copy size={13} /></button>
                 </div>
               </td>
               <td class="value" class:null={entry.value === null}>
@@ -154,7 +155,7 @@
                       : typeof entry.value === "object" ? JSON.stringify(entry.value)
                       : String(entry.value);
                     navigator.clipboard.writeText(text);
-                  }}>📋</button>
+                  }}><Copy size={13} /></button>
                 </div>
               </td>
             </tr>
@@ -253,6 +254,11 @@
   .cell-actions button {
     all: unset;
     cursor: pointer;
+    /* `all: unset` leaves the button inline, which would drop the icon onto
+       the text baseline and leave descender space under it. */
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-2);
     font-size: var(--font-sm);
     line-height: 1;
     padding: 3px 3px;

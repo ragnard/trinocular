@@ -4,11 +4,12 @@
   import {
     Box,
     ChevronRight,
-    CircleX,
     Database,
+    Moon,
     Pencil,
     Plus,
     Settings,
+    Sun,
     Table,
     Trash2,
     Type
@@ -163,7 +164,11 @@
 
   <div class="menu-bottom">
     <button class="theme-toggle" onclick={onToggleTheme} title="Toggle dark mode">
-      {theme === "light" ? "🌙" : "☀️"}
+      {#if theme === "light"}
+        <Moon size={16} />
+      {:else}
+        <Sun size={16} />
+      {/if}
     </button>
     <div class="user">{userId}</div>
   </div>
@@ -212,6 +217,13 @@
     border-radius: 4px;
     cursor: pointer;
     padding: 0.2em 0.4em;
+    display: flex;
+    align-items: center;
+    color: var(--text-2);
+  }
+
+  .theme-toggle:hover {
+    color: var(--bg-text);
   }
 
   .user {
