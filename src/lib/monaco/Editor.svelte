@@ -2,9 +2,11 @@
   import { mount, onMount, unmount, untrack, type Component } from "svelte";
   import * as monaco from "monaco-editor";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import ExternalLink from "@lucide/svelte/icons/external-link";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Play from "@lucide/svelte/icons/play";
   import Table from "@lucide/svelte/icons/table";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import X from "@lucide/svelte/icons/x";
   import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
   import {
@@ -83,6 +85,7 @@
       void result.cancelling;
       void result.canceled;
       void result.elapsedTimeSeconds;
+      void result.infoUri;
     }
     syncToolbars();
   });
@@ -299,8 +302,10 @@
 
   /** The icon and text the status button carries in a given result state. */
   function resultStatus(result: Result): { icon: IconComponent; text: string; spin: boolean } {
-    if (result.canceled) return { icon: CircleAlert, text: "Results · canceled", spin: false };
-    if (result.error) return { icon: CircleAlert, text: "Results · error", spin: false };
+    if (result.canceled) return { icon: CircleAlert, text: "Canceled", spin: false };
+    // A failed statement has no rows behind it, so the status says so rather
+    // than offering "Results" behind a table icon.
+    if (result.error) return { icon: TriangleAlert, text: "Error", spin: false };
     if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
     if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
     const rows = result.rowCount ?? 0;
@@ -364,7 +369,7 @@
   }
 
   interface ToolbarButton {
-    el: HTMLElement;
+    el: HTMLAnchorElement;
     slot: IconSlot;
     label: HTMLElement;
   }
@@ -373,6 +378,7 @@
     node: HTMLElement;
     run: ToolbarButton;
     status: ToolbarButton;
+    details: ToolbarButton;
     cancel: ToolbarButton;
     widget: monaco.editor.IContentWidget;
     /** The zone object monaco holds: mutate it, then ask for a re-layout. */
@@ -420,9 +426,17 @@
 
     const run = button("run", Play, "Run");
     const status = button("status", null);
+    // A real link rather than a role="button": it leaves for the cluster's own
+    // query page, so middle-click and "copy link address" do what they look
+    // like they do. Monaco suppresses only mousedown; a click still navigates.
+    const details = button("details", ExternalLink, "Details");
+    details.el.removeAttribute("role");
+    details.el.target = "_blank";
+    details.el.rel = "noopener noreferrer";
+    details.el.title = "Open this query in the Trino UI";
     const cancel = button("cancel", X, "Cancel");
     cancel.el.title = "Cancel this query";
-    node.append(run.el, status.el, cancel.el);
+    node.append(run.el, status.el, details.el, cancel.el);
 
     const zone: monaco.editor.IViewZone = {
       afterLineNumber: 0,
@@ -436,6 +450,7 @@
       node,
       run,
       status,
+      details,
       cancel,
       widget: null!,
       zone,
@@ -497,7 +512,7 @@
         accessor.removeZone(toolbar.zoneId);
         editor?.removeContentWidget(toolbar.widget);
         // Each icon is a mounted component tree of its own.
-        for (const button of [toolbar.run, toolbar.status, toolbar.cancel]) {
+        for (const button of [toolbar.run, toolbar.status, toolbar.details, toolbar.cancel]) {
           clearIcon(button.slot);
         }
       }
@@ -507,6 +522,7 @@
   function renderToolbar(toolbar: StatementToolbar, result: Result | undefined): void {
     toolbar.result = result ?? null;
     toolbar.status.el.hidden = !result;
+    toolbar.details.el.hidden = true;
     toolbar.cancel.el.hidden = true;
     if (!result) return;
 
@@ -520,6 +536,15 @@
     const tooltip = resultTooltip(result);
     if (tooltip) toolbar.status.el.title = tooltip;
     else toolbar.status.el.removeAttribute("title");
+    // Trino reports `infoUri` — its own page for the query — alongside the
+    // query id, on the first response and every one after, so the link stands
+    // for as long as the cluster keeps the query, running or finished.
+    if (result.queryId && result.infoUri) {
+      toolbar.details.el.href = result.infoUri;
+      toolbar.details.el.hidden = false;
+    } else {
+      toolbar.details.el.removeAttribute("href");
+    }
     // Only offered while the cancel can still do something — once asked for,
     // the status beside it reads "Cancelling…" instead.
     toolbar.cancel.el.hidden = !(result.running && !result.cancelling);
@@ -724,6 +749,10 @@
   :global(.monaco-editor .trinette-statement-toolbar .action) {
     cursor: pointer;
     user-select: none;
+    /* "Details" is a real `<a href>`, so it would otherwise arrive wearing the
+       browser's own link colour and underline. */
+    color: inherit;
+    text-decoration: none;
     /* inline-flex, not inline: keeps the icon and its label on one baseline.
        Only the widget's own root has its display forced by monaco. */
     display: inline-flex;
@@ -736,6 +765,19 @@
   :global(.monaco-editor .trinette-statement-toolbar .icon) {
     display: inline-flex;
     align-items: center;
+  }
+
+  /* Undoes the `max-width: 100%` the app's reset puts on every svg, which is
+     what used to leave a strip reading "Run" with no icon beside it until
+     something forced a re-layout. Monaco caps a content widget that may not
+     overflow at the editor's content width, and it reads that width once, when
+     the widget is added — for the strips built on the first pass, before the
+     editor has been laid out, that is 0. The label survives a `max-width: 0`
+     ancestor because nowrap text overflows it; the icon, a replaced element
+     sizing itself against its container, collapsed to nothing. */
+  :global(.monaco-editor .trinette-statement-toolbar .icon svg) {
+    max-width: none;
+    flex: none;
   }
 
   :global(.monaco-editor .trinette-statement-toolbar .icon.spin svg) {
