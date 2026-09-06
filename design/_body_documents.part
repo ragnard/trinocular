@@ -1,0 +1,92 @@
+
+<div class="dark" style="width:1240px;height:1080px;background:var(--s0);color:var(--fg);padding:32px">
+
+  <div style="margin-bottom:6px;font-size:13px;font-weight:600">A second kind of document</div>
+  <div style="color:var(--fg-2);max-width:880px;margin-bottom:26px">Nothing new in the chrome. A document is whatever the middle column is showing; the header rail names it, &#8984;P switches between them, and the connection chip still says which cluster it belongs to. Only the icon and the chip menu tell you which kind you are looking at.</div>
+
+  <div style="display:grid;grid-template-columns:576px 576px;gap:0 24px;margin-bottom:26px">
+
+    <!-- ---- 1. where it starts ---- -->
+    <div>
+      <div class="caps" style="color:var(--fg-3);margin-bottom:10px">1 &nbsp;Where it starts</div>
+      <div style="border:1px solid var(--line-strong);border-radius:8px;background:var(--s1);padding:8px;height:196px;overflow:hidden">
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3);transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">sf100</span></div>
+        <div style="padding-left:14px">
+          <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">customer</span></div>
+          <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px;background:var(--s2)"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">lineitem</span><span class="row" style="width:20px;height:20px;justify-content:center;border-radius:4px;background:var(--s0);color:var(--accent);box-shadow:0 0 0 1px var(--accent-line)" title="Inspect table"><svg class="ic12"><use href="#i-panel"/></svg></span></div>
+          <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">orders</span></div>
+          <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">nation</span></div>
+        </div>
+        <div class="meta" style="color:var(--fg-3);padding:10px 8px 0;line-height:17px">One icon-button on hover, the same 20&nbsp;px slot every tree row already reserves. It is the only new affordance in the whole idea &mdash; and it still takes a click, so nothing on the keystroke path reaches the cluster.</div>
+      </div>
+    </div>
+
+    <!-- ---- 2. the switcher ---- -->
+    <div>
+      <div class="caps" style="color:var(--fg-3);margin-bottom:10px">2 &nbsp;&#8984;P lists both kinds</div>
+      <div style="border:1px solid var(--line-strong);border-radius:8px;background:var(--s1);box-shadow:var(--shadow);overflow:hidden;height:196px">
+        <div class="row" style="gap:8px;height:36px;padding:0 12px;border-bottom:1px solid var(--line);color:var(--fg-3)">
+          <svg class="ic"><use href="#i-search"/></svg><span style="flex:1">line</span><span style="width:1px;height:14px;background:var(--line-strong)"></span><span class="meta">5 documents</span>
+        </div>
+        <div class="row" style="gap:8px;height:30px;padding:0 12px;background:var(--accent-bg)"><svg class="ic" style="color:var(--accent)"><use href="#i-table"/></svg><span class="ell" style="flex:1">tpch.sf100.<strong>line</strong>item</span><span class="meta" style="color:var(--fg-3)">analytics-prod</span></div>
+        <div class="row" style="gap:8px;height:30px;padding:0 12px"><svg class="ic" style="color:var(--fg-3)"><use href="#i-file"/></svg><span class="ell" style="flex:1"><strong>line</strong>item-skew.sql</span><span class="meta" style="color:var(--fg-3)">analytics-prod</span></div>
+        <div class="row" style="gap:8px;height:30px;padding:0 12px"><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">iceberg.core.<strong>line</strong>_events</span><span class="meta" style="color:var(--fg-3)">warehouse-eu</span></div>
+        <div class="row" style="gap:8px;height:30px;padding:0 12px"><svg class="ic" style="color:var(--fg-3)"><use href="#i-file"/></svg><span class="ell" style="flex:1">revenue-by-nation.sql</span><span class="meta" style="color:var(--fg-3)">analytics-prod</span></div>
+        <div class="row meta" style="gap:8px;height:26px;padding:0 12px;color:var(--fg-3);border-top:1px solid var(--line)"><span>Same list, same chord.</span><span style="flex:1"></span><span>The icon is the type.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- 3. the chip menu ---- -->
+  <div class="caps" style="color:var(--fg-3);margin-bottom:10px">3 &nbsp;The chip is the same control; only its menu differs</div>
+  <div style="display:grid;grid-template-columns:576px 576px;gap:0 24px;margin-bottom:26px">
+
+    <div style="border:1px solid var(--line-strong);border-radius:8px;background:var(--s0);padding:14px;height:232px">
+      <div class="row" style="gap:2px;height:36px;margin:-14px -14px 0;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-radius:8px 8px 0 0">
+        <span class="row" style="gap:6px;height:24px;padding:0 8px;border-radius:6px;background:var(--s2);font-weight:600"><svg class="ic" style="color:var(--fg-3)"><use href="#i-file"/></svg>revenue-by-nation.sql<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      </div>
+      <div style="width:230px;margin:8px 0 0 8px;padding:4px 0;background:var(--s2);border:1px solid var(--line-strong);border-radius:6px;box-shadow:var(--shadow)">
+        <div class="row" style="height:26px;padding:0 12px">Rename&hellip;</div>
+        <div class="row" style="height:26px;padding:0 12px">New file</div>
+        <div class="row" style="height:26px;padding:0 12px">Switch document&hellip;</div>
+        <div style="height:1px;margin:4px 0;background:var(--line-strong)"></div>
+        <div class="row" style="height:26px;padding:0 12px;color:var(--error)">Delete file</div>
+      </div>
+    </div>
+
+    <div style="border:1px solid var(--line-strong);border-radius:8px;background:var(--s0);padding:14px;height:232px">
+      <div class="row" style="gap:2px;height:36px;margin:-14px -14px 0;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-radius:8px 8px 0 0">
+        <span class="row" style="gap:6px;height:24px;padding:0 8px;border-radius:6px;background:var(--s2);font-weight:600"><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg>tpch.sf100.lineitem<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      </div>
+      <div style="width:230px;margin:8px 0 0 8px;padding:4px 0;background:var(--s2);border:1px solid var(--line-strong);border-radius:6px;box-shadow:var(--shadow)">
+        <div class="row" style="height:26px;padding:0 12px">Open as SQL</div>
+        <div class="row" style="height:26px;padding:0 12px">Refresh metadata</div>
+        <div class="row" style="height:26px;padding:0 12px">Copy qualified name</div>
+        <div style="height:1px;margin:4px 0;background:var(--line-strong)"></div>
+        <div class="row" style="height:26px;padding:0 12px">Close document</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- 4. anatomy ---- -->
+  <div class="caps" style="color:var(--fg-3);margin-bottom:10px">4 &nbsp;One anatomy, two fillings</div>
+  <div style="display:grid;grid-template-columns:576px 576px;gap:0 24px">
+    <div>
+      <div style="border:1px solid var(--line-strong);border-radius:8px;overflow:hidden">
+        <div class="row" style="gap:8px;height:36px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong)"><svg class="ic" style="color:var(--fg-3)"><use href="#i-file"/></svg><span class="ell" style="flex:1">SQL document</span><span class="meta" style="color:var(--fg-3)">header rail &mdash; 36 px</span></div>
+        <div class="row" style="height:56px;padding:0 12px;background:var(--s0);border-bottom:1px solid var(--line-strong)"><span style="flex:1;color:var(--fg-2)">editor</span><span class="meta" style="color:var(--fg-3)">surface, no rail</span></div>
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line)"><span class="meta" style="color:var(--fg-2)">200 rows &middot; 1.4 s</span></div>
+        <div class="row" style="height:44px;padding:0 12px;background:var(--s0)"><span style="flex:1;color:var(--fg-2)">results table</span><span class="meta" style="color:var(--fg-3)">surface with a rail</span></div>
+      </div>
+    </div>
+    <div>
+      <div style="border:1px solid var(--line-strong);border-radius:8px;overflow:hidden">
+        <div class="row" style="gap:8px;height:36px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong)"><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">Table document</span><span class="meta" style="color:var(--fg-3)">header rail &mdash; 36 px</span></div>
+        <div class="row" style="height:56px;padding:0 12px;background:var(--s0);border-bottom:1px solid var(--line-strong)"><span style="flex:1;color:var(--fg-2)">format, size, spec, location&hellip;</span><span class="meta" style="color:var(--fg-3)">surface, no rail</span></div>
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line)"><span class="meta" style="color:var(--fg-2)">Snapshots &middot; Partitions &middot; Files &middot; Schema</span></div>
+        <div class="row" style="height:44px;padding:0 12px;background:var(--s0)"><span style="flex:1;color:var(--fg-2)">snapshot table</span><span class="meta" style="color:var(--fg-3)">surface with a rail</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meta" style="color:var(--fg-3);margin-top:12px;line-height:17px;max-width:1176px">Both are a header rail over two surfaces split by the same draggable divider, and the lower surface of each is an ordinary results table &mdash; so selection, the anchor strip and the inspector work identically on a snapshot list and on query rows, with no second implementation. The inspector sits outside the document column entirely, which is why it does not care which kind is open.</div>
+</div>

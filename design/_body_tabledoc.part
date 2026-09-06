@@ -1,0 +1,162 @@
+
+<div class="dark" style="width:1440px;height:900px;background:var(--s0);color:var(--fg);display:grid;grid-template-rows:36px 1fr 26px">
+
+  <!-- ================= the same 36px band. Only the document changed. ======== -->
+  <div style="display:grid;grid-template-columns:264px 1px 1fr 1px 440px;background:var(--s1);border-bottom:1px solid var(--line-strong)">
+
+    <div style="display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;color:var(--fg-3)">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <span style="flex:1;color:var(--fg-3)">Filter schema&hellip;</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-rows"/></svg></span>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- document rail: same chip, different icon. The type is the icon. -->
+    <div style="display:flex;align-items:center;gap:2px;padding:0 12px">
+      <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:6px;background:var(--s2);font-weight:600"><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg>tpch.sf100.lineitem<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      <span style="width:1px;height:16px;background:var(--line-strong);margin:0 8px"></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:6px;color:var(--fg-2)"><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg>analytics-prod<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      <span style="flex:1"></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;color:var(--fg-3)"><kbd class="meta" style="border:1px solid var(--line-strong);border-radius:4px;background:var(--s0);padding:1px 5px;font-family:inherit">&#8984;P</kbd>Switch document</span>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <div class="row" style="gap:8px;padding:0 6px 0 12px">
+      <svg class="ic" style="color:var(--fg-3)"><use href="#i-panel"/></svg>
+      <span class="ell" style="flex:1">2 rows &times; 5 columns</span>
+      <span class="row" style="width:24px;height:24px;justify-content:center;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-copy"/></svg></span>
+      <span class="row" style="width:24px;height:24px;justify-content:center;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-x"/></svg></span>
+    </div>
+  </div>
+
+  <!-- ================= body ================= -->
+  <div style="display:grid;grid-template-columns:264px 1px 1fr 1px 440px;min-height:0">
+
+    <!-- ---------- schema browser: where the document came from ---------- -->
+    <div style="background:var(--s1);display:flex;flex-direction:column;min-height:0;padding:8px">
+      <div class="row meta" style="gap:6px;height:26px;padding:0 8px;color:var(--fg-3);flex:none">
+        <svg class="ic12"><use href="#i-db"/></svg><span style="flex:1">analytics-prod</span>
+      </div>
+      <div style="flex:1;min-height:0;overflow:hidden">
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3);transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">tpch</span></div>
+        <div style="padding-left:14px">
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">sf1</span></div>
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3);transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">sf100</span></div>
+          <div style="padding-left:14px">
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">customer</span></div>
+            <!-- the active document's own row, and the affordance that made it -->
+            <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px;background:var(--accent-bg);box-shadow:inset 2px 0 0 var(--accent)"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--accent)"><use href="#i-table"/></svg><span class="ell" style="flex:1">lineitem</span><span class="row" style="width:20px;height:20px;justify-content:center;border-radius:4px;background:var(--s0);color:var(--accent)" title="Inspect table"><svg class="ic12"><use href="#i-panel"/></svg></span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px;background:var(--s2)"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">orders</span><span class="row" style="width:20px;height:20px;justify-content:center;border-radius:4px;color:var(--fg-3)" title="Inspect table"><svg class="ic12"><use href="#i-panel"/></svg></span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">nation</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">region</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">supplier</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">part</span></div>
+          </div>
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">tiny</span></div>
+        </div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">iceberg</span></div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">hive</span></div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">system</span></div>
+      </div>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- ---------- the document: same two-surface anatomy as a SQL file.
+         Facts where the editor would be, rows where the results would be. -->
+    <div style="display:grid;grid-template-rows:210px 1px 1fr;min-width:0;min-height:0;background:var(--s0)">
+
+      <!-- upper surface: what the table IS. No rail, exactly like the editor. -->
+      <div style="padding:16px;overflow:hidden;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(4,42px);gap:0 24px">
+        <div><div class="meta" style="color:var(--fg-3)">format</div><div class="mono ell">iceberg &middot; v2</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">records</div><div class="mono ell num">600037902</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">data files</div><div class="mono ell num">4812</div></div>
+
+        <div><div class="meta" style="color:var(--fg-3)">total size</div><div class="mono ell num">1.24 TB</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">snapshots</div><div class="mono ell num">37</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">manifests</div><div class="mono ell num">118</div></div>
+
+        <div><div class="meta" style="color:var(--fg-3)">partition spec</div><div class="mono ell" title="days(l_shipdate), bucket(16, l_suppkey)">days(l_shipdate), bucket(16, l_suppkey)</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">sort order</div><div class="mono ell">l_shipdate ASC NULLS FIRST</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">last updated</div><div class="mono ell">2026-08-30 04:12:07 UTC</div></div>
+
+        <div style="grid-column:span 2"><div class="meta" style="color:var(--fg-3)">location</div><div class="mono ell" title="s3://warehouse/tpch/sf100/lineitem">s3://warehouse/tpch/sf100/lineitem</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">current snapshot</div><div class="mono ell num">7286302847263048192</div></div>
+      </div>
+
+      <div style="background:var(--line-strong)"></div>
+
+      <!-- lower surface: rows, with the same rail the results pane has -->
+      <div style="display:grid;grid-template-rows:36px 1fr;min-height:0">
+        <div class="row" style="gap:4px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong)">
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;background:var(--s2);font-weight:600">Snapshots</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Partitions</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Files</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Schema</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Properties</span>
+          <span style="flex:1"></span>
+          <span class="row" style="gap:6px;height:24px;padding:0 8px;border-radius:6px;color:var(--fg-2)"><svg class="ic"><use href="#i-file"/></svg>Open as SQL</span>
+        </div>
+
+        <div style="display:grid;grid-template-rows:1fr 30px;min-width:0;min-height:0">
+          <div style="overflow:hidden;min-height:0">
+            <table style="border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%">
+              <!--SNAPHEADER-->
+              <!--SNAPROWS-->
+            </table>
+          </div>
+          <div class="row" style="gap:10px;padding:0 12px;background:var(--s1);border-top:1px solid var(--line-strong)">
+            <span class="meta" style="color:var(--fg-3)">committed_at</span>
+            <span style="width:1px;height:14px;background:var(--line-strong)"></span>
+            <span class="mono ell" style="flex:1">2026-08-30 04:12:07.412 UTC</span>
+            <span class="meta" style="color:var(--fg-3)">2 rows &times; 5 columns</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- ---------- the inspector does not care which document it is ---------- -->
+    <div style="background:var(--s1);display:flex;flex-direction:column;min-width:0;min-height:0">
+      <div class="row" style="gap:8px;height:24px;margin:8px 12px 6px;padding:0 8px;border:1px solid var(--line-strong);border-radius:6px;color:var(--fg-3);flex:none">
+        <svg class="ic12"><use href="#i-search"/></svg><span style="flex:1">Filter fields&hellip;</span>
+      </div>
+      <div style="flex:1;min-height:0;overflow:hidden">
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span class="caps" style="color:var(--fg-2)">Row 1</span><span style="flex:1"></span><span class="row" style="color:var(--fg-3)"><svg class="ic12"><use href="#i-copy"/></svg></span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">committed_at</span><span class="mono ell">2026-08-30 04:12:07.412</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">snapshot_id</span><span class="mono ell">7286302847263048192</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">operation</span><span class="mono ell">append</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">added_records</span><span class="mono ell">1284119</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-data-files</span><span class="mono ell">41</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-records</span><span class="mono ell">1284119</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-files-size</span><span class="mono ell">3821004112</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-data-files</span><span class="mono ell">4812</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-records</span><span class="mono ell">600037902</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-files-size</span><span class="mono ell">1363998117888</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.engine-name</span><span class="mono ell">spark</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.engine-version</span><span class="mono ell">3.5.1</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.app-id</span><span class="mono ell">application_1756204471_0293</span></div>
+
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s2);border-bottom:1px solid var(--line)"><span class="caps" style="color:var(--fg-2)">Row 2</span><span style="flex:1"></span><span class="row" style="color:var(--fg-3)"><svg class="ic12"><use href="#i-copy"/></svg></span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">committed_at</span><span class="mono ell">2026-08-29 04:11:52.907</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">snapshot_id</span><span class="mono ell">6104772819930014772</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">operation</span><span class="mono ell">append</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">added_records</span><span class="mono ell">1279044</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-data-files</span><span class="mono ell">39</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 26px status bar ================= -->
+  <div class="row meta" style="gap:8px;padding:0 12px;background:var(--s1);border-top:1px solid var(--line-strong);color:var(--fg-3)">
+    <span style="width:16px;height:16px;border-radius:50%;border:1px solid var(--line-strong);background:var(--s0);display:inline-flex;align-items:center;justify-content:center;font-size:9px">&#128055;</span>
+    <span>Oink</span>
+    <span style="flex:1"></span>
+    <span>r.dahlen@gmail.com</span>
+    <span style="width:1px;height:12px;background:var(--line-strong)"></span>
+    <span style="display:inline-flex;color:var(--fg-3)"><svg class="ic12"><use href="#i-moon"/></svg></span>
+  </div>
+</div>

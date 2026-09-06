@@ -1,0 +1,282 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Current tokens, resolved from the app's oklch relative colors -------- */
+    .now-dark{
+      --bg-0:#1e1e1e; --bg-1:#262626; --bg-2:#2e2e2e; --bg-focus:#454545;
+      --text-0:#c4c4c4; --text-2:#767676;
+      --border:#414141; --border-dark:#303030;
+      --accent:#4da6ff; --accent-bg:rgba(77,166,255,.15); --error:#f47067;
+    }
+    .now-light{
+      --bg-0:#ffffff; --bg-1:#f0f0f0; --bg-2:#f5f5f5; --bg-focus:#d8d8d8;
+      --text-0:#000000; --text-2:#999999;
+      --border:#e0e0e0; --border-dark:#cccccc;
+      --accent:#0e65eb; --accent-bg:rgba(14,101,235,.12); --error:#cf222e;
+    }
+    /* Proposed tokens: one monotonic elevation ramp, same meaning in both --- */
+    .dark{
+      --s0:#1e1e1e; --s1:#252527; --s2:#2e2e31; --s3:#3a3a3e;
+      --line:#303033; --line-strong:#3f3f44;
+      --fg:#cfcfd2; --fg-2:#96969c; --fg-3:#6e6e75;
+      --accent:#4da6ff; --accent-fg:#0d1a26;
+      --accent-bg:rgba(77,166,255,.16); --accent-line:rgba(77,166,255,.55);
+      --ok:#5ec9a8; --warn:#e2b341; --error:#f47067; --error-bg:rgba(244,112,103,.13);
+      --kw:#569cd6; --str:#ce9178; --num:#b5cea8; --fn:#dcdcaa; --id:#9cdcfe; --cmt:#6a9955;
+      --shadow:0 10px 30px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+    }
+    .light{
+      --s0:#ffffff; --s1:#f7f7f8; --s2:#eeeef1; --s3:#e3e3e8;
+      --line:#e8e8ec; --line-strong:#d6d6dc;
+      --fg:#1f2024; --fg-2:#6b6c74; --fg-3:#8f9099;
+      --accent:#0e65eb; --accent-fg:#ffffff;
+      --accent-bg:rgba(14,101,235,.10); --accent-line:rgba(14,101,235,.45);
+      --ok:#1a7f5a; --warn:#9a6700; --error:#cf222e; --error-bg:rgba(207,34,46,.09);
+      --kw:#0000c0; --str:#a31515; --num:#098658; --fn:#795e26; --id:#0b5c8a; --cmt:#3a8a3a;
+      --shadow:0 10px 28px rgba(15,18,25,.14), 0 2px 6px rgba(15,18,25,.07);
+    }
+    /* Warm variant used by the Cards direction */
+    .warm{
+      --s0:#fdfcfb; --s1:#f6f4f1; --s2:#edeae5; --s3:#e2ded7;
+      --line:#eae7e2; --line-strong:#d9d5ce;
+      --fg:#25231f; --fg-2:#6d6960; --fg-3:#938e84;
+      --accent:#1f6feb; --accent-fg:#ffffff;
+      --accent-bg:rgba(31,111,235,.10); --accent-line:rgba(31,111,235,.4);
+      --ok:#1a7f5a; --warn:#9a6700; --error:#c0392b; --error-bg:rgba(192,57,43,.09);
+      --kw:#1d4ed8; --str:#9a3412; --num:#0f766e; --fn:#7c5a12; --id:#0f5d80; --cmt:#6b8f5f;
+      --shadow:0 12px 32px rgba(60,50,35,.10), 0 2px 6px rgba(60,50,35,.06);
+    }
+
+    *{box-sizing:border-box;margin:0}
+    body{
+      margin:0;
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+      font-size:13px; line-height:20px;
+      -webkit-font-smoothing:antialiased;
+    }
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:var(--accent);text-decoration:underline}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+    .ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+    .ic12{width:12px;height:12px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .ic16{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+    .meta{font-size:11px;line-height:16px}
+    .caps{font-size:11px;line-height:16px;letter-spacing:.055em;text-transform:uppercase;font-weight:600}
+    .num{font-variant-numeric:tabular-nums}
+    .row{display:flex;align-items:center}
+    .ell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  </style>
+</helmet>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h6"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 9v12"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3.5 6h.01"/><path d="M3.5 12h.01"/><path d="M3.5 18h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-rows" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-pig" viewBox="0 0 24 24"><path d="M4 12a7 6 0 0 1 7-6h3a7 6 0 0 1 7 6c0 3.3-3.1 6-7 6h-3l-3 3v-3.6A6 6 0 0 1 4 12Z"/><circle cx="16" cy="12" r="1.6"/><path d="M14.4 12h3.2"/></symbol>
+</svg>
+
+<div class="dark" style="width:1440px;height:900px;background:var(--s0);color:var(--fg);display:grid;grid-template-rows:36px 1fr 26px">
+
+  <!-- ================= the same 36px band. Only the document changed. ======== -->
+  <div style="display:grid;grid-template-columns:264px 1px 1fr 1px 440px;background:var(--s1);border-bottom:1px solid var(--line-strong)">
+
+    <div style="display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;color:var(--fg-3)">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <span style="flex:1;color:var(--fg-3)">Filter schema&hellip;</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-rows"/></svg></span>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- document rail: same chip, different icon. The type is the icon. -->
+    <div style="display:flex;align-items:center;gap:2px;padding:0 12px">
+      <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:6px;background:var(--s2);font-weight:600"><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg>tpch.sf100.lineitem<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      <span style="width:1px;height:16px;background:var(--line-strong);margin:0 8px"></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:6px;color:var(--fg-2)"><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg>analytics-prod<svg class="ic12" style="color:var(--fg-3)"><use href="#i-down"/></svg></span>
+      <span style="flex:1"></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;color:var(--fg-3)"><kbd class="meta" style="border:1px solid var(--line-strong);border-radius:4px;background:var(--s0);padding:1px 5px;font-family:inherit">&#8984;P</kbd>Switch document</span>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <div class="row" style="gap:8px;padding:0 6px 0 12px">
+      <svg class="ic" style="color:var(--fg-3)"><use href="#i-panel"/></svg>
+      <span class="ell" style="flex:1">2 rows &times; 5 columns</span>
+      <span class="row" style="width:24px;height:24px;justify-content:center;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-copy"/></svg></span>
+      <span class="row" style="width:24px;height:24px;justify-content:center;border-radius:6px;color:var(--fg-3)"><svg class="ic"><use href="#i-x"/></svg></span>
+    </div>
+  </div>
+
+  <!-- ================= body ================= -->
+  <div style="display:grid;grid-template-columns:264px 1px 1fr 1px 440px;min-height:0">
+
+    <!-- ---------- schema browser: where the document came from ---------- -->
+    <div style="background:var(--s1);display:flex;flex-direction:column;min-height:0;padding:8px">
+      <div class="row meta" style="gap:6px;height:26px;padding:0 8px;color:var(--fg-3);flex:none">
+        <svg class="ic12"><use href="#i-db"/></svg><span style="flex:1">analytics-prod</span>
+      </div>
+      <div style="flex:1;min-height:0;overflow:hidden">
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3);transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">tpch</span></div>
+        <div style="padding-left:14px">
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">sf1</span></div>
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3);transform:rotate(90deg)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">sf100</span></div>
+          <div style="padding-left:14px">
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">customer</span></div>
+            <!-- the active document's own row, and the affordance that made it -->
+            <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px;background:var(--accent-bg);box-shadow:inset 2px 0 0 var(--accent)"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--accent)"><use href="#i-table"/></svg><span class="ell" style="flex:1">lineitem</span><span class="row" style="width:20px;height:20px;justify-content:center;border-radius:4px;background:var(--s0);color:var(--accent)" title="Inspect table"><svg class="ic12"><use href="#i-panel"/></svg></span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 4px 0 8px;border-radius:6px;background:var(--s2)"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell" style="flex:1">orders</span><span class="row" style="width:20px;height:20px;justify-content:center;border-radius:4px;color:var(--fg-3)" title="Inspect table"><svg class="ic12"><use href="#i-panel"/></svg></span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">nation</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">region</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">supplier</span></div>
+            <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-table"/></svg><span class="ell">part</span></div>
+          </div>
+          <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-box"/></svg><span class="ell">tiny</span></div>
+        </div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">iceberg</span></div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">hive</span></div>
+        <div class="row" style="gap:6px;height:26px;padding:0 8px;border-radius:6px"><svg class="ic12" style="color:var(--fg-3)"><use href="#i-right"/></svg><svg class="ic" style="color:var(--fg-3)"><use href="#i-db"/></svg><span class="ell">system</span></div>
+      </div>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- ---------- the document: same two-surface anatomy as a SQL file.
+         Facts where the editor would be, rows where the results would be. -->
+    <div style="display:grid;grid-template-rows:210px 1px 1fr;min-width:0;min-height:0;background:var(--s0)">
+
+      <!-- upper surface: what the table IS. No rail, exactly like the editor. -->
+      <div style="padding:16px;overflow:hidden;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(4,42px);gap:0 24px">
+        <div><div class="meta" style="color:var(--fg-3)">format</div><div class="mono ell">iceberg &middot; v2</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">records</div><div class="mono ell num">600037902</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">data files</div><div class="mono ell num">4812</div></div>
+
+        <div><div class="meta" style="color:var(--fg-3)">total size</div><div class="mono ell num">1.24 TB</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">snapshots</div><div class="mono ell num">37</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">manifests</div><div class="mono ell num">118</div></div>
+
+        <div><div class="meta" style="color:var(--fg-3)">partition spec</div><div class="mono ell" title="days(l_shipdate), bucket(16, l_suppkey)">days(l_shipdate), bucket(16, l_suppkey)</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">sort order</div><div class="mono ell">l_shipdate ASC NULLS FIRST</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">last updated</div><div class="mono ell">2026-08-30 04:12:07 UTC</div></div>
+
+        <div style="grid-column:span 2"><div class="meta" style="color:var(--fg-3)">location</div><div class="mono ell" title="s3://warehouse/tpch/sf100/lineitem">s3://warehouse/tpch/sf100/lineitem</div></div>
+        <div><div class="meta" style="color:var(--fg-3)">current snapshot</div><div class="mono ell num">7286302847263048192</div></div>
+      </div>
+
+      <div style="background:var(--line-strong)"></div>
+
+      <!-- lower surface: rows, with the same rail the results pane has -->
+      <div style="display:grid;grid-template-rows:36px 1fr;min-height:0">
+        <div class="row" style="gap:4px;padding:0 12px;background:var(--s1);border-bottom:1px solid var(--line-strong)">
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;background:var(--s2);font-weight:600">Snapshots</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Partitions</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Files</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Schema</span>
+          <span class="row" style="height:24px;padding:0 10px;border-radius:6px;color:var(--fg-2)">Properties</span>
+          <span style="flex:1"></span>
+          <span class="row" style="gap:6px;height:24px;padding:0 8px;border-radius:6px;color:var(--fg-2)"><svg class="ic"><use href="#i-file"/></svg>Open as SQL</span>
+        </div>
+
+        <div style="display:grid;grid-template-rows:1fr 30px;min-width:0;min-height:0">
+          <div style="overflow:hidden;min-height:0">
+            <table style="border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%">
+              <tr style="height:36px"><th style="width:52px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line)"></th><th style="width:140px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);padding:0 12px;text-align:left;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">committed_at</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">timestamp(6) with time zone</div></th><th style="width:160px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);padding:0 12px;text-align:left;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">snapshot_id</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">bigint</div></th><th style="width:90px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);padding:0 12px;text-align:left;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">operation</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">varchar</div></th><th style="width:110px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);padding:0 12px;text-align:left;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">added_records</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">bigint</div></th><th style="width:160px;background:var(--s1);border-bottom:1px solid var(--line-strong);border-right:1px solid var(--line);padding:0 12px;text-align:left;vertical-align:middle"><div class="ell" style="font-size:13px;line-height:17px">summary</div><div class="ell meta" style="color:var(--fg-3);line-height:14px">map(varchar, varchar)</div></th><th style="background:var(--s1);border-bottom:1px solid var(--line-strong)"></th></tr>
+              <tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--accent);background:var(--accent-bg);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">1</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent-line)">2026-08-30 04:12:07</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right;background:var(--accent-bg)">7286302847263048192</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg)">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right;background:var(--accent-bg)">1284119</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--accent);background:var(--accent-bg);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">2</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg)">2026-08-29 04:11:52</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right;background:var(--accent-bg)">6104772819930014772</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg)">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right;background:var(--accent-bg)">1279044</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;background:var(--accent-bg)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">3</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-28 04:12:19</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">5518830472019477310</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1281907</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">4</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-27 11:48:02</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">4471003918827740165</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">overwrite</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">88214</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">5</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-27 04:12:11</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">3920184471028837744</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1277330</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">6</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-26 04:11:47</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">8817204471930028174</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1283006</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">7</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-25 04:12:33</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">2204718839017744820</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1276448</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">8</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-24 22:03:16</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">9018374471029948173</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">delete</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">0</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">9</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-24 04:12:04</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1174829930184477201</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1280771</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">10</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-23 04:11:58</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">7744019283710046628</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1278115</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">11</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-22 04:12:22</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">3310472819944017283</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1284902</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">12</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-21 15:27:41</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">6628193047718820114</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">replace</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">0</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">13</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-21 04:12:09</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">5019283744710028846</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1279663</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">14</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-20 04:11:51</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">8471920038174472019</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1281204</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">15</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-19 04:12:15</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">2938471002847719330</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1277889</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">16</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-18 04:12:02</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">4710283391847720046</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1283441</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">17</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-17 04:11:44</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1028374471992018837</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1276092</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+<tr><td class="meta num" style="height:30px;padding:0 12px;text-align:right;color:var(--fg-3);background:var(--s1);border-right:1px solid var(--line);border-bottom:1px solid var(--line)">18</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">2026-08-16 04:12:28</td><td class="ell num mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">6193047710288472013</td><td class="ell" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left">append</td><td class="ell num" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:right">1282517</td><td class="ell mono" style="height:30px;padding:0 12px;border-bottom:1px solid var(--line);text-align:left;color:var(--fg-2)">{added-data-files=41, added-records=1284119, …}</td><td style="border-bottom:1px solid var(--line)"></td></tr>
+            </table>
+          </div>
+          <div class="row" style="gap:10px;padding:0 12px;background:var(--s1);border-top:1px solid var(--line-strong)">
+            <span class="meta" style="color:var(--fg-3)">committed_at</span>
+            <span style="width:1px;height:14px;background:var(--line-strong)"></span>
+            <span class="mono ell" style="flex:1">2026-08-30 04:12:07.412 UTC</span>
+            <span class="meta" style="color:var(--fg-3)">2 rows &times; 5 columns</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--line-strong)"></div>
+
+    <!-- ---------- the inspector does not care which document it is ---------- -->
+    <div style="background:var(--s1);display:flex;flex-direction:column;min-width:0;min-height:0">
+      <div class="row" style="gap:8px;height:24px;margin:8px 12px 6px;padding:0 8px;border:1px solid var(--line-strong);border-radius:6px;color:var(--fg-3);flex:none">
+        <svg class="ic12"><use href="#i-search"/></svg><span style="flex:1">Filter fields&hellip;</span>
+      </div>
+      <div style="flex:1;min-height:0;overflow:hidden">
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span class="caps" style="color:var(--fg-2)">Row 1</span><span style="flex:1"></span><span class="row" style="color:var(--fg-3)"><svg class="ic12"><use href="#i-copy"/></svg></span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">committed_at</span><span class="mono ell">2026-08-30 04:12:07.412</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">snapshot_id</span><span class="mono ell">7286302847263048192</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">operation</span><span class="mono ell">append</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">added_records</span><span class="mono ell">1284119</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-data-files</span><span class="mono ell">41</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-records</span><span class="mono ell">1284119</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-files-size</span><span class="mono ell">3821004112</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-data-files</span><span class="mono ell">4812</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-records</span><span class="mono ell">600037902</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.total-files-size</span><span class="mono ell">1363998117888</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.engine-name</span><span class="mono ell">spark</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.engine-version</span><span class="mono ell">3.5.1</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.app-id</span><span class="mono ell">application_1756204471_0293</span></div>
+
+        <div class="row" style="gap:8px;height:24px;padding:0 12px;background:var(--s2);border-bottom:1px solid var(--line)"><span class="caps" style="color:var(--fg-2)">Row 2</span><span style="flex:1"></span><span class="row" style="color:var(--fg-3)"><svg class="ic12"><use href="#i-copy"/></svg></span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">committed_at</span><span class="mono ell">2026-08-29 04:11:52.907</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">snapshot_id</span><span class="mono ell">6104772819930014772</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">operation</span><span class="mono ell">append</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">added_records</span><span class="mono ell">1279044</span></div>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:0 10px;padding:6px 12px;border-bottom:1px solid var(--line)"><span class="ell" style="color:var(--fg-2)">summary.added-data-files</span><span class="mono ell">39</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 26px status bar ================= -->
+  <div class="row meta" style="gap:8px;padding:0 12px;background:var(--s1);border-top:1px solid var(--line-strong);color:var(--fg-3)">
+    <span style="width:16px;height:16px;border-radius:50%;border:1px solid var(--line-strong);background:var(--s0);display:inline-flex;align-items:center;justify-content:center;font-size:9px">&#128055;</span>
+    <span>Oink</span>
+    <span style="flex:1"></span>
+    <span>r.dahlen@gmail.com</span>
+    <span style="width:1px;height:12px;background:var(--line-strong)"></span>
+    <span style="display:inline-flex;color:var(--fg-3)"><svg class="ic12"><use href="#i-moon"/></svg></span>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
