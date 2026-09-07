@@ -23,3 +23,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Seeded design canvas: ~2.7 MB of generated editor payload, rebuilt from
+# design/*.dc.html by design/build.mjs plus the canvas seeder.
+design/trinette-restyle.html
