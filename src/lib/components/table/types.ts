@@ -32,12 +32,6 @@ export interface Selection {
   minCol: number;
   maxCol: number;
   getData: () => SelectionData;
-  /**
-   * The cell the keyboard is on — the corner the selection grew from, or the
-   * single cell when there is only one. The strip under the table reads it so
-   * a value stays legible however narrow its column is.
-   */
-  getActive: () => { field: Field; value: any } | null;
 }
 
 export type CellRendererLookup = (field: Field) => Snippet<[Field, any]>;

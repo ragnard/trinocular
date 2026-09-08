@@ -24,19 +24,6 @@
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 
-  /**
-   * The anchor cell, spelled out under the table. A column can be narrower
-   * than its contents — that is the normal case for a wide result — so the
-   * one cell you are actually on is always readable somewhere.
-   */
-  let active = $derived(selection?.getActive() ?? null);
-
-  function preview(value: unknown): string {
-    if (value === null || value === undefined) return "null";
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-  }
-
   function bytes(n: number | undefined): string | null {
     if (!n) return null;
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -111,22 +98,6 @@
         </div>
       {/snippet}
     </Table>
-
-    <div class="anchor-cell">
-      {#if active}
-        <span class="meta">{active.field.name}</span>
-        <span class="rule"></span>
-        <span class="mono ell value">{preview(active.value)}</span>
-        {#if selection}
-          <span class="meta">
-            {selection.maxRow - selection.minRow + 1} rows &times;
-            {selection.maxCol - selection.minCol + 1} fields
-          </span>
-        {/if}
-      {:else}
-        <span class="meta">Select cells to inspect</span>
-      {/if}
-    </div>
   {:else}
     <div class="message">
       <Spinner />
@@ -202,27 +173,5 @@
     color: var(--fg-3);
     font-size: var(--text-sm);
     line-height: var(--leading-sm);
-  }
-
-  /* The anchor cell, spelled out. Named for the cell, not for positioning. */
-  .anchor-cell {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: none;
-    height: var(--h-row);
-    padding: 0 12px;
-    background: var(--s1);
-    border-top: 1px solid var(--line-strong);
-  }
-
-  .anchor-cell .value {
-    flex: 1;
-  }
-
-  .rule {
-    width: 1px;
-    height: 14px;
-    background: var(--line-strong);
   }
 </style>

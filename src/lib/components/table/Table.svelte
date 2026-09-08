@@ -320,7 +320,6 @@
     const s = schema;
     const r = rows;
     const vc = valueConverter;
-    const cell = active;
     selection = {
       minRow, maxRow, minCol, maxCol,
       getData() {
@@ -331,13 +330,6 @@
             fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
           );
         return { fields, rows: selectedRows };
-      },
-      getActive() {
-        if (!cell) return null;
-        const field = s.fields[cell.col];
-        const row = r[cell.row];
-        if (!field || !row) return null;
-        return { field, value: vc(row[cell.col], field, cell.col) };
       }
     };
   });
