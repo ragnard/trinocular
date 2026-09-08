@@ -13,6 +13,7 @@
     Hash,
     Parentheses,
     Search,
+    Server,
     Table,
     ToggleLeft,
     Type
@@ -280,8 +281,8 @@
   <!-- Says what the tree is. The connection also appears in the document
        header, where it says what the file runs on; sitting on one band the
        two read as the same fact rather than a repetition. -->
-  <div class="scope meta">
-    <Database size={12} />
+  <div class="scope">
+    <Server size={14} />
     <span class="ell">{connectionName}</span>
   </div>
 
@@ -359,6 +360,10 @@
     outline: none;
   }
 
+  /* Body text, not `.meta`. This names the cluster every row in the tree below
+     belongs to, which is the same weight of fact as the tree itself — at
+     `--text-sm` it read as a caption on the filter above it instead. Muted, so
+     it still sits behind the tree without shrinking. */
   .scope {
     display: flex;
     align-items: center;
@@ -366,6 +371,7 @@
     flex: none;
     height: var(--h-tree);
     padding: 0 12px;
+    color: var(--fg-3);
   }
 
   .tree {

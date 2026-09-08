@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SqlFile, Workspace } from "$lib/State.svelte";
-  import { ChevronDown, Database, FileText } from "@lucide/svelte";
+  import { ChevronDown, FileText, Server } from "@lucide/svelte";
 
   interface Connection {
     id: string;
@@ -102,7 +102,7 @@
       onclick={() => toggle("connection")}
       title="The Trino cluster this document runs against"
     >
-      <Database size={14} />
+      <Server size={14} />
       <span class="ell">{connectionName}</span>
       <ChevronDown size={12} />
     </button>
