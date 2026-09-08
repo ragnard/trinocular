@@ -638,6 +638,10 @@
       wordBasedSuggestions: "off",
       "semanticHighlighting.enabled": true,
       scrollBeyondLastLine: false,
+      // A statement on line 1 opens its toolbar band at the very top of the
+      // scrollable content, so without this the strip is pressed against the
+      // editor's top edge. 12px is the same step the rails pad by.
+      padding: { top: 12 },
       automaticLayout: true,
       ...options
     });
