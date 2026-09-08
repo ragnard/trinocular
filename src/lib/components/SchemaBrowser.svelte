@@ -6,11 +6,11 @@
   import {
     Binary,
     Box,
-    Boxes,
     Braces,
     Brackets,
     Clock,
     Database,
+    HardDrive,
     Hash,
     Parentheses,
     Search,
@@ -282,7 +282,7 @@
        header, where it says what the file runs on; sitting on one band the
        two read as the same fact rather than a repetition. -->
   <div class="scope">
-    <Boxes size={14} />
+    <HardDrive size={14} />
     <span class="ell">{connectionName}</span>
   </div>
 

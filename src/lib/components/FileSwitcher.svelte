@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SqlFile, Workspace } from "$lib/State.svelte";
-  import { Boxes, FileText, Plus } from "@lucide/svelte";
+  import { FileText, HardDrive, Plus } from "@lucide/svelte";
 
   interface Connection {
     id: string;
@@ -122,7 +122,7 @@
         >
           <FileText size={14} />
           <span class="name">{file.name}</span>
-          <span class="connection"><Boxes size={12} />{connectionName(file)}</span>
+          <span class="connection"><HardDrive size={12} />{connectionName(file)}</span>
         </button>
       {/each}
 
