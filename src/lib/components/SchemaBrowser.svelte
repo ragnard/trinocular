@@ -6,6 +6,7 @@
   import {
     Binary,
     Box,
+    Boxes,
     Braces,
     Brackets,
     Clock,
@@ -13,7 +14,6 @@
     Hash,
     Parentheses,
     Search,
-    Server,
     Table,
     ToggleLeft,
     Type
@@ -282,7 +282,7 @@
        header, where it says what the file runs on; sitting on one band the
        two read as the same fact rather than a repetition. -->
   <div class="scope">
-    <Server size={14} />
+    <Boxes size={14} />
     <span class="ell">{connectionName}</span>
   </div>
 
