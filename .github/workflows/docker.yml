@@ -48,10 +48,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The default image is the debian-slim one; the distroless variant is
+          # tagged for what it is. The distroless image used to publish under
+          # `-slim`, which named the *other* image's base.
           - target: runtime
             suffix: ""
           - target: distroless
-            suffix: "-slim"
+            suffix: "-distroless"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
