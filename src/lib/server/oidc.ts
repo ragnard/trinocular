@@ -29,6 +29,9 @@ interface OIDCSessionData {
   refreshToken?: string;
   /** The identity's claims, from whichever token `claimsFrom` names. */
   claims?: Claims;
+  /** Kept solely as the `id_token_hint` for RP-initiated logout: it is what
+   *  tells the provider whose session to end. */
+  idToken?: string;
 }
 
 interface OIDCCallbackData {
@@ -78,7 +81,7 @@ const claimsFor = (
 const createSessionData = (
   response: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
   claimsFrom: OIDCOptions["claimsFrom"],
-  previous?: { claims?: Claims; refreshToken?: string }
+  previous?: OIDCSessionData
 ): OIDCSessionData => {
   if (!response.expires_in) {
     throw new Error('No "expires_in" in token response');
@@ -87,7 +90,8 @@ const createSessionData = (
     accessToken: response.access_token,
     accessTokenExpiresAt: nowInSeconds() + response.expires_in,
     refreshToken: response.refresh_token ?? previous?.refreshToken,
-    claims: claimsFor(claimsFrom, response, previous)
+    claims: claimsFor(claimsFrom, response, previous),
+    idToken: response.id_token ?? previous?.idToken
   };
 };
 
@@ -165,6 +169,28 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const redirectUri = env.ORIGIN + callbackPath;
 
   const loginPath = opts.paths.prefix + "/" + opts.paths.login;
+
+  /** RP-initiated logout. Dropping our own session is only half of signing out:
+   *  the provider keeps its own SSO cookie, so the next visit to the login path
+   *  is answered without a prompt and the same person comes straight back. That
+   *  makes "sign out" a no-op from the user's side — and on the forbidden page,
+   *  where signing out is the only move a refused user has, it makes the button
+   *  a lie. `post_logout_redirect_uri` has to be registered with the provider
+   *  (in Keycloak: the client's "Valid post logout redirect URIs"). */
+  const endSessionSupported = Boolean(config.serverMetadata().end_session_endpoint);
+  if (!endSessionSupported) {
+    logger.warn(
+      "provider advertises no end_session_endpoint: signing out will not end the provider's session"
+    );
+  }
+  const endSessionUrl = (idToken?: string): string | undefined => {
+    if (!endSessionSupported) return undefined;
+    const parameters: Record<string, string> = { post_logout_redirect_uri: env.ORIGIN + "/" };
+    // Without the hint the provider may ask which session to end; with it the
+    // logout is unattended, which is the point.
+    if (idToken) parameters.id_token_hint = idToken;
+    return client.buildEndSessionUrl(config, parameters).href;
+  };
 
   const redirectToProvider = async (session: Session, returnToUrl: string) => {
     const codeVerifier: string = client.randomPKCECodeVerifier();
@@ -246,8 +272,12 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
           event.locals.logger.warn({ error: e }, "token revocation failed");
         }
       }
+      // Read the hint before the session goes, then hand the user to the
+      // provider to finish the job. Falling back to "/" leaves them signed in
+      // there, which is the best a provider without the endpoint allows.
+      const endSession = endSessionUrl(oidcData?.idToken);
       await session.destroy();
-      redirect(303, "/");
+      redirect(303, endSession ?? "/");
     }
 
     // is this an auth callback request?

@@ -2,6 +2,7 @@ import type { RequestEvent } from "./$types";
 
 import { config, type Connection } from "$lib/server/config";
 import { error } from "$lib/server/errors";
+import type { Identity } from "$lib/server/identity";
 import { isTrinoHeader } from "$lib/trino";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
@@ -42,18 +43,41 @@ function toProxyUrl(url: string, event: RequestEvent, target: Connection, id: st
   return proxyBase + parsed.pathname + parsed.search;
 }
 
-function createUpstreamHeaders(event: RequestEvent) {
+/**
+ * The `X-Trino-*` request headers the browser is allowed to set — what shapes a
+ * session, and nothing that says who is running the query.
+ *
+ * It has to be a list rather than the `X-Trino-` prefix test, because several
+ * headers under that prefix are identity: `X-Trino-Authorization-User` and
+ * `X-Trino-Original-User` are Trino's impersonation headers, `X-Trino-Role`
+ * selects a role inside a catalog's access control, and
+ * `X-Trino-Extra-Credential` hands credentials to connectors. Overriding
+ * `X-Trino-User` server-side while forwarding those would settle who you are
+ * and then let the request say who to act as; whether that escalated would
+ * depend on the cluster's configuration rather than on anything here.
+ *
+ * The list is what `src/lib/trino` actually sends. A header the client learns
+ * to send later has to be added here too.
+ */
+const FORWARDED_REQUEST_HEADERS = new Set([
+  "x-trino-source",
+  "x-trino-catalog",
+  "x-trino-schema",
+  "x-trino-session",
+  "x-trino-prepared-statement"
+]);
+
+function createUpstreamHeaders(event: RequestEvent, identity: Identity) {
   const headers: Record<string, string> = {
     accept: "application/json",
   };
   event.request.headers.forEach((value, name) => {
-    if (isTrinoHeader(name)) {
+    if (FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) {
       headers[name] = value;
     }
   });
-  // Override with server-side auth — takes precedence over client-sent values
-  // Non-null: `proxy` refuses a request without an identity before it gets here.
-  headers["x-trino-user"] = event.locals.identity!.userId;
+  // Server-side auth: the identity the gate established, never a client claim.
+  headers["x-trino-user"] = identity.userId;
   if (event.locals.accessToken) {
     headers["authorization"] = "bearer " + event.locals.accessToken;
   }
@@ -74,7 +98,11 @@ function updateResponseBody(
 }
 
 async function proxy(event: RequestEvent, target: Connection, id: string) {
-  if (!event.locals.identity) {
+  // The access gate in hooks.server.ts already refused an anonymous request.
+  // Kept anyway: this route sends a user's name to a cluster, and it should not
+  // be reachable without one just because a hook was reordered.
+  const identity = event.locals.identity;
+  if (!identity) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" }
@@ -84,7 +112,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   event.locals.logger.debug({ id, target }, "proxying request");
 
   const url = toTargetUrl(event, target);
-  const headers = createUpstreamHeaders(event);
+  const headers = createUpstreamHeaders(event, identity);
 
   const requestBody = event.request.body ? await event.request.blob() : null;
 
@@ -123,6 +151,10 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   const responseHeaders: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  // The response direction stays a prefix match: these are the cluster talking
+  // back (Set-Catalog, Set-Session, Added-Prepare, the Clear-* pair), and the
+  // client needs all of them to keep its session in step. Only the request
+  // direction carries something a caller could assert about itself.
   response.headers.forEach((value, name) => {
     if (isTrinoHeader(name)) {
       responseHeaders[name] = value;

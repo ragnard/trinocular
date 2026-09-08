@@ -1,14 +1,14 @@
 import { type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
-import { authPrefix, config, type Config } from "$lib/server/config";
+import { config, forbiddenPath, isAuthPath, loginPath, type Config } from "$lib/server/config";
 import { env } from "$env/dynamic/private";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
-import { AllowAll, AuthzHandler, RequireRole, type Authorizer } from "$lib/server/authz";
+import { AccessHandler, AllowAll, RequireRole, type Authorizer } from "$lib/server/authz";
 import { logger } from "$lib/server/logging";
-import type { Claims } from "$lib/server/identity";
+import { parseClaimPath, type Claims } from "$lib/server/identity";
 
 const NoAuthnHandler = async (opts: { user: string; claims: Claims }): Promise<Handle> => {
   return async ({ event, resolve }) => {
@@ -46,15 +46,21 @@ const authorizer = (config: Config): Authorizer => {
     case "allow":
       return AllowAll();
     case "require-role": {
-      const client = authz.client ?? (config.authn.kind === "oidc" ? config.authn.clientId : undefined);
-      const claimPath = authz.claim ?? (client && `resource_access.${client}.roles`);
-      if (!claimPath) {
+      if (authz.claim) {
+        return RequireRole({ role: authz.role, claimPath: parseClaimPath(authz.claim) });
+      }
+      const client =
+        authz.client ?? (config.authn.kind === "oidc" ? config.authn.clientId : undefined);
+      if (!client) {
         logger.error(
           "authz require-role needs a `client` or `claim`: there is no OIDC clientId to default to"
         );
         process.exit(1);
       }
-      return RequireRole({ role: authz.role, claimPath });
+      // Segments, not `resource_access.${client}.roles`: a clientId may itself
+      // contain a dot, and interpolating one into a dotted path would send the
+      // lookup down levels that do not exist.
+      return RequireRole({ role: authz.role, claimPath: ["resource_access", client, "roles"] });
     }
   }
 };
@@ -80,10 +86,7 @@ const createHandle = async () => {
       }
     }),
     await authnHandler(config),
-    AuthzHandler(authz, {
-      isExempt: (pathname) => pathname === authPrefix || pathname.startsWith(authPrefix + "/"),
-      forbiddenPath: "/auth/forbidden"
-    })
+    AccessHandler(authz, { isExempt: isAuthPath, loginPath, forbiddenPath })
   );
 };
 

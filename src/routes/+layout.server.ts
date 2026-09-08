@@ -1,20 +1,11 @@
-import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
-import { authPrefix, config } from "$lib/server/config";
+import { config } from "$lib/server/config";
 
-/** Auth pages (login, error, forbidden) must render for a signed-out user — see `load`. */
-const isAuthPage = (pathname: string) =>
-  pathname === authPrefix || pathname.startsWith(authPrefix + "/");
+// The authn/authz gate used to live here, as a redirect for a missing userId.
+// It is `AccessHandler` in hooks.server.ts now: a layout only guards what
+// renders under it, so an API route inherited nothing from this check.
 
-export const load: LayoutServerLoad = async ({ locals, url }) => {
-  // The auth pages are exempt from the gate. Gating them sends a signed-out
-  // visitor of /auth/error to /auth/login, which the OIDC handler forwards
-  // straight back to the provider — so the error page was never reachable.
-  if (config.authn.kind !== "none" && !locals.identity && !isAuthPage(url.pathname)) {
-    const returnTo = url.pathname + url.search;
-    redirect(303, `/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
-  }
-
+export const load: LayoutServerLoad = async ({ locals }) => {
   const connections = Object.entries(config.connections ?? {}).map(
     ([id, conn]) => ({ id, name: conn.name })
   );

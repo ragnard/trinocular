@@ -140,7 +140,28 @@ function loadConfig(configPath?: string): Config {
 
 export const config: Config = loadConfig(env.TRINETTE_CONFIG);
 
-/** Where the pages a signed-out or refused user must still reach live. Both
- *  the layout's authn gate and the authz handler exempt this subtree, so they
- *  cannot disagree about what "an auth page" is. */
-export const authPrefix = config.authn.kind === "oidc" ? config.authn.paths.prefix : "/auth";
+/** The auth pages — login, error, forbidden — are SvelteKit routes, so they sit
+ *  at a fixed `/auth/*` however `paths.prefix` is configured. Only the paths the
+ *  OIDC handler intercepts itself (callback, logout, the login trigger) move
+ *  with the prefix. Both subtrees have to be exempt from the access gate: if
+ *  only the configured prefix were, a deployment that renamed it would send a
+ *  refused user to a forbidden page that the gate then refused as well, which
+ *  is a redirect loop rather than an explanation. */
+const AUTH_PAGES = "/auth";
+export const authPrefix = config.authn.kind === "oidc" ? config.authn.paths.prefix : AUTH_PAGES;
+
+const within = (prefix: string, pathname: string) =>
+  pathname === prefix || pathname.startsWith(prefix + "/");
+
+export const isAuthPath = (pathname: string) =>
+  within(AUTH_PAGES, pathname) || within(authPrefix, pathname);
+
+/** Where the gate sends a signed-out user. This one *is* handler-intercepted,
+ *  so it follows the configured prefix and segment. */
+export const loginPath =
+  config.authn.kind === "oidc"
+    ? `${authPrefix}/${config.authn.paths.login}`
+    : `${AUTH_PAGES}/login`;
+
+/** Where the gate sends a refused user: a page, so a fixed route. */
+export const forbiddenPath = `${AUTH_PAGES}/forbidden`;

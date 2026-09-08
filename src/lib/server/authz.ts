@@ -1,7 +1,6 @@
-import { redirect, type Handle } from "@sveltejs/kit";
+import { redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 
-import { claim, stringList, type Identity } from "./identity";
-import { error } from "./errors";
+import { claim, formatClaimPath, stringList, type ClaimPath, type Identity } from "./identity";
 
 /** Why a request was refused. The reason is written to the log and never to
  *  the response: it names claims the user cannot change and would only tell an
@@ -27,55 +26,94 @@ export const AllowAll = (): Authorizer => ({
  *  being one everywhere. The claim path is configurable because only the
  *  default is Keycloak's; the shape (a list of strings under a path) is what
  *  every provider has in common. */
-export const RequireRole = (opts: { role: string; claimPath: string }): Authorizer => ({
-  name: `require-role(${opts.claimPath} contains "${opts.role}")`,
-  authorize(identity) {
-    const roles = stringList(claim(identity.claims, opts.claimPath));
-    if (roles.includes(opts.role)) return { allowed: true };
-    return {
-      allowed: false,
-      reason: `identity has no "${opts.role}" in ${opts.claimPath} (found: ${
-        roles.length ? roles.join(", ") : "nothing"
-      })`
-    };
-  }
-});
+export const RequireRole = (opts: { role: string; claimPath: ClaimPath }): Authorizer => {
+  const path = formatClaimPath(opts.claimPath);
+  return {
+    name: `require-role(${path} contains "${opts.role}")`,
+    authorize(identity) {
+      const roles = stringList(claim(identity.claims, opts.claimPath));
+      if (roles.includes(opts.role)) return { allowed: true };
+      return {
+        allowed: false,
+        reason: `identity has no "${opts.role}" in ${path} (found: ${
+          roles.length ? roles.join(", ") : "nothing"
+        })`
+      };
+    }
+  };
+};
 
-interface AuthzOptions {
-  /** Paths that must stay reachable to a refused user — the login, error and
-   *  forbidden pages, and logout above all: a user who cannot get past authz
-   *  must still be able to sign out and come back as somebody else. */
+interface AccessOptions {
+  /** Paths that must stay reachable to a signed-out or refused user — the
+   *  login, error and forbidden pages, and logout above all: a user who cannot
+   *  get past authz must still be able to sign out and come back as somebody
+   *  else. */
   isExempt: (pathname: string) => boolean;
+  loginPath: string;
   forbiddenPath: string;
 }
 
-/** Runs after authn, on the identity authn established.
+/** Whether a refusal should be a page the user can read or a status code the
+ *  caller can act on. A data request is a client-side navigation: SvelteKit
+ *  turns a redirect thrown here into one its router follows. */
+const isNavigation = (event: RequestEvent): boolean =>
+  event.isDataRequest || (event.request.headers.get("accept")?.includes("text/html") ?? false);
+
+/** Where to send the user back to once they have signed in. A data request
+ *  asks for `/some/page/__data.json`, which is not a page anyone can return to
+ *  — and carries SvelteKit's own invalidation parameter, which is noise in a
+ *  bookmarkable URL. Both have to come off. */
+const returnTo = (event: RequestEvent): string => {
+  const pathname = event.isDataRequest
+    ? event.url.pathname.replace(/\/__data\.json$/, "") || "/"
+    : event.url.pathname;
+  const params = new URLSearchParams(event.url.searchParams);
+  params.delete("x-sveltekit-invalidated");
+  const query = params.toString();
+  return pathname + (query ? `?${query}` : "");
+};
+
+/** A refusal a program can read. Thrown SvelteKit errors render the fallback
+ *  HTML error page even for a JSON caller, which the Trino client would meet as
+ *  a parse failure rather than a status. */
+const refuse = (status: number, error: string): Response =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { "content-type": "application/json" }
+  });
+
+/** The whole gate, in one place and after authn: is there an identity, and may
+ *  it do this?
  *
- *  An unauthenticated request is not this handler's business: it has no
- *  identity to judge, and the layout's own gate already sends it to the login
- *  page. Refusing it here instead would answer "who are you?" with "not you",
- *  and a signed-out visitor would meet the forbidden page rather than a login
- *  button. */
-export const AuthzHandler = (authorizer: Authorizer, opts: AuthzOptions): Handle => {
+ *  Both halves live here rather than the authn half sitting in a layout load,
+ *  because a layout only guards what renders under it. An API route added
+ *  tomorrow would inherit nothing from it and serve anonymous traffic until
+ *  somebody remembered to write its own check — the failure the Trino proxy's
+ *  hand-rolled 401 exists to patch. Default-deny with a named list of
+ *  exemptions is the only arrangement where forgetting is safe. */
+export const AccessHandler = (authorizer: Authorizer, opts: AccessOptions): Handle => {
   return async ({ event, resolve }) => {
+    if (opts.isExempt(event.url.pathname)) return await resolve(event);
+
     const identity = event.locals.identity;
 
-    if (identity && !opts.isExempt(event.url.pathname)) {
-      const decision = authorizer.authorize(identity);
-      if (!decision.allowed) {
-        event.locals.logger.warn(
-          { userId: identity.userId, authorizer: authorizer.name, reason: decision.reason },
-          "authz denied"
-        );
-        // A navigation gets a page that explains itself; anything else — the
-        // Trino proxy, a fetch — gets the status code it can act on.
-        if (event.isDataRequest || event.request.headers.get("accept")?.includes("text/html")) {
-          redirect(303, opts.forbiddenPath);
-        }
-        error(event.locals.logger, 403, "Not authorized", "authz denied", {
-          userId: identity.userId
-        });
+    if (!identity) {
+      if (isNavigation(event)) {
+        redirect(303, `${opts.loginPath}?returnTo=${encodeURIComponent(returnTo(event))}`);
       }
+      return refuse(401, "unauthorized");
+    }
+
+    const decision = authorizer.authorize(identity);
+    if (!decision.allowed) {
+      event.locals.logger.warn(
+        { userId: identity.userId, authorizer: authorizer.name, reason: decision.reason },
+        "authz denied"
+      );
+      if (isNavigation(event)) {
+        redirect(303, opts.forbiddenPath);
+      }
+      return refuse(403, "forbidden");
     }
 
     return await resolve(event);
