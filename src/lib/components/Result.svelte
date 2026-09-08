@@ -3,6 +3,7 @@
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
+  import { abbreviateType } from "$lib/trino/typeString";
   import Spinner from "./Spinner.svelte";
   import { PanelRight, TriangleAlert } from "@lucide/svelte";
 
@@ -23,20 +24,6 @@
   let schema = $derived(toSchema(result?.schema));
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
-
-  function bytes(n: number | undefined): string | null {
-    if (!n) return null;
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let i = 0;
-    let v = n;
-    while (v >= 1024 && i < units.length - 1) {
-      v /= 1024;
-      i++;
-    }
-    return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
-  }
-
-  let processed = $derived(bytes(result?.stats?.processedBytes));
 </script>
 
 <div class="result">
@@ -48,10 +35,6 @@
       <span>{result.rowCount ?? 0} rows</span>
       <span class="sep">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
-      {#if processed}
-        <span class="sep">&middot;</span>
-        <span class="soft">{processed}</span>
-      {/if}
     {:else}
       <span class="soft">No result</span>
     {/if}
@@ -81,10 +64,14 @@
       {#snippet header(field)}
         <!-- Name over type: a column is routinely named far wider than
              anything in it, and stacking buys those characters back without
-             paying for them in table width. -->
+             paying for them in table width. The type is abbreviated the way
+             the schema browser abbreviates it — a nested row's full text runs
+             to hundreds of characters, and a header two lines tall has even
+             less room for it than a tree does. The whole thing stays on the
+             hover title. -->
         <div class="col" title="{field.name} — {field.dataTypeName}">
           <div class="ell name">{field.name}</div>
-          <div class="ell type">{field.dataTypeName}</div>
+          <div class="ell type">{abbreviateType(field.dataTypeName)}</div>
         </div>
       {/snippet}
       {#snippet empty()}

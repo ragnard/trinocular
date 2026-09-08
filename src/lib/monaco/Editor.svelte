@@ -95,15 +95,18 @@
   // Redraw the statement toolbars when a result changes state (running ->
   // finished / failed / cancelling). Reading the fields is what subscribes
   // this effect to them; the redraw itself is a textContent write.
+  //
+  // Only the fields the strip actually draws from: `rowCount` and
+  // `elapsedTimeSeconds` used to be read here too, and since a streaming
+  // result ticks its row count on every chunk, they re-ran this for a strip
+  // that no longer says anything about either.
   $effect(() => {
     void editorModel; // re-sync after a file switch swaps the model
     for (const result of file?.results ?? []) {
       void result.queryState;
-      void result.rowCount;
       void result.error;
       void result.cancelling;
       void result.canceled;
-      void result.elapsedTimeSeconds;
       void result.infoUri;
     }
     syncToolbars();
@@ -288,12 +291,10 @@
     if (result.error) return { icon: TriangleAlert, text: "Error", spin: false };
     if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
     if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
-    const rows = result.rowCount ?? 0;
-    return {
-      icon: Table,
-      text: `Results · ${rows} ${rows === 1 ? "row" : "rows"} · ${result.elapsedTimeSeconds}s`,
-      spin: false
-    };
+    // Just the word. The row count and the elapsed time are already on the
+    // results rail, and repeating them here only made the strip above every
+    // finished statement wide enough to matter.
+    return { icon: Table, text: "Results", spin: false };
   }
 
   function resultTooltip(result: Result): string | undefined {
