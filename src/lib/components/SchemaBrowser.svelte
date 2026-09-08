@@ -1,7 +1,22 @@
 <script lang="ts">
   import type { Workspace } from "$lib/State.svelte";
   import type { TreeNode } from "./TreeView.svelte";
-  import { Box, Database, Search, Table, Type } from "@lucide/svelte";
+  import type { TypeCategory } from "$lib/trino/typeString";
+  import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
+  import {
+    Binary,
+    Box,
+    Braces,
+    Brackets,
+    Clock,
+    Database,
+    Hash,
+    Parentheses,
+    Search,
+    Table,
+    ToggleLeft,
+    Type
+  } from "@lucide/svelte";
   import TreeView from "./TreeView.svelte";
   import { page } from "$app/state";
 
@@ -45,30 +60,106 @@
    */
   let filterOverride = $state(new Map<string, boolean>());
 
-  let nodes: TreeNode[] = $derived.by(() => {
+  /**
+   * Path segments are joined with a unit separator, not a dot. A dot is a
+   * character Trino identifiers are allowed to contain — `SHOW COLUMNS` will
+   * report a field literally named `weird name.with dot` — so a dotted id
+   * could never be taken apart again with any confidence.
+   */
+  const SEP = "\u001f";
+
+  type NodeKind = "catalog" | "schema" | "table" | TypeCategory;
+
+  interface NodeMeta {
+    /** Picks the icon, and nothing else. */
+    kind: NodeKind;
+    /** Only the three levels that live on the cluster have anything to fetch. */
+    load?: () => void;
+  }
+
+  /**
+   * The tree and, beside it, what each node *is*. This used to be read back out
+   * of the id by counting dots, which a field named with a dot already broke
+   * and which stopped meaning anything at all once a column's own fields hang
+   * below it at no fixed depth. Saying it once, here, where the node is built,
+   * is the only version that cannot drift from what was built.
+   */
+  let tree: { nodes: TreeNode[]; meta: Map<string, NodeMeta> } = $derived.by(() => {
     const cache = workspace.catalog;
     const loading = cache.loading;
-    return cache.catalogs.map((catalog) => ({
-      id: catalog,
-      label: catalog,
-      loading: loading.has(`schemas:${catalog}`),
-      children: cache.getSchemas(catalog).map((schema) => ({
-        id: `${catalog}.${schema}`,
-        label: schema,
-        loading: loading.has(`tables:${catalog}.${schema}`),
-        children: cache.getTables(catalog, schema).map((table) => ({
-          id: `${catalog}.${schema}.${table}`,
-          label: table,
-          loading: loading.has(`columns:${catalog}.${schema}.${table}`),
-          children: cache.getColumns(catalog, schema, table).map((col) => ({
-            id: `${catalog}.${schema}.${table}.${col.name}`,
-            label: col.name,
-            detail: col.type
-          }))
-        }))
-      }))
-    }));
+    const meta = new Map<string, NodeMeta>();
+
+    /**
+     * A type, expanded in place, as deep as it goes. Nothing in here reaches
+     * the cluster: the whole shape already arrived in the string `SHOW COLUMNS`
+     * returned, so a row nested six deep costs a parse and not a round trip.
+     */
+    function typeNodes(prefix: string, type: string): TreeNode[] | undefined {
+      const fields = typeChildren(type);
+      if (fields.length === 0) return undefined;
+      return fields.map((field, i) => {
+        // Keyed by position: two fields of a row cannot share one, and there is
+        // nothing else about them that they are guaranteed not to share.
+        const id = `${prefix}${SEP}${i}`;
+        meta.set(id, { kind: typeCategory(field.type) });
+        return {
+          id,
+          label: field.name,
+          detail: abbreviateType(field.type),
+          // Both halves, because at six levels of indent it is as often the
+          // name that ran out of room as the type.
+          hint: `${field.name} ${field.type}`,
+          children: typeNodes(id, field.type)
+        };
+      });
+    }
+
+    const nodes = cache.catalogs.map((catalog) => {
+      meta.set(catalog, { kind: "catalog", load: () => cache.loadSchemas(catalog) });
+      return {
+        id: catalog,
+        label: catalog,
+        loading: loading.has(`schemas:${catalog}`),
+        children: cache.getSchemas(catalog).map((schema) => {
+          const schemaId = `${catalog}${SEP}${schema}`;
+          meta.set(schemaId, { kind: "schema", load: () => cache.loadTables(catalog, schema) });
+          return {
+            id: schemaId,
+            label: schema,
+            loading: loading.has(`tables:${catalog}.${schema}`),
+            children: cache.getTables(catalog, schema).map((table) => {
+              const tableId = `${schemaId}${SEP}${table}`;
+              meta.set(tableId, {
+                kind: "table",
+                load: () => cache.loadColumns(catalog, schema, table)
+              });
+              return {
+                id: tableId,
+                label: table,
+                loading: loading.has(`columns:${catalog}.${schema}.${table}`),
+                children: cache.getColumns(catalog, schema, table).map((col) => {
+                  const colId = `${tableId}${SEP}${col.name}`;
+                  meta.set(colId, { kind: typeCategory(col.type) });
+                  return {
+                    id: colId,
+                    label: col.name,
+                    detail: abbreviateType(col.type),
+                    hint: `${col.name} ${col.type}`,
+                    children: typeNodes(colId, col.type)
+                  };
+                })
+              };
+            })
+          };
+        })
+      };
+    });
+
+    return { nodes, meta };
   });
+
+  let nodes: TreeNode[] = $derived(tree.nodes);
+  let meta: Map<string, NodeMeta> = $derived(tree.meta);
 
   /**
    * Narrows what is already on screen — it never asks the cluster for more.
@@ -149,15 +240,9 @@
 
     if (!opening) return;
 
-    const parts = node.id.split(".");
-    const cache = workspace.catalog;
-    if (parts.length === 1) {
-      cache.loadSchemas(parts[0]);
-    } else if (parts.length === 2) {
-      cache.loadTables(parts[0], parts[1]);
-    } else if (parts.length === 3) {
-      cache.loadColumns(parts[0], parts[1], parts[2]);
-    }
+    // Nested fields have no `load`: their shape came down with the column's
+    // type string, so opening one is a pure display change.
+    meta.get(node.id)?.load?.();
   }
 
   /**
@@ -203,13 +288,27 @@
   <div class="tree">
     <TreeView nodes={visible} expanded={open} ontoggle={handleToggle}>
       {#snippet icon(node)}
-        {@const depth = node.id.split(".").length}
-        {#if depth === 1}
+        {@const kind = meta.get(node.id)?.kind}
+        {#if kind === "catalog"}
           <Database size={14} />
-        {:else if depth === 2}
+        {:else if kind === "schema"}
           <Box size={14} />
-        {:else if depth === 3}
+        {:else if kind === "table"}
           <Table size={14} />
+        {:else if kind === "row"}
+          <Braces size={14} />
+        {:else if kind === "array"}
+          <Brackets size={14} />
+        {:else if kind === "map"}
+          <Parentheses size={14} />
+        {:else if kind === "numeric"}
+          <Hash size={14} />
+        {:else if kind === "temporal"}
+          <Clock size={14} />
+        {:else if kind === "binary"}
+          <Binary size={14} />
+        {:else if kind === "boolean"}
+          <ToggleLeft size={14} />
         {:else}
           <Type size={14} />
         {/if}

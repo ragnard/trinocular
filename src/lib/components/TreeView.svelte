@@ -5,6 +5,13 @@
     id: string;
     label: string;
     detail?: string;
+    /**
+     * The whole truth behind a row that had to be shortened, on hover. A nested
+     * row's type runs to hundreds of characters, so the tree shows `row(…)`
+     * rather than taking its width from the worst column in the schema — and
+     * deep enough in, the ellipsis falls on the label instead.
+     */
+    hint?: string;
     children?: TreeNode[];
     loading?: boolean;
   }
@@ -39,7 +46,7 @@
     {@const isOpen = expanded.has(node.id)}
     <li class="node" class:leaf={isLeaf}>
       {#if isLeaf}
-        <button class="label leaf-label" onclick={() => onclick?.(node)}>
+        <button class="label leaf-label" title={node.hint} onclick={() => onclick?.(node)}>
           <ChevronRight size={12} style="visibility: hidden;" />
           {#if icon}{@render icon(node)}{/if}
           <span class="node-label">{node.label}</span>
@@ -48,7 +55,7 @@
           {/if}
         </button>
       {:else}
-        <button class="label branch-label" onclick={() => ontoggle(node)}>
+        <button class="label branch-label" title={node.hint} onclick={() => ontoggle(node)}>
           {#if node.loading}
             <LoaderCircle size={12} class="spin" />
           {:else}
