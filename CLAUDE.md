@@ -50,9 +50,24 @@ Monaco Editor → runStatement() → Trino client (fetch, one per run) → serve
 ### Server-side
 
 - **Hooks** (`src/hooks.server.ts`): `sequence(LoggingHandler, SessionHandler, AuthnHandler)`. Session is an encrypted cookie (AES-GCM via Web Crypto) pointing to a server-side session store.
-- **Auth**: Pluggable — `NoAuthn` (dev) or OIDC with PKCE, token refresh via priority queue.
+- **Authn** (who): Pluggable — `NoAuthn` (dev) or OIDC with PKCE, token refresh via priority queue. Either way it yields one thing: an `Identity` (`src/lib/server/identity.ts`) on `event.locals.identity`, a `userId` plus the `claims` the mechanism was able to say about the user. Absent means signed out. Only the `userId` is sent to the browser in layout data — nothing on the client reads a claim, and shipping a whole token payload to the page would be exposure bought for nothing. `claimsFrom` picks which OIDC token the claims come from: `id_token` (the default; it *is* the statement of who the user is) or `access_token`, which exists because Keycloak puts client roles in the access token unless someone ticks "Add to ID token" on the client roles mapper — so a role rule usually wants the other token. The access token is read with an unverified JWT decode, which is safe only because it came back over TLS from the provider's own token endpoint in a call we made: there is no untrusted party in between whose signature there would be anything to check. `authn: none` takes a literal `claims` map, which is the only way to exercise an authz rule without standing up an identity provider.
+- **Authz** (whether): Configured separately from authn and reads nothing but the identity's claims — that separation is the point: a rule never learns which provider issued the identity, and a mechanism never learns what a rule will look for. `AuthzHandler` (`src/lib/server/authz.ts`) runs last in the `sequence`, so the OIDC handler has already dealt with logout/callback/login itself and a refused user can still sign out. Two authorizers: `allow` (the default) and `require-role`, which is Keycloak's client roles — `resource_access.<client>.roles`, where `client` defaults to this app's own `clientId`, since "the role I granted Trinette" means the roles of the client Trinette signs in as. A `claim` path overrides that for providers shaped otherwise (`realm_access.roles`, `groups`); a claim that is absent or is not an array of strings reads as no roles, because a role check has no use for the difference and both must fail closed. A misconfigured `require-role` with no client to default to exits at startup rather than locking everyone out at runtime. An *unauthenticated* request is not authz's business — it has no identity to judge, and the layout's gate already sends it to login; refusing it here would answer "who are you?" with "not you". A refusal is a 303 to `/auth/forbidden` for a navigation or data request and a bare 403 for anything else (the Trino proxy, a fetch), and the reason goes to the log only: it names claims the user cannot change and would tell an attacker which role to go and ask for.
 - **Proxy** (`src/routes/api/trino/[id]/[...path]/+server.ts`): Forwards requests to configured Trino connections, rewrites `nextUri`/`partialCancelUri` in responses to route back through the proxy. Adds `X-Trino-User` and bearer token from session.
-- **Config** (`src/lib/server/config.ts`): ArkType-validated config loaded from `TRINETTE_CONFIG` env var (JSON file path). Defines connections, session settings, and authn mode.
+- **Config** (`src/lib/server/config.ts`): Zod-validated config loaded from `TRINETTE_CONFIG` env var (a JSON or YAML file path — YAML goes through `Bun.YAML`, so it needs the bun runtime). Defines connections, session settings, and the authn and authz modes. A validation failure exits the process: a server that came up with half a policy would be worse than one that did not come up.
+
+  ```yaml
+  authn:
+    kind: oidc
+    issuer: https://keycloak.example/realms/prod
+    clientId: trinette
+    clientSecret: ...
+    scope: openid profile email
+    claimsFrom: access_token   # where Keycloak puts client roles by default
+
+  authz:
+    kind: require-role
+    role: user                 # resource_access.trinette.roles must contain "user"
+  ```
 
 ### Monaco language package
 

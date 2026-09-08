@@ -52,7 +52,8 @@ function createUpstreamHeaders(event: RequestEvent) {
     }
   });
   // Override with server-side auth — takes precedence over client-sent values
-  headers["x-trino-user"] = event.locals.userId;
+  // Non-null: `proxy` refuses a request without an identity before it gets here.
+  headers["x-trino-user"] = event.locals.identity!.userId;
   if (event.locals.accessToken) {
     headers["authorization"] = "bearer " + event.locals.accessToken;
   }
@@ -73,7 +74,7 @@ function updateResponseBody(
 }
 
 async function proxy(event: RequestEvent, target: Connection, id: string) {
-  if (!event.locals.userId) {
+  if (!event.locals.identity) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" }

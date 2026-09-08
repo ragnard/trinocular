@@ -29,6 +29,10 @@ const SessionSchema = z.object({
 const NoAuthnSchema = z.object({
   kind: z.literal("none"),
   user: z.string(),
+  // Claims to hand the authorizer for a user nobody authenticated. There is no
+  // provider here to ask, so the only way to exercise an authz rule without
+  // standing up an identity provider is to write the claims down.
+  claims: z.record(z.string(), z.unknown()).default({}),
 });
 
 const OIDCAuthnSchema = z.object({
@@ -38,6 +42,11 @@ const OIDCAuthnSchema = z.object({
   clientSecret: z.string(),
   scope: z.string(),
   userIdClaim: z.string().default("preferred_username"),
+  // Which token the identity's claims are read from. The ID token is who the
+  // user is and is the right default; but Keycloak puts client roles in the
+  // access token unless the "Add to ID token" box is ticked on the client
+  // roles mapper, so a role-based authz rule often wants the other one.
+  claimsFrom: z.enum(["id_token", "access_token"]).default("id_token"),
   paths: z.object({
     prefix: z.string().default("/auth"),
     callback: z.string().default("callback"),
@@ -53,9 +62,29 @@ const OIDCAuthnSchema = z.object({
   }),
 });
 
+const AllowAuthzSchema = z.object({
+  kind: z.literal("allow"),
+});
+
+const RequireRoleAuthzSchema = z.object({
+  kind: z.literal("require-role"),
+  role: z.string(),
+  // The OIDC client whose roles are consulted. Defaults to this application's
+  // own clientId, which is what "the role I granted Trinette in Keycloak"
+  // means; name another client to reuse its roles.
+  client: z.string().optional(),
+  // Escape hatch for a provider that does not lay roles out the way Keycloak
+  // does: a dotted claim path to a list of strings, e.g. `realm_access.roles`
+  // for realm-wide Keycloak roles, or plain `groups`. Overrides `client`.
+  claim: z.string().optional(),
+});
+
 const ConfigSchema = z.object({
   session: SessionSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
+  authz: z
+    .discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema])
+    .default({ kind: "allow" }),
   connections: z.record(z.string(), ConnectionSchema).optional(),
 });
 
@@ -110,3 +139,8 @@ function loadConfig(configPath?: string): Config {
 }
 
 export const config: Config = loadConfig(env.TRINETTE_CONFIG);
+
+/** Where the pages a signed-out or refused user must still reach live. Both
+ *  the layout's authn gate and the authz handler exempt this subtree, so they
+ *  cannot disagree about what "an auth page" is. */
+export const authPrefix = config.authn.kind === "oidc" ? config.authn.paths.prefix : "/auth";

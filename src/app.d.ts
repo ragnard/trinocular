@@ -2,7 +2,7 @@
 // for information about these interfaces
 import type { Logger } from "pino";
 import type { Session } from "$lib/server/session";
-import type { IDToken } from "openid-client";
+import type { Identity } from "$lib/server/identity";
 
 declare global {
   namespace App {
@@ -11,9 +11,9 @@ declare global {
       logger: Logger;
       requestId: string;
       session: Session;
-      userId: string;
+      /** Set by the authn handler; absent means nobody is signed in. */
+      identity: Identity | undefined;
       accessToken: string;
-      claims: IDToken | undefined;
     }
     // interface PageData {}
     // interface PageState {}

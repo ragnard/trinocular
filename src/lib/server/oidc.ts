@@ -5,6 +5,7 @@ import type { Session } from "./session";
 import { env } from "$env/dynamic/private";
 import { error as error } from "./errors";
 import { logger } from "./logging";
+import type { Claims } from "./identity";
 
 interface OIDCOptions {
   issuer: URL;
@@ -12,6 +13,7 @@ interface OIDCOptions {
   clientSecret: string;
   scope: string;
   userIdClaim: string;
+  claimsFrom: "id_token" | "access_token";
   paths: {
     prefix: string;
     callback: string;
@@ -25,7 +27,8 @@ interface OIDCSessionData {
   accessToken: string;
   accessTokenExpiresAt: number;
   refreshToken?: string;
-  claims?: client.IDToken;
+  /** The identity's claims, from whichever token `claimsFrom` names. */
+  claims?: Claims;
 }
 
 interface OIDCCallbackData {
@@ -37,9 +40,45 @@ interface OIDCCallbackData {
 
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
 
+/** Reads a JWT's payload without verifying it. Safe here and nowhere else:
+ *  this token came back over TLS from the provider's own token endpoint, in a
+ *  back-channel call we made, so there is no untrusted party between us and
+ *  the issuer whose signature there would be anything to check. */
+const decodePayload = (token: string): Claims | undefined => {
+  const parts = token.split(".");
+  if (parts.length !== 3) return undefined;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
+    return typeof payload === "object" && payload !== null ? payload : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const claimsFor = (
+  claimsFrom: OIDCOptions["claimsFrom"],
+  response: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+  previous?: { claims?: Claims }
+): Claims | undefined => {
+  if (claimsFrom === "access_token") {
+    const claims = decodePayload(response.access_token);
+    if (!claims) {
+      // Nothing to fall back on: an opaque access token cannot be made to
+      // yield claims, and carrying the previous ones forward would leave a
+      // refreshed session judged on a token it no longer holds.
+      logger.warn("claimsFrom is access_token but the access token is not a readable JWT");
+    }
+    return claims;
+  }
+  // A refresh need not return a new ID token; the identity it described is
+  // still the one the session is for.
+  return response.id_token ? response.claims() : previous?.claims;
+};
+
 const createSessionData = (
   response: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-  previous?: { claims?: client.IDToken; refreshToken?: string }
+  claimsFrom: OIDCOptions["claimsFrom"],
+  previous?: { claims?: Claims; refreshToken?: string }
 ): OIDCSessionData => {
   if (!response.expires_in) {
     throw new Error('No "expires_in" in token response');
@@ -48,7 +87,7 @@ const createSessionData = (
     accessToken: response.access_token,
     accessTokenExpiresAt: nowInSeconds() + response.expires_in,
     refreshToken: response.refresh_token ?? previous?.refreshToken,
-    claims: response.id_token ? response.claims() : previous?.claims
+    claims: claimsFor(claimsFrom, response, previous)
   };
 };
 
@@ -64,10 +103,7 @@ const isSafeReturnUrl = (url: string): boolean => {
 
 /** Checks that the session has claims with a usable userId. The library
  *  already validates aud/iss/sub/exp/nonce at token exchange time. */
-const hasValidUserId = (
-  claims: client.IDToken | undefined,
-  userIdClaim: string
-): claims is client.IDToken => {
+const hasValidUserId = (claims: Claims | undefined, userIdClaim: string): claims is Claims => {
   if (!claims) return false;
   const userId = claims[userIdClaim];
   return typeof userId === "string" && userId !== "";
@@ -76,10 +112,12 @@ const hasValidUserId = (
 class TokenRefreshCoalescer {
   #inflight = new Map<string, Promise<OIDCSessionData>>();
   #config: client.Configuration;
+  #claimsFrom: OIDCOptions["claimsFrom"];
   #log;
 
-  constructor(config: client.Configuration) {
+  constructor(config: client.Configuration, claimsFrom: OIDCOptions["claimsFrom"]) {
     this.#config = config;
+    this.#claimsFrom = claimsFrom;
     this.#log = logger.child({ component: "token-refresh" });
   }
 
@@ -101,7 +139,7 @@ class TokenRefreshCoalescer {
     }
     this.#log.info({ sessionId: session.sessionId.slice(0, 8) }, "refreshing token");
     const response = await client.refreshTokenGrant(this.#config, data.refreshToken);
-    const newData = createSessionData(response, data);
+    const newData = createSessionData(response, this.#claimsFrom, data);
     await session.set("oidc", newData);
     this.#log.info({ sessionId: session.sessionId.slice(0, 8) }, "token refreshed");
     return newData;
@@ -119,7 +157,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
     opts.clientSecret
   );
 
-  const coalescer = new TokenRefreshCoalescer(config);
+  const coalescer = new TokenRefreshCoalescer(config, opts.claimsFrom);
 
   const callbackPath = opts.paths.prefix + "/" + opts.paths.callback;
   const logoutPath = opts.paths.prefix + "/" + opts.paths.logout;
@@ -174,7 +212,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
     await session.take("oidc-callback");
 
-    const sessionData = createSessionData(tokens);
+    const sessionData = createSessionData(tokens, opts.claimsFrom);
 
     if (!hasValidUserId(sessionData.claims, opts.userIdClaim)) {
       error(
@@ -258,8 +296,10 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
       if (oidcData) {
         event.locals.accessToken = oidcData.accessToken;
-        event.locals.claims = oidcData.claims;
-        event.locals.userId = oidcData.claims![opts.userIdClaim] as string;
+        event.locals.identity = {
+          userId: oidcData.claims![opts.userIdClaim] as string,
+          claims: oidcData.claims!
+        };
       }
     }
 

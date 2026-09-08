@@ -1,15 +1,18 @@
 import { type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
-import { config, type Config } from "$lib/server/config";
+import { authPrefix, config, type Config } from "$lib/server/config";
 import { env } from "$env/dynamic/private";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
+import { AllowAll, AuthzHandler, RequireRole, type Authorizer } from "$lib/server/authz";
+import { logger } from "$lib/server/logging";
+import type { Claims } from "$lib/server/identity";
 
-const NoAuthnHandler = async (opts: { user: string }): Promise<Handle> => {
+const NoAuthnHandler = async (opts: { user: string; claims: Claims }): Promise<Handle> => {
   return async ({ event, resolve }) => {
-    event.locals.userId = opts.user;
+    event.locals.identity = { userId: opts.user, claims: opts.claims };
     return resolve(event);
   };
 };
@@ -19,7 +22,7 @@ const authnHandler = async (config: Config) => {
 
   switch (authn.kind) {
     case "none":
-      return await NoAuthnHandler({ user: authn.user });
+      return await NoAuthnHandler({ user: authn.user, claims: authn.claims });
     case "oidc":
       return await OIDCHandler({
         issuer: new URL(authn.issuer),
@@ -27,13 +30,39 @@ const authnHandler = async (config: Config) => {
         clientSecret: authn.clientSecret,
         scope: authn.scope,
         userIdClaim: authn.userIdClaim,
+        claimsFrom: authn.claimsFrom,
         paths: authn.paths,
       });
   }
 };
 
+/** Turns the configured policy into an authorizer. The one thing authz borrows
+ *  from authn is the default client for a role lookup: "the role I granted
+ *  Trinette" means the roles of the client Trinette signs in as. */
+const authorizer = (config: Config): Authorizer => {
+  const authz = config.authz;
+
+  switch (authz.kind) {
+    case "allow":
+      return AllowAll();
+    case "require-role": {
+      const client = authz.client ?? (config.authn.kind === "oidc" ? config.authn.clientId : undefined);
+      const claimPath = authz.claim ?? (client && `resource_access.${client}.roles`);
+      if (!claimPath) {
+        logger.error(
+          "authz require-role needs a `client` or `claim`: there is no OIDC clientId to default to"
+        );
+        process.exit(1);
+      }
+      return RequireRole({ role: authz.role, claimPath });
+    }
+  }
+};
+
 const createHandle = async () => {
   const sessionStore = new InMemoryStore();
+  const authz = authorizer(config);
+  logger.info({ authn: config.authn.kind, authz: authz.name }, "auth configured");
 
   return sequence(
     await LoggingHandler(),
@@ -50,7 +79,11 @@ const createHandle = async () => {
         ...(config.session.cookie.maxAge && { maxAge: config.session.cookie.maxAge }),
       }
     }),
-    await authnHandler(config)
+    await authnHandler(config),
+    AuthzHandler(authz, {
+      isExempt: (pathname) => pathname === authPrefix || pathname.startsWith(authPrefix + "/"),
+      forbiddenPath: "/auth/forbidden"
+    })
   );
 };
 
