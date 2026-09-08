@@ -191,10 +191,11 @@ export function typeCategory(type: string): TypeCategory {
 
 /**
  * The type as a label for a node you can expand: the parts that are on screen
- * one click below are elided, so `row(…)` stands in for a whois column whose
+ * one click below are dropped, so `row` stands in for a whois column whose
  * full text runs to three hundred characters and would set the width of the
- * whole tree. Scalars are left exactly as Trino wrote them — `decimal(10,2)`
- * has nothing underneath it, so there is nothing to defer.
+ * whole tree. The chevron beside it is what says there is more. Scalars are
+ * left exactly as Trino wrote them — `decimal(10,2)` has nothing underneath
+ * it, so there is nothing to defer.
  */
 export function abbreviateType(type: string): string {
   const { base, args } = decompose(type);
@@ -202,7 +203,7 @@ export function abbreviateType(type: string): string {
 
   switch (base) {
     case "row":
-      return "row(…)";
+      return "row";
     case "array":
       return `array(${abbreviateType(args.trim())})`;
     case "map": {
