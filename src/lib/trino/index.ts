@@ -7,9 +7,7 @@ export class HttpError extends Error {
   }
 }
 
-const DEFAULT_SERVER = 'http://localhost:8080';
 const DEFAULT_SOURCE = 'trinette';
-const DEFAULT_USER = ''
 
 // Trino headers
 const TRINO_HEADER_PREFIX = 'X-Trino-';
@@ -18,33 +16,16 @@ export const isTrinoHeader = (name: string): boolean =>
   name.toLowerCase().startsWith(TRINO_HEADER_PREFIX.toLowerCase());
 const TRINO_PREPARED_STATEMENT_HEADER = TRINO_HEADER_PREFIX + 'Prepared-Statement';
 const TRINO_ADDED_PREPARE_HEADER = TRINO_HEADER_PREFIX + 'Added-Prepare';
-const TRINO_USER_HEADER = TRINO_HEADER_PREFIX + 'User';
 const TRINO_SOURCE_HEADER = TRINO_HEADER_PREFIX + 'Source';
 const TRINO_CATALOG_HEADER = TRINO_HEADER_PREFIX + 'Catalog';
 const TRINO_SCHEMA_HEADER = TRINO_HEADER_PREFIX + 'Schema';
 const TRINO_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Session';
 const TRINO_SET_CATALOG_HEADER = TRINO_HEADER_PREFIX + 'Set-Catalog';
 const TRINO_SET_SCHEMA_HEADER = TRINO_HEADER_PREFIX + 'Set-Schema';
-const TRINO_SET_PATH_HEADER = TRINO_HEADER_PREFIX + 'Set-Path';
 const TRINO_SET_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Set-Session';
 const TRINO_CLEAR_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Clear-Session';
-const TRINO_SET_ROLE_HEADER = TRINO_HEADER_PREFIX + 'Set-Role';
-const TRINO_EXTRA_CREDENTIAL_HEADER = TRINO_HEADER_PREFIX + 'Extra-Credential';
-
-export type AuthType = string;
-
-export interface Auth {
-  readonly type: AuthType;
-}
-
-export class BasicAuth implements Auth {
-  readonly type: AuthType = 'basic';
-  constructor(readonly username: string, readonly password?: string) {}
-}
 
 export type Session = { [key: string]: string };
-
-export type ExtraCredential = { [key: string]: string };
 
 const encodeAsString = (obj: { [key: string]: string }) => {
   return Object.entries(obj)
@@ -56,20 +37,13 @@ export type RequestHeaders = {
   [key: string]: string;
 }
 
-export type SecureContextOptions = {
-  readonly rejectUnauthorized?: boolean;
-  [key: string]: unknown;
-};
-
 export type ConnectionOptions = {
-  readonly server?: string;
+  /** Always this app's own proxy: `/api/trino/<connectionId>`. */
+  readonly server: string;
   readonly source?: string;
   readonly catalog?: string;
   readonly schema?: string;
-  readonly auth?: Auth;
   readonly session?: Session;
-  readonly extraCredential?: ExtraCredential;
-  readonly ssl?: SecureContextOptions;
   readonly extraHeaders?: RequestHeaders;
 };
 
@@ -161,20 +135,11 @@ export type QueryResult = {
   error?: QueryError;
 };
 
-export type QueryInfo = {
-  queryId: string;
-  state: string;
-  query: string;
-  failureInfo?: QueryFailureInfo;
-};
-
 export type Query = {
   query: string;
   catalog?: string;
   schema?: string;
-  user?: string;
   session?: Session;
-  extraCredential?: ExtraCredential;
   extraHeaders?: RequestHeaders;
 };
 
@@ -200,37 +165,35 @@ const cleanHeaders = (headers: RequestHeaders) => {
   return sanitizedHeaders;
 };
 
-/* A wrapper around fetch that adds Trino specific headers to the requests */
-class Client {
+/**
+ * A fetch wrapper that keeps Trino's session headers in step across the
+ * requests of one query.
+ *
+ * One instance per query, and not safe to share: the session headers are
+ * mutable state that each response can rewrite (Set-Catalog, Set-Session, the
+ * prepared statements it accumulates), so two concurrent queries on one
+ * instance would rewrite each other's session.
+ */
+export default class Trino {
   private constructor(
     private readonly baseURL: string,
     private headers: RequestHeaders,
     private readonly options: ConnectionOptions
   ) {}
 
-  static create(options: ConnectionOptions): Client {
-    const baseURL = options.server ?? DEFAULT_SERVER;
-
+  // Who the query runs as is not the browser's to say: the proxy sets
+  // X-Trino-User from the identity the access gate established, and refuses to
+  // forward any header the client sends that would name somebody else.
+  static create(options: ConnectionOptions): Trino {
     const headers: RequestHeaders = {
-      [TRINO_USER_HEADER]: DEFAULT_USER ?? '',
       [TRINO_SOURCE_HEADER]: options.source ?? DEFAULT_SOURCE,
       [TRINO_CATALOG_HEADER]: options.catalog ?? '',
       [TRINO_SCHEMA_HEADER]: options.schema ?? '',
       [TRINO_SESSION_HEADER]: encodeAsString(options.session ?? {}),
-      [TRINO_EXTRA_CREDENTIAL_HEADER]: encodeAsString(
-        options.extraCredential ?? {}
-      ),
       ...(options.extraHeaders ?? {}),
     };
 
-    if (options.auth && options.auth.type === 'basic') {
-      const basic: BasicAuth = <BasicAuth>options.auth;
-      const credentials = btoa(`${basic.username}:${basic.password ?? ''}`);
-      headers['Authorization'] = `Basic ${credentials}`;
-      headers[TRINO_USER_HEADER] = basic.username;
-    }
-
-    return new Client(baseURL, cleanHeaders(headers), options);
+    return new Trino(options.server, cleanHeaders(headers), options);
   }
 
   /**
@@ -316,16 +279,12 @@ class Client {
    * @param {Query | string} query - The query to execute.
    * @returns A promise that resolves to a QueryResult object.
    */
-  async query(query: Query | string): Promise<Iterator<QueryResult>> {
+  async query(query: Query | string): Promise<QueryIterator> {
     const req = typeof query === 'string' ? { query } : query;
     const headers: RequestHeaders = {
-      [TRINO_USER_HEADER]: req.user ?? '',
       [TRINO_CATALOG_HEADER]: req.catalog ?? '',
       [TRINO_SCHEMA_HEADER]: req.schema ?? '',
       [TRINO_SESSION_HEADER]: encodeAsString(req.session ?? {}),
-      [TRINO_EXTRA_CREDENTIAL_HEADER]: encodeAsString(
-        req.extraCredential ?? {}
-      ),
       ...(req.extraHeaders ?? {})
     };
     const requestConfig: FetchRequestConfig = {
@@ -335,17 +294,8 @@ class Client {
       headers: cleanHeaders(headers),
     };
     return this.request<QueryResult>(requestConfig).then(
-      result => new Iterator(new QueryIterator(this, result))
+      result => new QueryIterator(this, result)
     );
-  }
-
-  /**
-   * It returns the query info for a given queryId.
-   * @param {string} queryId - The query ID of the query you want to get information about.
-   * @returns The query info
-   */
-  async queryInfo(queryId: string): Promise<QueryInfo> {
-    return this.request({ url: `/v1/query/${queryId}`, method: 'GET' });
   }
 
   /**
@@ -360,59 +310,6 @@ class Client {
   }
 }
 
-export class Iterator<T> implements AsyncIterableIterator<T> {
-  constructor(private readonly iter: AsyncIterableIterator<T>) {}
-
-  [Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    return this;
-  }
-
-  next(): Promise<IteratorResult<T>> {
-    return this.iter.next();
-  }
-
-  /**
-   * Calls a defined callback function on each QueryResult, and returns an array that contains the results.
-   * @param fn A function that accepts a QueryResult. map calls the fn function one time for each QueryResult.
-   */
-  map<B>(fn: (t: T) => B): Iterator<B> {
-    const that: AsyncIterableIterator<T> = this.iter;
-    const asyncIterableIterator: AsyncIterableIterator<B> = {
-      [Symbol.asyncIterator]: () => asyncIterableIterator,
-      async next() {
-        return that.next().then(result => {
-          return <IteratorResult<B>>{
-            value: fn(result.value),
-            done: result.done,
-          };
-        });
-      },
-    };
-    return new Iterator(asyncIterableIterator);
-  }
-
-  /**
-   * Performs the specified action for each element.
-   * @param fn A function that accepts a QueryResult. forEach calls the fn function one time for each QueryResult.
-   */
-  async forEach(fn: (value: T) => void): Promise<void> {
-    for await (const value of this) {
-      fn(value);
-    }
-  }
-
-  /**
-   * Calls a defined callback function on each QueryResult. The return value of the callback function is the accumulated
-   * result, and is provided as an argument in the next call to the callback function.
-   * @param acc The initial value of the accumulator.
-   * @param fn A function that accepts a QueryResult and accumulator, and returns an accumulator.
-   */
-  async fold<B>(acc: B, fn: (value: T, acc: B) => B): Promise<B> {
-    await this.forEach(value => (acc = fn(value, acc)));
-    return acc;
-  }
-}
-
 /**
  * Iterator for the query result data.
  */
@@ -420,7 +317,7 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
   private finished = false;
 
   constructor(
-    private readonly client: Client,
+    private readonly client: Trino,
     private queryResult: QueryResult
   ) {}
 
@@ -454,43 +351,5 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
     }
     this.finished = true;
     return { value: this.queryResult, done: false };
-  }
-}
-
-/**
- * Trino is a client for the Trino REST API.
- */
-export default class Trino {
-  private constructor(private readonly client: Client) {}
-
-  static create(options: ConnectionOptions): Trino {
-    return new Trino(Client.create(options));
-  }
-
-  /**
-   * Submittes a query for execution and returns a QueryIterator object that can be used to iterate over the query results.
-   * @param query - The query to execute.
-   * @returns A QueryIterator object.
-   */
-  async query(query: Query | string): Promise<Iterator<QueryResult>> {
-    return this.client.query(query);
-  }
-
-  /**
-   * Retrieves the query info for a given queryId.
-   * @param queryId - The query to execute.
-   * @returns The query info
-   */
-  async queryInfo(queryId: string): Promise<QueryInfo> {
-    return this.client.queryInfo(queryId);
-  }
-
-  /**
-   * It cancels a query.
-   * @param {string} queryId - The queryId of the query to cancel.
-   * @returns The result of the query.
-   */
-  async cancel(queryId: string): Promise<QueryResult> {
-    return this.client.cancel(queryId);
   }
 }

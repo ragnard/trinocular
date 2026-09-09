@@ -8,18 +8,32 @@ import { isTrinoHeader } from "$lib/trino";
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
 /**
- * Resolves the upstream URL, enforcing the path allowlist.
+ * Resolves the upstream URL, enforcing that it is still *this connection's*
+ * Trino, at a path Trino's client protocol actually uses.
  *
- * The allowlist has to be checked against `url.pathname` — that is, *after* the
- * URL parser has resolved dot segments — rather than against the raw parameter.
- * SvelteKit decodes a route param once, so a double-encoded traversal
- * (`%252e%252e`) arrives here as the literal text "%2e%2e": it slips past a
- * `startsWith("/v1/statement")` check on the raw string and is only then
- * normalised away by `new URL`, which would reach any upstream endpoint with
- * the caller's bearer token attached.
+ * Both halves are checked against the parsed `url`, not the raw parameter,
+ * because `new URL` is what decides where the request finally goes:
+ *
+ *  - the path, because SvelteKit decodes a route param once, so a double-encoded
+ *    traversal (`%252e%252e`) arrives as the literal text "%2e%2e". That slips
+ *    past a `startsWith("/v1/statement")` test on the raw string and is only
+ *    then normalised away by the URL parser.
+ *  - the origin, because a parameter beginning with `/` makes `"/" + path` a
+ *    protocol-relative URL: `//evil.example/v1/statement` resolves to a
+ *    different *host* while leaving `pathname` as `/v1/statement`, so the path
+ *    allowlist waves it through. The request would then carry `X-Trino-User`
+ *    and the caller's bearer token to whatever host the path named — reachable
+ *    from a plain link, since a top-level GET navigation sends a SameSite=Lax
+ *    cookie. Checking the path without the origin is checking the half that
+ *    was never in doubt.
  */
 function toTargetUrl(event: RequestEvent, target: Connection): string {
   const url = new URL("/" + (event.params.path ?? ""), target.uri);
+  if (url.origin !== new URL(target.uri).origin) {
+    error(event.locals.logger, 400, "Invalid Trino API path", "trino API path left the target origin", {
+      origin: url.origin
+    });
+  }
   if (!ALLOWED_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     error(event.locals.logger, 400, "Invalid Trino API path", "invalid trino API path requested", {
       path: url.pathname
@@ -84,6 +98,34 @@ function createUpstreamHeaders(event: RequestEvent, identity: Identity) {
   return headers;
 }
 
+/**
+ * The headers of the cluster's answer that are allowed back to the browser.
+ *
+ * The `X-Trino-` prefix match is deliberate here where the request direction
+ * needs a list: these are the cluster talking back (Set-Catalog, Set-Session,
+ * Added-Prepare, the Clear-* pair), and the client needs all of them to keep
+ * its session in step. Only the request direction carries something a caller
+ * could assert about itself.
+ *
+ * Everything else is dropped, and that has to hold on *every* path out —
+ * including an upstream error, which is where it used to be skipped. Whatever
+ * answers at the connection URI is not necessarily Trino, and `Set-Cookie` from
+ * it lands on this app's origin: a 401 carrying one overwrote the session
+ * cookie, which is session fixation handed over by the proxy. `content-type`
+ * is kept because the body is passed through unread and is meaningless without
+ * it; `content-length` and `content-encoding` are not, since fetch has already
+ * decoded the body and both would then describe something else.
+ */
+function downstreamHeaders(response: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const contentType = response.headers.get("content-type");
+  if (contentType) headers["content-type"] = contentType;
+  response.headers.forEach((value, name) => {
+    if (isTrinoHeader(name)) headers[name] = value;
+  });
+  return headers;
+}
+
 function updateResponseBody(
   response: Record<string, unknown>,
   event: RequestEvent,
@@ -131,7 +173,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
+      headers: downstreamHeaders(response),
     });
   }
 
@@ -140,7 +182,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
+      headers: downstreamHeaders(response),
     });
   }
 
@@ -148,18 +190,8 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
 
   updateResponseBody(responseBody, event, target, id);
 
-  const responseHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  // The response direction stays a prefix match: these are the cluster talking
-  // back (Set-Catalog, Set-Session, Added-Prepare, the Clear-* pair), and the
-  // client needs all of them to keep its session in step. Only the request
-  // direction carries something a caller could assert about itself.
-  response.headers.forEach((value, name) => {
-    if (isTrinoHeader(name)) {
-      responseHeaders[name] = value;
-    }
-  });
+  const responseHeaders = downstreamHeaders(response);
+  responseHeaders["Content-Type"] = "application/json";
 
   return new Response(JSON.stringify(responseBody), {
     status: response.status,

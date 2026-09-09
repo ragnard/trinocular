@@ -53,8 +53,38 @@ function toJson(value: unknown, dataType: DataType): unknown {
 /** `,` `"` and the line endings are the whole of what CSV reserves. */
 const CSV_RESERVED = /[",\r\n]/;
 
+/**
+ * The characters a spreadsheet reads as "this cell is a formula" rather than
+ * text. Excel, LibreOffice and Sheets all evaluate a cell opening with one of
+ * these, so `=HYPERLINK(...)` or `=cmd|'/c calc'!A0` sitting in a varchar
+ * column is code that runs when somebody opens the file — the value came out
+ * of a shared warehouse, where the person who wrote the row and the person who
+ * exports it need not be the same person.
+ */
+const CSV_FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * A number, written the way a number is written. `-3` and `+1.5e9` open with a
+ * character from the list above and are not formulas, and a numeric column is
+ * mostly what a `-` at the front of a cell actually is — escaping those would
+ * turn every negative figure in the file into text, which is a worse file than
+ * the one the escape was protecting.
+ */
+const CSV_PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+/**
+ * Quoting is not the defence: a spreadsheet strips the quotes and evaluates
+ * what is inside. A leading apostrophe is, because that is the escape those
+ * programs already use for "treat this as text", and it is what they strip
+ * back off on display. It does mean the CSV holds a byte the query did not
+ * return — which is why it is spent only on the cells that would otherwise be
+ * executable, and why ndjson, where the question does not arise, is the format
+ * to reach for when the file is going somewhere that will parse it.
+ */
 function csvField(text: string): string {
-  return CSV_RESERVED.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  const executable = CSV_FORMULA_LEAD.test(text) && !CSV_PLAIN_NUMBER.test(text);
+  const escaped = executable ? `'${text}` : text;
+  return CSV_RESERVED.test(escaped) ? `"${escaped.replaceAll('"', '""')}"` : escaped;
 }
 
 /**
