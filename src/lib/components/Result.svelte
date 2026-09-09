@@ -4,9 +4,10 @@
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
-  import { PanelRight, TriangleAlert } from "@lucide/svelte";
+  import { Download, PanelRight, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
+  import { EXPORT_FORMATS, downloadText, type ExportFormat } from "$lib/export";
 
   interface Props {
     result: ResultModel | null;
@@ -26,6 +27,39 @@
   let hasRows = $derived((result?.data?.length ?? 0) > 0);
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
+
+  /**
+   * The format menu is a popover so it can hang below the rail: the results
+   * pane clips its overflow, and a menu that has to fit inside the pane would
+   * be a menu the pane can cut in half. The top layer costs a hand-placed
+   * position — there is no anchor positioning to rely on yet — and gives back
+   * light dismiss and Escape without writing either.
+   */
+  const menuId = $props.id();
+  let saveButton: HTMLButtonElement | undefined = $state();
+  let saveMenu: HTMLDivElement | undefined = $state();
+
+  /**
+   * Columns are enough to save: a result with no rows still has a header worth
+   * writing, and one that failed has neither. Saving mid-run writes the rows
+   * that have arrived, which is the number the rail is showing.
+   */
+  let canSave = $derived(!!schema && !result?.error);
+
+  function placeMenu(event: ToggleEvent) {
+    if (event.newState !== "open" || !saveButton || !saveMenu) return;
+    const rect = saveButton.getBoundingClientRect();
+    saveMenu.style.top = `${rect.bottom + 4}px`;
+    saveMenu.style.left = `${rect.left}px`;
+  }
+
+  function save(format: ExportFormat) {
+    saveMenu?.hidePopover();
+    if (!schema) return;
+    // The query id, so a saved file still says which run it came from.
+    const name = `${result?.queryId ?? "query"}.${format.extension}`;
+    downloadText(name, format.mimeType, format.serialize(schema.fields, result?.data ?? []));
+  }
 </script>
 
 <div class="result">
@@ -41,6 +75,27 @@
       <span class="soft">No result</span>
     {/if}
     <span class="fill"></span>
+    <button
+      class="chip"
+      bind:this={saveButton}
+      popovertarget={menuId}
+      disabled={!canSave}
+      title="Save these results to a file"
+    >
+      <Download size={14} />
+      Save
+    </button>
+    <!-- A menu even with one format in it: the file it writes is a choice, and
+         a button that silently picked CSV would have to grow a menu the day
+         ndjson lands and change what a click already meant. -->
+    <div class="menu" id={menuId} popover bind:this={saveMenu} ontoggle={placeMenu}>
+      {#each EXPORT_FORMATS as format (format.id)}
+        <button class="item" onclick={() => save(format)}>
+          {format.label}
+          <span class="meta">.{format.extension}</span>
+        </button>
+      {/each}
+    </div>
     <button
       class="chip"
       aria-pressed={inspectorOpen}
@@ -159,6 +214,48 @@
 
   .message p {
     max-width: 46em;
+  }
+
+  .chip:disabled {
+    color: var(--fg-3);
+    background: transparent;
+    cursor: default;
+  }
+
+  /* Placed by hand in the top layer, so only its own look is here. */
+  .menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 4px;
+    min-width: 140px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    background: var(--s2);
+    color: var(--fg);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  }
+
+  .menu .item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    height: var(--h-ctl);
+    padding: 0 8px;
+    border: none;
+    border-radius: var(--r-kbd);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .menu .item:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
   }
 
   .col {
