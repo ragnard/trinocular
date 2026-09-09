@@ -79,6 +79,12 @@ Monaco Editor → runStatement() → Trino client (fetch, one per run) → serve
 
 `build:lib` still exists for publishing the package standalone, but nothing in this repo consumes `dist/`. `build:grammar` regenerates the parser and then runs `fix:generated`, which restores the type-only `ParseTreeListener` import that the app's `verbatimModuleSyntax` requires and antlr-ng does not emit.
 
+### Dependencies and the image
+
+**Everything is a `devDependency` except `monaco-editor`, and that is load-bearing.** adapter-node bundles the vite output so that "deployments only need their production dependencies": it passes `Object.keys(pkg.dependencies)` to rollup as `external` and bundles everything else. The image ships `build/` alone — adapter-node's output, no `node_modules` — so anything left in `dependencies` becomes a bare import in `build/server/` with nothing to resolve it. Bun does not fail on that; it goes to the network and installs the package at boot, ignoring `bun.lock`, which is how the image came up running a zod the lockfile had never pinned. Run the image with `--network none` and it says what is really going on: `Cannot find package 'zod'`. So a new runtime import belongs in `devDependencies` — the name is wrong for what it does here, but it is the switch adapter-node reads.
+
+`monaco-editor` stays in `dependencies` because it cannot be bundled and does not need to be. Its modules import `.css`, which adapter-node's rollup has no loader for, so bundling it fails the build outright; pulling it in through vite instead (`ssr.noExternal`) works but adds ~26 MB of dead weight. Dead because `+page.ts` sets `ssr = false`: the page component's server chunk is emitted and never evaluated, so the bare `monaco-editor/esm/...` imports in it are never followed. What the editor needs, it needs in the browser, where the client build has it bundled already.
+
 ## Key conventions
 
 - **Svelte 5 runes** throughout: `$state`, `$state.raw`, `$derived`, `$derived.by`, `$effect`, `$bindable`. No stores.
