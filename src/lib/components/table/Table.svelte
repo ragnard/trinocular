@@ -6,6 +6,7 @@
     Schema,
     Selection,
     CellRendererLookup,
+    RowSource,
     ValueConverter
   } from "./types";
   import { defaultCell } from "./snippets.svelte";
@@ -23,7 +24,7 @@
 
   interface Props {
     schema?: Schema;
-    rows?: any[][];
+    rows?: RowSource;
     rowHeight?: number;
     bufferRows?: number;
     columnWidth?: number;

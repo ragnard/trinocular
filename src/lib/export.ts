@@ -23,7 +23,7 @@ export interface ExportFormat {
    * decisions is the wrong one for a file: base64 is what a varbinary column
    * arrived as and what any reader on the other side will expect back.
    */
-  serialize(fields: Field[], rows: readonly unknown[][]): string;
+  serialize(fields: Field[], rows: Iterable<readonly unknown[]>): string;
 }
 
 function isStruct(dataType: DataType): dataType is Struct {
@@ -102,7 +102,7 @@ function csvValue(value: unknown, dataType: DataType): string {
   return String(value);
 }
 
-function serializeCsv(fields: Field[], rows: readonly unknown[][]): string {
+function serializeCsv(fields: Field[], rows: Iterable<readonly unknown[]>): string {
   const lines = [fields.map((field) => csvField(field.name)).join(",")];
   for (const row of rows) {
     lines.push(fields.map((field, i) => csvField(csvValue(row[i], field.dataType))).join(","));
@@ -121,7 +121,7 @@ function serializeCsv(fields: Field[], rows: readonly unknown[][]): string {
  * object cannot hold both. Trino allows it; JSON does not; CSV is the format
  * that can carry it.
  */
-function serializeNdjson(fields: Field[], rows: readonly unknown[][]): string {
+function serializeNdjson(fields: Field[], rows: Iterable<readonly unknown[]>): string {
   const lines: string[] = [];
   for (const row of rows) {
     const object: Record<string, unknown> = {};

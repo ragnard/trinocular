@@ -1,5 +1,6 @@
 import Trino, { HttpError } from "$lib/trino";
-import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
+import { Rows } from "$lib/Rows";
+import type { Columns, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import { loadFiles, saveFiles, legacyEditorContent, clearLegacyEditor } from "$lib/fileStorage";
 
@@ -67,7 +68,8 @@ export class Result {
   queryId?: string = $state();
   infoUri?: string = $state();
   columns?: Columns = $state.raw();
-  data?: QueryData[] = $state.raw();
+  /** The pages Trino sent, not flattened; see `Rows` for why that matters. */
+  data: Rows = $state.raw(Rows.empty);
   stats?: QueryStats = $state.raw();
   warnings?: string[] = $state.raw();
   error?: QueryError = $state.raw();
@@ -94,7 +96,7 @@ export class Result {
   schema?: Columns = $derived(this.columns);
   completed?: boolean = $derived(this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState)))
   running?: boolean = $derived(!this.completed);
-  rowCount?: number = $derived(this.data?.length);
+  rowCount?: number = $derived(this.data.length);
   cancelling?: boolean = $derived(this.cancelRequested && !this.completed);
   /** Trino reports a killed query as a USER_CANCELED failure. */
   canceled?: boolean = $derived(this.error?.errorName === "USER_CANCELED");
@@ -129,9 +131,10 @@ export class Result {
         if (chunk.warnings) this.warnings = chunk.warnings;
         if (chunk.error) this.error = chunk.error;
 
-        if (chunk.data) {
-          this.data = this.data ? this.data.concat(chunk.data) : chunk.data;
-        }
+        // `append` returns a new Rows sharing the pages already held, so the
+        // reference changes (which is the whole of how $state.raw notices)
+        // without a row being copied.
+        if (chunk.data) this.data = this.data.append(chunk.data);
       }
     } catch (e) {
       if (e instanceof HttpError && e.status === 401) {
