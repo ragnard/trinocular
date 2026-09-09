@@ -76,15 +76,17 @@
              row of text under it. Spelled out, a type is mostly noise a column
              at a time — you read it once and then it is in the way of the
              name — while the icon is the same vocabulary the schema browser
-             already taught, and it costs the width of one glyph. The wording
-             is on hover: the icon carries the type (abbreviated to `row`, since
-             a nested row's full text runs to hundreds of characters), the name
-             carries the name, untruncated. -->
+             already taught, and it costs the width of one glyph. The name
+             leads and the icon is pushed to the far edge, so the icons line up
+             down the right of the header whatever the names do and read as a
+             column of their own. The wording is on hover: the icon carries the
+             type (abbreviated to `row`, since a nested row's full text runs to
+             hundreds of characters), the name carries the name, untruncated. -->
         <div class="col" class:num={field.dataType === "integer"}>
+          <span class="ell name" title={field.name}>{field.name}</span>
           <span class="kind" title={abbreviateType(field.dataTypeName)}>
             <TypeIcon category={typeCategory(field.dataTypeName)} />
           </span>
-          <span class="ell name" title={field.name}>{field.name}</span>
         </div>
       {/snippet}
       {#snippet empty()}
@@ -162,13 +164,15 @@
   .col {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     min-width: 0;
   }
 
-  /* Numeric columns are right-aligned in the body, so their header goes with
-     them; the icon leads either way, so the pair reads as one label rather
-     than as two things that swapped places. */
+  /* Numeric columns are right-aligned in the body, so their name goes with
+     them — up against the icon rather than across the gap from it. The icon
+     itself does not move: it is the right edge either way, which is what lets
+     the icons read as a column of their own. */
   .col.num {
     justify-content: flex-end;
   }
