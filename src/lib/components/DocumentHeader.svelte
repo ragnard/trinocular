@@ -62,7 +62,6 @@
     icon={HardDrive}
     label={connectionName}
     title="The Trino cluster this document runs against"
-    menuWidth="18em"
   >
     {#snippet menu()}
       {#each connections as connection (connection.id)}
@@ -73,11 +72,6 @@
           {connection.name}
         </button>
       {/each}
-      <div class="separator"></div>
-      <div class="note">
-        Applies to <strong>{file?.name ?? "this file"}</strong> only. Its statements, results and the
-        schema browser follow this connection.
-      </div>
     {/snippet}
   </Dropdown>
 
@@ -113,12 +107,5 @@
 
   button.danger:hover {
     color: var(--error);
-  }
-
-  .note {
-    padding: 4px 12px 6px;
-    color: var(--fg-3);
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
   }
 </style>
