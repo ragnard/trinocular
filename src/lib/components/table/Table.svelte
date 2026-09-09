@@ -464,6 +464,10 @@
     height: 100%;
     min-height: 0;
     overflow: auto;
+    /* An arrow, not an I-beam: a drag here sweeps out a range of cells, and
+       the caret would be promising a text selection the grid never makes. The
+       resize handles set their own cursor over it. */
+    cursor: default;
   }
 
   .table-container:focus {
