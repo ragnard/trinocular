@@ -81,6 +81,30 @@ function serializeCsv(fields: Field[], rows: readonly unknown[][]): string {
   return lines.join("\r\n") + "\r\n";
 }
 
+/**
+ * One JSON object per row, one row per line. Nothing is flattened or rendered
+ * on the way out: a row is an object, an array is an array, all the way down,
+ * which is the reason to pick this format over CSV — CSV has one dimension and
+ * has to spend a quoted string on anything that has two.
+ *
+ * Two columns of the same name (`SELECT a, a`) collapse into one key, since an
+ * object cannot hold both. Trino allows it; JSON does not; CSV is the format
+ * that can carry it.
+ */
+function serializeNdjson(fields: Field[], rows: readonly unknown[][]): string {
+  const lines: string[] = [];
+  for (const row of rows) {
+    const object: Record<string, unknown> = {};
+    fields.forEach((field, i) => {
+      object[field.name] = toJson(row[i], field.dataType);
+    });
+    lines.push(JSON.stringify(object));
+  }
+  // Trailing newline: every line is terminated, so appending to the file or
+  // `cat`ing two of them together cannot fuse two records into one.
+  return lines.length ? lines.join("\n") + "\n" : "";
+}
+
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "csv",
@@ -88,6 +112,13 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     extension: "csv",
     mimeType: "text/csv;charset=utf-8",
     serialize: serializeCsv
+  },
+  {
+    id: "ndjson",
+    label: "NDJSON",
+    extension: "ndjson",
+    mimeType: "application/x-ndjson;charset=utf-8",
+    serialize: serializeNdjson
   }
 ];
 

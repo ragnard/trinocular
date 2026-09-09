@@ -86,7 +86,12 @@
       <div class="menu">
         <button onclick={rename}>Rename&hellip;</button>
         <button onclick={create}>New file</button>
-        <button onclick={() => { open = null; onquickopen(); }}>Switch file&hellip;</button>
+        <button
+          onclick={() => {
+            open = null;
+            onquickopen();
+          }}>Switch file&hellip;</button
+        >
         <div class="separator"></div>
         <button class="danger" onclick={remove}>Delete file</button>
       </div>
@@ -118,8 +123,8 @@
         {/each}
         <div class="separator"></div>
         <div class="note">
-          Applies to <strong>{file?.name ?? "this file"}</strong> only. Its statements, results and
-          the schema browser follow this connection.
+          Applies to <strong>{file?.name ?? "this file"}</strong> only. Its statements, results and the
+          schema browser follow this connection.
         </div>
       </div>
     {/if}
@@ -175,38 +180,16 @@
     flex: 1;
   }
 
+  /* Only where it hangs — the look is the global `.menu` primitive. */
   .menu {
     position: absolute;
     z-index: 11;
     top: calc(100% + 6px);
     left: 0;
-    min-width: 12em;
-    padding: 4px 0;
-    background: var(--s2);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r);
-    box-shadow: var(--shadow);
   }
 
   .menu.wide {
     min-width: 18em;
-  }
-
-  .menu button {
-    display: block;
-    width: 100%;
-    height: var(--h-tree);
-    padding: 0 12px;
-    border: none;
-    background: transparent;
-    color: var(--fg);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .menu button:hover {
-    background: var(--s3);
   }
 
   .menu button.selected {
@@ -215,12 +198,6 @@
 
   .menu button.danger:hover {
     color: var(--error);
-  }
-
-  .separator {
-    height: 1px;
-    margin: 4px 0;
-    background: var(--line-strong);
   }
 
   .note {

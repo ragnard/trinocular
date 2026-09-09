@@ -143,6 +143,45 @@ html {
   flex: none;
 }
 
+/* What drops out of a chip that opens a menu. Only the surface and the rows
+   are here: where a menu is put is the caller's business, and the two we have
+   answer that differently — the document header hangs one off its own rail,
+   while the results pane has to escape an overflow it cannot afford to be
+   clipped by. What a menu looks like is not allowed to differ with that. */
+.menu {
+  min-width: 12em;
+  padding: 4px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--s2);
+  box-shadow: var(--shadow);
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: var(--h-tree);
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--s3);
+}
+
+.menu .separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line-strong);
+}
+
 .meta {
   font-size: var(--text-sm);
   line-height: var(--leading-sm);

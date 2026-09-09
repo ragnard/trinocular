@@ -4,7 +4,7 @@
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
-  import { Download, PanelRight, TriangleAlert } from "@lucide/svelte";
+  import { ChevronDown, Download, PanelRight, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import { EXPORT_FORMATS, downloadText, type ExportFormat } from "$lib/export";
@@ -46,10 +46,15 @@
    */
   let canSave = $derived(!!schema && !result?.error);
 
-  function placeMenu(event: ToggleEvent) {
-    if (event.newState !== "open" || !saveButton || !saveMenu) return;
+  let saveOpen = $state(false);
+
+  function onMenuToggle(event: ToggleEvent) {
+    // The popover dismisses itself, so this is also how the chip learns it is
+    // no longer open and can stop drawing itself as pressed.
+    saveOpen = event.newState === "open";
+    if (!saveOpen || !saveButton || !saveMenu) return;
     const rect = saveButton.getBoundingClientRect();
-    saveMenu.style.top = `${rect.bottom + 4}px`;
+    saveMenu.style.top = `${rect.bottom + 6}px`;
     saveMenu.style.left = `${rect.left}px`;
   }
 
@@ -79,20 +84,22 @@
       class="chip"
       bind:this={saveButton}
       popovertarget={menuId}
+      aria-pressed={saveOpen}
       disabled={!canSave}
       title="Save these results to a file"
     >
       <Download size={14} />
       Save
+      <!-- The chevron is what says a click opens something rather than doing
+           something, and it says it the same way the document header's file
+           and connection chips do. -->
+      <ChevronDown size={12} />
     </button>
-    <!-- A menu even with one format in it: the file it writes is a choice, and
-         a button that silently picked CSV would have to grow a menu the day
-         ndjson lands and change what a click already meant. -->
-    <div class="menu" id={menuId} popover bind:this={saveMenu} ontoggle={placeMenu}>
+    <div class="menu" id={menuId} popover bind:this={saveMenu} ontoggle={onMenuToggle}>
       {#each EXPORT_FORMATS as format (format.id)}
-        <button class="item" onclick={() => save(format)}>
+        <button onclick={() => save(format)}>
           {format.label}
-          <span class="meta">.{format.extension}</span>
+          <span class="ext meta">.{format.extension}</span>
         </button>
       {/each}
     </div>
@@ -222,40 +229,18 @@
     cursor: default;
   }
 
-  /* Placed by hand in the top layer, so only its own look is here. */
+  /* Only where it is put — the look is the global `.menu` primitive. The top
+     layer positions from the viewport, so this is placed by hand on open. */
   .menu {
     position: fixed;
     inset: auto;
     margin: 0;
-    padding: 4px;
-    min-width: 140px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r);
-    background: var(--s2);
-    color: var(--fg);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
   }
 
-  .menu .item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    width: 100%;
-    height: var(--h-ctl);
-    padding: 0 8px;
-    border: none;
-    border-radius: var(--r-kbd);
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .menu .item:hover {
-    background: var(--accent-bg);
-    color: var(--accent);
+  /* The extension is the answer to "what will the file be called", so it sits
+     against the right edge rather than trailing the name. */
+  .menu .ext {
+    margin-left: auto;
   }
 
   .col {
