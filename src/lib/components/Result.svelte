@@ -3,9 +3,10 @@
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
-  import { abbreviateType } from "$lib/trino/typeString";
+  import { abbreviateType, typeCategory } from "$lib/trino/typeString";
   import { PanelRight, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
+  import TypeIcon from "./TypeIcon.svelte";
 
   interface Props {
     result: ResultModel | null;
@@ -71,16 +72,19 @@
     {/if}
     <Table {schema} rows={result.data} {valueConverter} bind:selection>
       {#snippet header(field)}
-        <!-- Name over type: a column is routinely named far wider than
-             anything in it, and stacking buys those characters back without
-             paying for them in table width. The type is abbreviated the way
-             the schema browser abbreviates it — a nested row's full text runs
-             to hundreds of characters, and a header two lines tall has even
-             less room for it than a tree does. The whole thing stays on the
-             hover title. -->
-        <div class="col" title="{field.name} — {field.dataTypeName}">
-          <div class="ell name">{field.name}</div>
-          <div class="ell type">{abbreviateType(field.dataTypeName)}</div>
+        <!-- One line: the type is an icon beside the name rather than a second
+             row of text under it. Spelled out, a type is mostly noise a column
+             at a time — you read it once and then it is in the way of the
+             name — while the icon is the same vocabulary the schema browser
+             already taught, and it costs the width of one glyph. The wording
+             is on hover: the icon carries the type (abbreviated to `row`, since
+             a nested row's full text runs to hundreds of characters), the name
+             carries the name, untruncated. -->
+        <div class="col" class:num={field.dataType === "integer"}>
+          <span class="kind" title={abbreviateType(field.dataTypeName)}>
+            <TypeIcon category={typeCategory(field.dataTypeName)} />
+          </span>
+          <span class="ell name" title={field.name}>{field.name}</span>
         </div>
       {/snippet}
       {#snippet empty()}
@@ -155,13 +159,27 @@
     max-width: 46em;
   }
 
-  .col .name {
-    color: var(--fg);
+  .col {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
   }
 
-  .col .type {
+  /* Numeric columns are right-aligned in the body, so their header goes with
+     them; the icon leads either way, so the pair reads as one label rather
+     than as two things that swapped places. */
+  .col.num {
+    justify-content: flex-end;
+  }
+
+  .col .kind {
+    display: flex;
+    flex: none;
     color: var(--fg-3);
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
+  }
+
+  .col .name {
+    color: var(--fg);
   }
 </style>

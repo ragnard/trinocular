@@ -3,22 +3,9 @@
   import type { TreeNode } from "./TreeView.svelte";
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
-  import {
-    Binary,
-    Box,
-    Braces,
-    Brackets,
-    Clock,
-    Database,
-    HardDrive,
-    Hash,
-    Parentheses,
-    Search,
-    Table,
-    ToggleLeft,
-    Type
-  } from "@lucide/svelte";
+  import { Box, Database, HardDrive, Search, Table } from "@lucide/svelte";
   import TreeView from "./TreeView.svelte";
+  import TypeIcon from "./TypeIcon.svelte";
   import { page } from "$app/state";
 
   interface Props {
@@ -296,22 +283,8 @@
           <Box size={14} />
         {:else if kind === "table"}
           <Table size={14} />
-        {:else if kind === "row"}
-          <Braces size={14} />
-        {:else if kind === "array"}
-          <Brackets size={14} />
-        {:else if kind === "map"}
-          <Parentheses size={14} />
-        {:else if kind === "numeric"}
-          <Hash size={14} />
-        {:else if kind === "temporal"}
-          <Clock size={14} />
-        {:else if kind === "binary"}
-          <Binary size={14} />
-        {:else if kind === "boolean"}
-          <ToggleLeft size={14} />
         {:else}
-          <Type size={14} />
+          <TypeIcon category={kind ?? "other"} />
         {/if}
       {/snippet}
     </TreeView>
