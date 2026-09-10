@@ -4,9 +4,11 @@
  * A varchar column holding a JSON document is the case this exists for: the
  * type says `varchar`, the string says `{"...`, and only the person reading it
  * knows which of those to believe. So the choice is theirs — per field,
- * remembered with the document in `SqlFile.viewFormats`. It is picked against a
- * *path* (`items[].meta`) rather than a value, so it holds for every row of
- * every selection until it is picked again.
+ * remembered with the document in `SqlFile.viewFormats`. It is picked against
+ * the field's *path* (`items[3].meta`) rather than against the value, so it
+ * holds for that field in every row until it is picked again — but the path
+ * keeps its array indices, because the elements of a varchar array need not
+ * agree about what they hold.
  *
  * A format is one entry in `VIEW_FORMATS`, the arrangement `EXPORT_FORMATS`
  * already uses: the menu is drawn from the list, so hex, base64 or markdown

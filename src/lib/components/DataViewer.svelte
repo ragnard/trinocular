@@ -15,7 +15,7 @@
     selection?: Selection | null;
     hideNulls?: boolean;
     hideEmpty?: boolean;
-    /** How to draw each field, by path. See `SqlFile.viewFormats`. */
+    /** How to draw each field, by its path. See `SqlFile.viewFormats`. */
     formats?: Record<string, string>;
     onpick?: (path: string, formatId: string) => void;
   }
@@ -45,14 +45,14 @@
   });
 
   interface FlatEntry {
-    /** What the field is called on screen: `items[3].meta`. */
-    key: string;
     /**
-     * What it is called for the purpose of remembering a choice about it:
-     * `items[].meta`. The same string for every row and every element, because
-     * a format is a property of the column, not of the value you clicked.
+     * What the field is called on screen, and what a view format is remembered
+     * against: `items[3].meta`, indices and all. A varchar array can hold a
+     * JSON document in one element and a sentence in the next, so the index is
+     * part of what was picked — collapsing it to `items[]` would make one
+     * click re-type every element of the array.
      */
-    path: string;
+    key: string;
     value: any;
     field: Field;
     empty?: boolean;
@@ -68,20 +68,20 @@
 
   /** Structs and arrays become dotted paths, which is what makes a row read
       as a document rather than a handful of unopenable cells. */
-  function flatten(value: any, field: Field, key: string, path: string): FlatEntry[] {
+  function flatten(value: any, field: Field, key: string): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
-      return [{ key, path, value: null, field }];
+      return [{ key, value: null, field }];
     }
     if (isStruct(dataType) && Array.isArray(value)) {
       const entries = dataType.fields.flatMap((f, i) =>
-        flatten(value[i], f, key ? `${key}.${f.name}` : f.name, path ? `${path}.${f.name}` : f.name)
+        flatten(value[i], f, key ? `${key}.${f.name}` : f.name)
       );
-      return entries.length ? entries : [{ key, path, value: "{}", field, empty: true }];
+      return entries.length ? entries : [{ key, value: "{}", field, empty: true }];
     }
     if (isList(dataType) && Array.isArray(value)) {
       if (value.length === 0) {
-        return [{ key, path, value: "[]", field, empty: true }];
+        return [{ key, value: "[]", field, empty: true }];
       }
       const elementField: Field = {
         name: "",
@@ -89,11 +89,9 @@
         dataTypeName: field.dataTypeName,
         nullable: true
       };
-      return value.flatMap((element, i) =>
-        flatten(element, elementField, `${key}[${i + 1}]`, `${path}[]`)
-      );
+      return value.flatMap((element, i) => flatten(element, elementField, `${key}[${i + 1}]`));
     }
-    return [{ key, path, value, field }];
+    return [{ key, value, field }];
   }
 
   /**
@@ -108,9 +106,7 @@
     const needle = filter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
-      let entries = data!.fields.flatMap((field, c) =>
-        flatten(row[c], field, field.name, field.name)
-      );
+      let entries = data!.fields.flatMap((field, c) => flatten(row[c], field, field.name));
       if (hideNulls) entries = entries.filter((e) => e.value !== null);
       if (hideEmpty) entries = entries.filter((e) => !e.empty);
       if (needle) {
@@ -153,7 +149,7 @@
   }
 
   function pick(format: ViewFormat) {
-    if (picking) onpick?.(picking.path, format.id);
+    if (picking) onpick?.(picking.key, format.id);
   }
 
   function copy(value: string) {
@@ -162,7 +158,7 @@
 
   /** What the row shows, in full: the cap is on the screen, not on the value. */
   function copyValue(entry: FlatEntry) {
-    copy(render(entry.value, entry.field, formats[entry.path]).text);
+    copy(render(entry.value, entry.field, formats[entry.key]).text);
   }
 
   /**
@@ -231,11 +227,11 @@
       </div>
       {#each doc.entries as entry (entry.key)}
         {@const choices = formatsFor(entry.field)}
-        {@const chosen = resolveFormat(entry.field, formats[entry.path])}
+        {@const chosen = resolveFormat(entry.field, formats[entry.key])}
         {@const shown = display(
           entry.value,
           entry.field,
-          formats[entry.path],
+          formats[entry.key],
           !!expanded[expansionKey(doc.row, entry.key)]
         )}
         <div class="field">
@@ -250,7 +246,7 @@
                 class:set={chosen.id !== DEFAULT_FORMAT}
                 popovertarget={menuId}
                 onclick={(e) => startPick(entry, e.currentTarget)}
-                title={`Show "${entry.path}" as… (${chosen.label})`}
+                title={`Show "${entry.key}" as… (${chosen.label})`}
               >
                 <Eye size={12} />
               </button>
@@ -290,14 +286,14 @@
 <Menu bind:this={picker} id={menuId} {anchor}>
   {#snippet menu()}
     {#if picking}
-      {@const chosen = resolveFormat(picking.field, formats[picking.path])}
+      {@const chosen = resolveFormat(picking.field, formats[picking.key])}
       {#each formatsFor(picking.field) as format (format.id)}
         <button class:selected={format === chosen} onclick={() => pick(format)}>
           {format.label}
         </button>
       {/each}
       <div class="separator"></div>
-      <p class="scope meta ell">Applies to {picking.path}</p>
+      <p class="scope meta ell">Applies to {picking.key} in every row</p>
     {/if}
   {/snippet}
 </Menu>

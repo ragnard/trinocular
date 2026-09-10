@@ -252,9 +252,11 @@ export class SqlFile {
    */
   connectionId: string = $state("");
   /**
-   * How the inspector draws a field, keyed by path (`items[].meta`) — the
-   * display key with its array indices collapsed, so a choice made on one
-   * element holds for the column rather than for the row it was made on.
+   * How the inspector draws a field, keyed by the path the inspector shows
+   * (`items[3].meta`, indices and all). Held across rows, since that much is a
+   * property of the column, but not across elements: a varchar array can carry
+   * a JSON document in one element and a sentence in the next, so collapsing
+   * the index would make one click re-type the whole array.
    *
    * A property of the document for the same reason the connection is: a
    * workspace-wide map would let a column called `payload` in one document
