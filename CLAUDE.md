@@ -18,6 +18,16 @@ bun run preview          # Preview production build
 
 No test framework is configured.
 
+## The README
+
+`README.md` is what a user reads, and this file is what you read; the two describe the same program and go out of date separately. **Keep the README current as part of the change that makes it stale** — not afterwards, and not when somebody notices.
+
+Three things in it track the code and nothing tells you when they drift:
+
+- **The feature list.** It is deliberately free of implementation words — no Monaco, no virtual scrolling, no OIDC — because it answers "what can I do with this", which is the one question the rest of this file never asks. A feature that a user would choose the program for belongs there, phrased as the thing they can now do.
+- **The configuration reference.** Every option in `ConfigSchema` (`src/lib/server/config.ts`) is documented there with its default, and every environment variable the server reads (`TRINETTE_CONFIG`, `ORIGIN`, `LOG_LEVEL`, `PORT`/`HOST`). So a new field, a changed default, or a new `authn`/`authz`/connection option is not finished until its row is there — a config reference that is merely mostly right is worse than none, because the option it omits reads as one that does not exist. Defaults are the part that rots silently: they are written in the schema and in the code that consumes it (the session cookie's `secure` is derived from `ORIGIN` in `hooks.server.ts`, not in the schema), so check both.
+- **The run instructions.** Ports, `bun run` scripts, the image name and the Docker build targets, all of which live in `package.json`, `Dockerfile` and `.github/workflows/docker.yml`.
+
 ## Architecture
 
 ### Client-side data flow
