@@ -313,6 +313,21 @@ export class Workspace {
    * One catalog cache per connection, kept for the session. Browsing a Trino
    * cluster is slow enough that dropping the tree when the active file changes
    * -- which the old global connection did on every switch -- is felt.
+   *
+   * Built up front, one per configured connection, and **never lazily**. A
+   * `CatalogCache` is made of runes, and svelte does not register a dependency
+   * on a source that was created by the reaction currently running -- there is
+   * nothing to notify, since the reaction is producing the value in the same
+   * pass. So a cache constructed on first use was constructed inside whichever
+   * `$derived` or `$effect` asked for it first, and that reader's read of
+   * `catalogs` registered nothing: switching a document to another cluster left
+   * the schema browser empty, root and all, because `SHOW CATALOGS` came back
+   * and invalidated nobody. It filled in on the *second* visit, the instance by
+   * then having been built in an earlier pass, which is what made it look like
+   * a loading race rather than a missing subscription. Constructing every cache
+   * here, outside any reaction, is what makes the reads that matter trackable.
+   * Costs nothing: a cache is empty maps and a `Trino` client, and neither
+   * touches the network until something asks it to.
    */
   #catalogs = new Map<string, CatalogCache>();
 
@@ -339,6 +354,13 @@ export class Workspace {
     this.id = id;
     this.#connectionIds = new Set(connections.map((c) => c.id));
     this.defaultConnectionId = connections[0]?.id ?? "";
+    // Every id `#knownConnection` can hand back, so `catalogFor` is a lookup
+    // that always hits. `defaultConnectionId` is already one of the configured
+    // ids unless there are none at all, in which case it is "" and this seeds
+    // the one entry that keeps the degenerate case a lookup too.
+    for (const id of [...this.#connectionIds, this.defaultConnectionId]) {
+      this.#catalogs.set(id, new CatalogCache(this.#createClient(id)));
+    }
     this.#restoreFiles();
   }
 
@@ -352,13 +374,14 @@ export class Workspace {
     return Trino.create({ server: `/api/trino/${connectionId}` });
   }
 
+  /**
+   * The cache for a connection. Healed through `#knownConnection` for the same
+   * reason everything else is -- an id the config does not declare can only
+   * 404 at the proxy -- which also makes the map total over every id this can
+   * be asked for, so there is nothing to construct here.
+   */
   catalogFor(connectionId: string): CatalogCache {
-    let cache = this.#catalogs.get(connectionId);
-    if (!cache) {
-      cache = new CatalogCache(this.#createClient(connectionId));
-      this.#catalogs.set(connectionId, cache);
-    }
-    return cache;
+    return this.#catalogs.get(this.#knownConnection(connectionId))!;
   }
 
   /** The connection the active document runs against. */
