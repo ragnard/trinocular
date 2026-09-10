@@ -5,7 +5,8 @@
  *
  * One key per file:
  *
- *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, connectionId}
+ *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, connectionId,
+ *                                                       viewFormats}
  *     trinette:workspace:<workspaceId>:ui              {activeFileId, order}
  *
  * It used to be a single `:files` key holding every document, which made three
@@ -26,6 +27,8 @@ export interface StoredFile {
   name: string;
   content: string;
   connectionId: string;
+  /** Inspector view formats, by field path. See `SqlFile.viewFormats`. */
+  viewFormats: Record<string, string>;
 }
 
 export interface StoredUi {
@@ -70,8 +73,24 @@ export function toStoredFile(value: unknown): StoredFile | null {
     name: file.name,
     content: file.content,
     // An unknown connection is healed against the config by the caller.
-    connectionId: typeof file.connectionId === "string" ? file.connectionId : ""
+    connectionId: typeof file.connectionId === "string" ? file.connectionId : "",
+    viewFormats: toViewFormats(file.viewFormats)
   };
+}
+
+/**
+ * Whatever of a `path: formatId` map survives being read. A record written
+ * before the field existed has none, which is the empty map rather than a
+ * broken document. Format ids are not checked against the ones this build
+ * knows: that is `viewFormats.ts`'s to decide at render time, and dropping an
+ * id here would mean a newer tab's choices being erased by an older one every
+ * time it saved.
+ */
+function toViewFormats(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, format]) => typeof format === "string")
+  ) as Record<string, string>;
 }
 
 function parseFile(raw: string | null): StoredFile | null {

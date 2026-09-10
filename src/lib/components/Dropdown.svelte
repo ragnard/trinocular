@@ -10,17 +10,12 @@
    * that is the part that genuinely differs: one is a list of actions with a
    * destructive one at the bottom, one is a list of choices with a note under
    * it, one is a list of file formats. What the caller does not get to choose
-   * is the surface it lands on or how it goes away.
-   *
-   * Dismissal is the platform's: a native popover closes on Escape and on a
-   * click anywhere else, which is exactly the behaviour the hand-rolled
-   * version was reaching for with a full-window backdrop div and a window
-   * keydown handler. The top layer also means a menu is never clipped by a
-   * pane that has to hide its overflow — the reason the results pane could not
-   * use the same absolute positioning the document header does.
+   * is the surface it lands on or how it goes away — that is `Menu`, which the
+   * inspector's per-field picker shares rather than being a chip it is not.
    */
   import type { Component, Snippet } from "svelte";
   import { ChevronDown } from "@lucide/svelte";
+  import Menu from "./Menu.svelte";
 
   interface Props {
     label: string;
@@ -48,43 +43,7 @@
 
   const id = $props.id();
   let trigger: HTMLButtonElement | undefined = $state();
-  let panel: HTMLDivElement | undefined = $state();
   let open = $state(false);
-
-  function close() {
-    panel?.hidePopover();
-  }
-
-  /**
-   * The top layer positions against the viewport, so this is measured and
-   * placed each time it opens: under the chip, kept on screen, and flipped
-   * above it rather than run off the bottom.
-   */
-  function place() {
-    if (!trigger || !panel) return;
-    const chip = trigger.getBoundingClientRect();
-    const size = panel.getBoundingClientRect();
-    const below = chip.bottom + 6;
-    const top = below + size.height > window.innerHeight - 8 ? chip.top - 6 - size.height : below;
-    panel.style.left = `${Math.max(8, Math.min(chip.left, window.innerWidth - size.width - 8))}px`;
-    panel.style.top = `${Math.max(8, top)}px`;
-  }
-
-  function onToggle(event: ToggleEvent) {
-    // Also how the chip learns it has been dismissed from outside, which is
-    // most of the time: it is what keeps it drawn as pressed only while it is.
-    open = event.newState === "open";
-    if (open) place();
-  }
-
-  /**
-   * Any button in a menu closes it. Captured on the way down, so the menu is
-   * already gone by the time the item's own handler runs — one of them opens a
-   * `prompt()`, and a menu left standing behind a modal dialog looks stuck.
-   */
-  function onMenuClick(event: MouseEvent) {
-    if ((event.target as HTMLElement).closest("button")) close();
-  }
 </script>
 
 <button
@@ -104,17 +63,7 @@
   <ChevronDown size={12} />
 </button>
 
-<div
-  class="menu"
-  {id}
-  popover
-  bind:this={panel}
-  style:min-width={menuWidth}
-  ontoggle={onToggle}
-  onclickcapture={onMenuClick}
->
-  {@render menu(close)}
-</div>
+<Menu {id} anchor={trigger} {menuWidth} onopenchange={(o) => (open = o)} {menu} />
 
 <style>
   .chip {
@@ -136,12 +85,5 @@
     color: var(--fg-3);
     background: transparent;
     cursor: default;
-  }
-
-  /* Only where it is put — the look is the global `.menu` primitive. */
-  .menu {
-    position: fixed;
-    inset: auto;
-    margin: 0;
   }
 </style>

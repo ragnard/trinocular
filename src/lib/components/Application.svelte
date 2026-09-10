@@ -100,24 +100,6 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => workspace.persist(), 500);
   }
-
-  const decoder = new TextDecoder("utf-8", { fatal: true });
-
-  function decodeBinary(bytes: Uint8Array): string {
-    try {
-      const text = decoder.decode(bytes);
-      if (text.startsWith('{"')) {
-        try {
-          return JSON.stringify(JSON.parse(text), null, 2);
-        } catch {
-          // Not JSON after all; the decoded text is still the better answer.
-        }
-      }
-      return text;
-    } catch {
-      return "0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    }
-  }
 </script>
 
 {#snippet browser()}
@@ -125,17 +107,16 @@
 {/snippet}
 
 {#snippet inspector()}
-  <DataViewer {selection}>
-    {#snippet formatValue(field, value)}
-      {#if field.dataType === "binary"}
-        <pre>{decodeBinary(value)}</pre>
-      {:else if value === null || value === undefined}
-        {"null"}
-      {:else}
-        {typeof value === "object" ? JSON.stringify(value) : value}
-      {/if}
-    {/snippet}
-  </DataViewer>
+  <!-- How a field is drawn is a property of the document, so it travels with
+       the file rather than with the result being inspected. -->
+  <DataViewer
+    {selection}
+    formats={workspace.activeFile?.viewFormats ?? {}}
+    onpick={(path, formatId) => {
+      const file = workspace.activeFile;
+      if (file) workspace.setViewFormat(file, path, formatId);
+    }}
+  />
 {/snippet}
 
 {#snippet editor()}
@@ -177,11 +158,7 @@
         <SplitPane type="horizontal" min="35%" max="85%" pos="66%" b={inspector}>
           {#snippet a()}
             <div class="document">
-              <DocumentHeader
-                {workspace}
-                {connections}
-                onquickopen={() => (switcherOpen = true)}
-              />
+              <DocumentHeader {workspace} {connections} onquickopen={() => (switcherOpen = true)} />
               <div class="document-body">
                 <SplitPane type="vertical" min="10%" max="90%" pos="38%" a={editor} b={results} />
               </div>
@@ -267,10 +244,5 @@
   footer .chip {
     height: 20px;
     width: 20px;
-  }
-
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
   }
 </style>

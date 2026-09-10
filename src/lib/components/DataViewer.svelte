@@ -1,26 +1,39 @@
 <script lang="ts">
   import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
-  import type { Snippet } from "svelte";
-  import { Copy, PanelRight, Search } from "@lucide/svelte";
+  import { Copy, Eye, PanelRight, Search } from "@lucide/svelte";
+  import Menu from "./Menu.svelte";
+  import {
+    DEFAULT_FORMAT,
+    display,
+    formatsFor,
+    render,
+    resolveFormat,
+    type ViewFormat
+  } from "$lib/viewFormats";
 
   interface Props {
     selection?: Selection | null;
     hideNulls?: boolean;
     hideEmpty?: boolean;
-    formatValue?: Snippet<[Field, any]>;
+    /** How to draw each field, by path. See `SqlFile.viewFormats`. */
+    formats?: Record<string, string>;
+    onpick?: (path: string, formatId: string) => void;
   }
 
   let {
     selection = null,
     hideNulls = true,
     hideEmpty = true,
-    formatValue
+    formats = {},
+    onpick
   }: Props = $props();
 
   let data: SelectionData | null = $state.raw(null);
 
   $effect(() => {
     const sel = selection;
+    // What was expanded belongs to values that are no longer on screen.
+    expanded = {};
     if (!sel) {
       data = null;
       return;
@@ -32,7 +45,14 @@
   });
 
   interface FlatEntry {
+    /** What the field is called on screen: `items[3].meta`. */
     key: string;
+    /**
+     * What it is called for the purpose of remembering a choice about it:
+     * `items[].meta`. The same string for every row and every element, because
+     * a format is a property of the column, not of the value you clicked.
+     */
+    path: string;
     value: any;
     field: Field;
     empty?: boolean;
@@ -48,21 +68,20 @@
 
   /** Structs and arrays become dotted paths, which is what makes a row read
       as a document rather than a handful of unopenable cells. */
-  function flatten(value: any, field: Field, prefix: string): FlatEntry[] {
+  function flatten(value: any, field: Field, key: string, path: string): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
-      return [{ key: prefix, value: null, field }];
+      return [{ key, path, value: null, field }];
     }
     if (isStruct(dataType) && Array.isArray(value)) {
-      const entries = dataType.fields.flatMap((f, i) => {
-        const key = prefix ? `${prefix}.${f.name}` : f.name;
-        return flatten(value[i], f, key);
-      });
-      return entries.length ? entries : [{ key: prefix, value: "{}", field, empty: true }];
+      const entries = dataType.fields.flatMap((f, i) =>
+        flatten(value[i], f, key ? `${key}.${f.name}` : f.name, path ? `${path}.${f.name}` : f.name)
+      );
+      return entries.length ? entries : [{ key, path, value: "{}", field, empty: true }];
     }
     if (isList(dataType) && Array.isArray(value)) {
       if (value.length === 0) {
-        return [{ key: prefix, value: "[]", field, empty: true }];
+        return [{ key, path, value: "[]", field, empty: true }];
       }
       const elementField: Field = {
         name: "",
@@ -70,9 +89,11 @@
         dataTypeName: field.dataTypeName,
         nullable: true
       };
-      return value.flatMap((element, i) => flatten(element, elementField, `${prefix}[${i + 1}]`));
+      return value.flatMap((element, i) =>
+        flatten(element, elementField, `${key}[${i + 1}]`, `${path}[]`)
+      );
     }
-    return [{ key: prefix, value, field }];
+    return [{ key, path, value, field }];
   }
 
   /**
@@ -87,14 +108,15 @@
     const needle = filter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
-      let entries = data!.fields.flatMap((field, c) => flatten(row[c], field, field.name));
+      let entries = data!.fields.flatMap((field, c) =>
+        flatten(row[c], field, field.name, field.name)
+      );
       if (hideNulls) entries = entries.filter((e) => e.value !== null);
       if (hideEmpty) entries = entries.filter((e) => !e.empty);
       if (needle) {
         entries = entries.filter(
           (e) =>
-            e.key.toLowerCase().includes(needle) ||
-            String(e.value).toLowerCase().includes(needle)
+            e.key.toLowerCase().includes(needle) || String(e.value).toLowerCase().includes(needle)
         );
       }
       return { row: firstRow + i + 1, entries };
@@ -103,16 +125,52 @@
 
   let fieldCount = $derived(documents[0]?.entries.length ?? 0);
 
-  function text(value: any): string {
-    if (value === null || value === undefined) return "null";
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
+  /**
+   * Which values have been asked for in full, by row and display key — one
+   * value at a time rather than one column, since it is a particular cell that
+   * turned out to be worth reading and the one below it may be megabytes.
+   * Session-only: it says what you are looking at, not what the field means.
+   */
+  let expanded: Record<string, true> = $state({});
+
+  const expansionKey = (row: number, key: string) => `${row}\u001f${key}`;
+
+  /**
+   * The picker: one menu for the whole pane, pointed at by every row's button.
+   * A `Dropdown` per field would put a popover element behind every row of
+   * every selected document, and only one of them can ever be open.
+   */
+  const menuId = $props.id();
+  let picker: ReturnType<typeof Menu> | undefined = $state();
+  let picking: FlatEntry | null = $state.raw(null);
+  let anchor: HTMLElement | null = $state(null);
+
+  // Runs before the button's own `popovertarget` toggle, so the menu is placed
+  // against the right row and drawn with the right field's formats.
+  function startPick(entry: FlatEntry, button: HTMLElement) {
+    picking = entry;
+    anchor = button;
+  }
+
+  function pick(format: ViewFormat) {
+    if (picking) onpick?.(picking.path, format.id);
   }
 
   function copy(value: string) {
     void navigator.clipboard.writeText(value);
   }
 
+  /** What the row shows, in full: the cap is on the screen, not on the value. */
+  function copyValue(entry: FlatEntry) {
+    copy(render(entry.value, entry.field, formats[entry.path]).text);
+  }
+
+  /**
+   * A document and a whole selection copy the values Trino sent, not the ones
+   * the pane drew. A view choice says how to read a field here; it has no
+   * business deciding what lands in somebody's clipboard as JSON — the same
+   * line `export.ts` draws.
+   */
   function copyDocument(entries: FlatEntry[]) {
     copy(JSON.stringify(Object.fromEntries(entries.map((e) => [e.key, e.value])), null, 2));
   }
@@ -126,6 +184,8 @@
       )
     );
   }
+
+  const count = (n: number) => n.toLocaleString();
 </script>
 
 <div class="inspector">
@@ -138,7 +198,12 @@
         Inspector
       {/if}
     </span>
-    <button class="chip square" onclick={copyAll} disabled={!documents.length} title="Copy selection as JSON">
+    <button
+      class="chip square"
+      onclick={copyAll}
+      disabled={!documents.length}
+      title="Copy selection as JSON"
+    >
       <Copy size={14} />
     </button>
   </div>
@@ -148,7 +213,7 @@
     <input type="text" placeholder="Filter fields&hellip;" bind:value={filter} spellcheck="false" />
   </div>
 
-  <div class="stack">
+  <div class="stack" onscroll={() => picker?.close()}>
     {#if !documents.length}
       <p class="empty">Select cells in the results to inspect them.</p>
     {/if}
@@ -156,31 +221,84 @@
       <div class="doc-head">
         <span class="caps">Row {doc.row}</span>
         <span class="fill"></span>
-        <button class="chip square" onclick={() => copyDocument(doc.entries)} title="Copy row as JSON">
+        <button
+          class="chip square"
+          onclick={() => copyDocument(doc.entries)}
+          title="Copy row as JSON"
+        >
           <Copy size={12} />
         </button>
       </div>
       {#each doc.entries as entry (entry.key)}
+        {@const choices = formatsFor(entry.field)}
+        {@const chosen = resolveFormat(entry.field, formats[entry.path])}
+        {@const shown = display(
+          entry.value,
+          entry.field,
+          formats[entry.path],
+          !!expanded[expansionKey(doc.row, entry.key)]
+        )}
         <div class="field">
           <span class="key ell" title={entry.key}>{entry.key}</span>
           <span class="value mono" class:null={entry.value === null}>
-            {#if formatValue}
-              <svelte:boundary>
-                {@render formatValue(entry.field, entry.value)}
-                {#snippet failed(error)}<span class="null">{error}</span>{/snippet}
-              </svelte:boundary>
-            {:else}
-              {text(entry.value)}
-            {/if}
+            {#if shown.pre}<pre>{shown.text}</pre>{:else}{shown.text}{/if}{#if shown.truncated}&hellip;{/if}
           </span>
-          <button class="chip square copy" onclick={() => copy(text(entry.value))} title="Copy value">
+          {#if choices.length > 1}
+            <button
+              class="chip square pick"
+              class:set={chosen.id !== DEFAULT_FORMAT}
+              popovertarget={menuId}
+              onclick={(e) => startPick(entry, e.currentTarget)}
+              title={`Show "${entry.path}" as… (${chosen.label})`}
+            >
+              <Eye size={12} />
+            </button>
+          {:else}
+            <span></span>
+          {/if}
+          <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
             <Copy size={12} />
           </button>
+          {#if shown.note || shown.truncated}
+            <p class="note meta">
+              {#if shown.note}<span class="warn">{shown.note}</span>{/if}
+              {#if shown.truncated}
+                <span>
+                  Showing {count(shown.text.length)} of {count(shown.total)} characters
+                  {#if !shown.expandable}&mdash; copy for the whole value{/if}
+                </span>
+                {#if shown.expandable}
+                  <button
+                    class="more"
+                    onclick={() => (expanded[expansionKey(doc.row, entry.key)] = true)}
+                  >
+                    Show more
+                  </button>
+                {/if}
+              {/if}
+            </p>
+          {/if}
         </div>
       {/each}
     {/each}
   </div>
 </div>
+
+<!-- One menu, shared. `picking` is whichever row's button last opened it. -->
+<Menu bind:this={picker} id={menuId} {anchor}>
+  {#snippet menu()}
+    {#if picking}
+      {@const chosen = resolveFormat(picking.field, formats[picking.path])}
+      {#each formatsFor(picking.field) as format (format.id)}
+        <button class:selected={format === chosen} onclick={() => pick(format)}>
+          {format.label}
+        </button>
+      {/each}
+      <div class="separator"></div>
+      <p class="scope meta ell">Applies to {picking.path}</p>
+    {/if}
+  {/snippet}
+</Menu>
 
 <style>
   .inspector {
@@ -274,7 +392,7 @@
 
   .field {
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr) var(--h-ctl);
+    grid-template-columns: 150px minmax(0, 1fr) var(--h-ctl) var(--h-ctl);
     gap: 0 10px;
     align-items: start;
     padding: 6px 12px 6px 12px;
@@ -299,19 +417,67 @@
     font-style: italic;
   }
 
-  .value :global(pre) {
+  .value pre {
     margin: 0;
     font: inherit;
     white-space: pre-wrap;
   }
 
-  /* Revealed on hover so twenty fields are not twenty buttons. */
-  .copy {
-    visibility: hidden;
-    align-self: center;
+  /* Why the value is not all of itself, or not what the format promised. Under
+     the value rather than beside it: the columns to the right are 24px of
+     button. */
+  .note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    grid-column: 2 / -1;
+    margin: 4px 0 0;
   }
 
+  .note .warn {
+    color: var(--error);
+  }
+
+  .note .more {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  /* Revealed on hover so twenty fields are not forty buttons — except a picker
+     that has been used, which stays lit: it is the only thing on screen saying
+     this field is not being shown the way the others are, and the only way
+     back. */
+  .pick,
+  .copy {
+    visibility: hidden;
+    /* Beside the field, not beside the middle of it: a value can be two
+       hundred lines tall and its controls belong up where its name is. */
+    align-self: start;
+  }
+
+  .field:hover .pick,
   .field:hover .copy {
     visibility: visible;
+  }
+
+  .pick.set {
+    visibility: visible;
+    color: var(--accent);
+  }
+
+  /* The menu around these rows belongs to `Menu`, so what the rows say about
+     themselves is all this component can style. */
+  .selected {
+    color: var(--accent);
+  }
+
+  .scope {
+    margin: 0;
+    padding: 2px 12px 4px;
   }
 </style>

@@ -100,7 +100,9 @@ export class Result {
   }
 
   queryState?: State = $derived(this.stats?.state as State);
-  completed?: boolean = $derived(this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState)))
+  completed?: boolean = $derived(
+    this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState))
+  );
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data.length);
   cancelling?: boolean = $derived(this.cancelRequested && !this.completed);
@@ -111,9 +113,7 @@ export class Result {
    *  rail as `{elapsedTimeSeconds} s`, and returning the number 0 before Trino
    *  has reported any timing drew "0 s" among readings that all otherwise read
    *  "12.3 s" — a different shape for the one value that is not yet news. */
-  elapsedTimeSeconds: string = $derived(
-    ((this.stats?.elapsedTimeMillis ?? 0) / 1000).toFixed(1)
-  );
+  elapsedTimeSeconds: string = $derived(((this.stats?.elapsedTimeMillis ?? 0) / 1000).toFixed(1));
 
   async execute() {
     try {
@@ -152,7 +152,7 @@ export class Result {
         errorCode: 0,
         errorName: "CLIENT_ERROR",
         errorType: "CLIENT_ERROR",
-        failureInfo: { type: "ClientError", message, suppressed: [], stack: [] },
+        failureInfo: { type: "ClientError", message, suppressed: [], stack: [] }
       };
     }
   }
@@ -251,14 +251,35 @@ export class SqlFile {
    * and every other open file keeps meaning what it meant.
    */
   connectionId: string = $state("");
+  /**
+   * How the inspector draws a field, keyed by path (`items[].meta`) — the
+   * display key with its array indices collapsed, so a choice made on one
+   * element holds for the column rather than for the row it was made on.
+   *
+   * A property of the document for the same reason the connection is: a
+   * workspace-wide map would let a column called `payload` in one document
+   * silently re-type `payload` in another, and a per-result one would be
+   * thrown away by the thing you do most, which is run the query again. It is
+   * only ever consulted with `viewFormats.ts`, which reads an id it does not
+   * know as the default — so a stored choice can outlive the format that
+   * served it, and a column can come back as a different type.
+   */
+  viewFormats: Record<string, string> = $state({});
   results: Result[] = $state([]);
   activeResult: Result | null = $state.raw(null);
 
-  constructor(id: string, name: string, content: string = "", connectionId: string = "") {
+  constructor(
+    id: string,
+    name: string,
+    content: string = "",
+    connectionId: string = "",
+    viewFormats: Record<string, string> = {}
+  ) {
     this.id = id;
     this.name = name;
     this.content = content;
     this.connectionId = connectionId;
+    this.viewFormats = viewFormats;
   }
 
   addResult(result: Result, replacesId?: string) {
@@ -401,12 +422,20 @@ export class Workspace {
     this.persist();
   }
 
+  /** Records how the inspector is to draw a field of this document. */
+  setViewFormat(file: SqlFile, path: string, formatId: string) {
+    if (file.viewFormats[path] === formatId) return;
+    file.viewFormats[path] = formatId;
+    this.persist();
+  }
+
   #restoreFiles() {
     const stored = loadWorkspace(this.id);
     for (const file of stored.files) this.#lastWritten.set(file.id, JSON.stringify(file));
 
     this.files = stored.files.map(
-      (f) => new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId))
+      (f) =>
+        new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId), f.viewFormats)
     );
     if (this.files.length === 0) this.files = [this.#scratchFile()];
     this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
@@ -421,7 +450,8 @@ export class Workspace {
       id: file.id,
       name: file.name,
       content: file.content,
-      connectionId: file.connectionId
+      connectionId: file.connectionId,
+      viewFormats: { ...file.viewFormats }
     };
   }
 
@@ -552,17 +582,27 @@ export class Workspace {
     const existing = this.files.find((f) => f.id === record.id);
 
     if (!existing) {
-      this.files.push(new SqlFile(record.id, record.name, record.content, connectionId));
+      this.files.push(
+        new SqlFile(record.id, record.name, record.content, connectionId, record.viewFormats)
+      );
       return;
     }
 
     if (existing === this.activeFile || existing.content === record.content) {
       existing.name = record.name;
       existing.connectionId = connectionId;
+      // In place, like the name: how a value is drawn is nothing monaco holds.
+      existing.viewFormats = record.viewFormats;
       return;
     }
 
-    const replacement = new SqlFile(record.id, record.name, record.content, connectionId);
+    const replacement = new SqlFile(
+      record.id,
+      record.name,
+      record.content,
+      connectionId,
+      record.viewFormats
+    );
     this.files[this.files.indexOf(existing)] = replacement;
     for (const result of existing.results) result.discard();
   }
