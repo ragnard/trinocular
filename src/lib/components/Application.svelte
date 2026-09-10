@@ -23,6 +23,11 @@
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
 
+  // Other tabs share this workspace's storage; the `storage` event is how this
+  // one hears about documents they add, rename or delete. The effect's return
+  // value unsubscribes.
+  $effect(() => workspace.watchOtherTabs());
+
   let connections: { id: string; name: string }[] = $derived(page.data.connections ?? []);
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);

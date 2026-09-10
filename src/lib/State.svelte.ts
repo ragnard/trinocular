@@ -2,7 +2,14 @@ import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
-import { loadFiles, saveFiles, legacyEditorContent, clearLegacyEditor } from "$lib/fileStorage";
+import {
+  loadWorkspace,
+  writeFile,
+  removeFile,
+  writeUi,
+  watchWorkspace,
+  type StoredFile
+} from "$lib/fileStorage";
 
 const MAX_RESULTS_PER_FILE = 10;
 
@@ -297,7 +304,7 @@ export class SqlFile {
 
 export class Workspace {
   id: string;
-  /** Connection for new files, and for files stored before this was per-file. */
+  /** Connection for new files, and for any whose stored one no longer exists. */
   defaultConnectionId: string;
   #connectionIds: Set<string>;
 
@@ -310,6 +317,19 @@ export class Workspace {
    * -- which the old global connection did on every switch -- is felt.
    */
   #catalogs = new Map<string, CatalogCache>();
+
+  /**
+   * What this tab last wrote for each file, serialized, so `persist` can write
+   * only the documents that actually changed.
+   *
+   * Seeded from what was loaded, which is the whole of why two tabs no longer
+   * overwrite each other: a tab that has not touched a document never writes
+   * its key, so it cannot put back the copy it happened to load. The old
+   * single-blob `persist` rewrote every document from this tab's memory on
+   * every save, and the last tab to save won for all of them.
+   */
+  #lastWritten = new Map<string, string>();
+  #lastUi = "";
 
   /**
    * `connections` is the configured set, newest config wins: a file restored
@@ -361,32 +381,61 @@ export class Workspace {
   }
 
   #restoreFiles() {
-    const stored = loadFiles(this.id);
-    if (stored.files.length > 0) {
-      this.files = stored.files.map(
-        (f) => new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId))
-      );
-    } else {
-      const legacy = legacyEditorContent(this.id);
-      this.files = [
-        new SqlFile(crypto.randomUUID(), "scratch.sql", legacy ?? "", this.defaultConnectionId)
-      ];
-      if (legacy != null) clearLegacyEditor(this.id);
-    }
+    const stored = loadWorkspace(this.id);
+    for (const file of stored.files) this.#lastWritten.set(file.id, JSON.stringify(file));
+
+    this.files = stored.files.map(
+      (f) => new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId))
+    );
+    if (this.files.length === 0) this.files = [this.#scratchFile()];
     this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
   }
 
+  #scratchFile(): SqlFile {
+    return new SqlFile(crypto.randomUUID(), "scratch.sql", "", this.defaultConnectionId);
+  }
+
+  #record(file: SqlFile): StoredFile {
+    return {
+      id: file.id,
+      name: file.name,
+      content: file.content,
+      connectionId: file.connectionId
+    };
+  }
+
+  /**
+   * Writes the documents whose contents differ from what this tab last wrote,
+   * and removes the keys of documents that have gone. Called on a debounce
+   * while typing, so the comparison is what keeps a keystroke from rewriting
+   * every open document -- and, more importantly, from rewriting documents
+   * this tab has not touched at all.
+   */
   persist() {
-    saveFiles(
-      this.id,
-      this.files.map((f) => ({
-        id: f.id,
-        name: f.name,
-        content: f.content,
-        connectionId: f.connectionId
-      })),
-      this.activeFile?.id
-    );
+    const live = new Set<string>();
+    for (const file of this.files) {
+      live.add(file.id);
+      const record = this.#record(file);
+      const serialized = JSON.stringify(record);
+      if (this.#lastWritten.get(file.id) === serialized) continue;
+      if (writeFile(this.id, record)) {
+        this.#lastWritten.set(file.id, serialized);
+      } else {
+        // Almost always the quota. Losing the write silently is what the old
+        // `catch {}` did; at least say so, and only this document is affected.
+        console.error(`trinette: could not save "${file.name}" — storage is full`);
+      }
+    }
+
+    for (const id of [...this.#lastWritten.keys()]) {
+      if (live.has(id)) continue;
+      removeFile(this.id, id);
+      this.#lastWritten.delete(id);
+    }
+
+    const ui = { activeFileId: this.activeFile?.id, order: this.files.map((f) => f.id) };
+    const serializedUi = JSON.stringify(ui);
+    if (serializedUi !== this.#lastUi && writeUi(this.id, ui)) this.#lastUi = serializedUi;
   }
 
   openFile(file: SqlFile) {
@@ -445,6 +494,75 @@ export class Workspace {
     );
     file.addResult(result, replacesId);
     void result.execute();
+  }
+
+  /**
+   * Follows what other tabs do to this workspace. Returns a disposer, so a
+   * component can hold it in an `$effect`.
+   *
+   * The rules come from where a document's text actually lives. `Editor.svelte`
+   * builds a monaco model from `SqlFile.content` *once* and caches it in a
+   * WeakMap keyed by the `SqlFile`; after that the model is the truth and
+   * writing to `content` would not reach the screen. So:
+   *
+   *  - The file open in this tab is never touched. Its text is under a caret
+   *    that somebody is using, and replacing it from another tab would either
+   *    do nothing visible or move the cursor out from under them.
+   *  - Any other file whose text changed is *replaced* rather than mutated.
+   *    A new `SqlFile` is a new WeakMap key, which is what guarantees the
+   *    stale model is dropped and a fresh one is built from the new text next
+   *    time the document is opened. Its results go with it: they belong to
+   *    statements that no longer exist.
+   *  - A name or connection change is applied in place, since neither is
+   *    something monaco holds.
+   */
+  watchOtherTabs(): () => void {
+    return watchWorkspace(this.id, {
+      onFile: (record) => this.#applyRemoteFile(record),
+      onFileRemoved: (fileId) => this.#applyRemoteRemoval(fileId),
+      onOrder: (order) => this.#applyRemoteOrder(order)
+    });
+  }
+
+  #applyRemoteFile(record: StoredFile) {
+    // Record it as seen, so this tab does not write the value straight back.
+    this.#lastWritten.set(record.id, JSON.stringify(record));
+    const connectionId = this.#knownConnection(record.connectionId);
+    const existing = this.files.find((f) => f.id === record.id);
+
+    if (!existing) {
+      this.files.push(new SqlFile(record.id, record.name, record.content, connectionId));
+      return;
+    }
+
+    if (existing === this.activeFile || existing.content === record.content) {
+      existing.name = record.name;
+      existing.connectionId = connectionId;
+      return;
+    }
+
+    const replacement = new SqlFile(record.id, record.name, record.content, connectionId);
+    this.files[this.files.indexOf(existing)] = replacement;
+    for (const result of existing.results) result.discard();
+  }
+
+  #applyRemoteRemoval(fileId: string) {
+    this.#lastWritten.delete(fileId);
+    const index = this.files.findIndex((f) => f.id === fileId);
+    if (index === -1) return;
+
+    const [removed] = this.files.splice(index, 1);
+    for (const result of removed.results) result.discard();
+    if (this.files.length === 0) this.files.push(this.#scratchFile());
+    if (this.activeFile === removed) this.activeFile = this.files[0];
+  }
+
+  /** Reorders to match another tab's listing. Ids naming nothing are ignored,
+   *  and files the order does not mention keep their place at the end. */
+  #applyRemoteOrder(order: string[]) {
+    const rank = new Map(order.map((id, i) => [id, i]));
+    const at = (file: SqlFile) => rank.get(file.id) ?? Number.MAX_SAFE_INTEGER;
+    this.files = [...this.files].sort((a, b) => at(a) - at(b));
   }
 
   cancel(result: Result) {
