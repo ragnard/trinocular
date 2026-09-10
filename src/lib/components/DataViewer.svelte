@@ -243,22 +243,24 @@
           <span class="value mono" class:null={entry.value === null}>
             {#if shown.pre}<pre>{shown.text}</pre>{:else}{shown.text}{/if}{#if shown.truncated}&hellip;{/if}
           </span>
-          {#if choices.length > 1}
-            <button
-              class="chip square pick"
-              class:set={chosen.id !== DEFAULT_FORMAT}
-              popovertarget={menuId}
-              onclick={(e) => startPick(entry, e.currentTarget)}
-              title={`Show "${entry.path}" as… (${chosen.label})`}
-            >
-              <Eye size={12} />
+          <div class="controls">
+            {#if choices.length > 1}
+              <button
+                class="chip square pick"
+                class:set={chosen.id !== DEFAULT_FORMAT}
+                popovertarget={menuId}
+                onclick={(e) => startPick(entry, e.currentTarget)}
+                title={`Show "${entry.path}" as… (${chosen.label})`}
+              >
+                <Eye size={12} />
+              </button>
+            {:else}
+              <span class="no-pick"></span>
+            {/if}
+            <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
+              <Copy size={12} />
             </button>
-          {:else}
-            <span></span>
-          {/if}
-          <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
-            <Copy size={12} />
-          </button>
+          </div>
           {#if shown.note || shown.truncated}
             <p class="note meta">
               {#if shown.note}<span class="warn">{shown.note}</span>{/if}
@@ -392,7 +394,7 @@
 
   .field {
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr) var(--h-ctl) var(--h-ctl);
+    grid-template-columns: 150px minmax(0, 1fr) auto;
     gap: 0 10px;
     align-items: start;
     padding: 6px 12px 6px 12px;
@@ -448,6 +450,22 @@
     cursor: pointer;
   }
 
+  /* One track for both buttons rather than one each: as grid columns they were
+     a gutter apart, which read as two unrelated controls that happened to
+     share a row. Beside the field, too, not beside the middle of it — a value
+     can be two hundred lines tall and its controls belong up where its name
+     is. */
+  .controls {
+    display: flex;
+    align-self: start;
+  }
+
+  /* Holds the picker's place so `Copy` stays on the same edge down the pane
+     whether or not a field has a format to choose. */
+  .no-pick {
+    width: var(--h-ctl);
+  }
+
   /* Revealed on hover so twenty fields are not forty buttons — except a picker
      that has been used, which stays lit: it is the only thing on screen saying
      this field is not being shown the way the others are, and the only way
@@ -455,9 +473,6 @@
   .pick,
   .copy {
     visibility: hidden;
-    /* Beside the field, not beside the middle of it: a value can be two
-       hundred lines tall and its controls belong up where its name is. */
-    align-self: start;
   }
 
   .field:hover .pick,
