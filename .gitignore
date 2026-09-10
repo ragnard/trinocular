@@ -29,7 +29,7 @@ vite.config.ts.timestamp-*
 design/trinette-restyle.html
 
 # Iosevka release archive and the TTF extracted from it, both rebuildable by
-# `make fonts`. The two built .woff2 under assets/fonts are checked in on
+# `make fonts`. The two built .woff2 under src/lib/assets are checked in on
 # purpose: a build should not need 84 MB of network and a python toolchain to
 # produce two files that change only when IOSEVKA_VERSION does.
 .fontbuild/

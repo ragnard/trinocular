@@ -9,7 +9,7 @@
  * of those swapped which one was stronger when the theme flipped, so a
  * component tuned in one theme was guessing in the other.
  */
-@import "../assets/fonts/iosevka-aile.css";
+@import "./lib/assets/fonts/iosevka-aile.css";
 
 :root {
   color-scheme: light;

@@ -9,7 +9,7 @@
 # GitHub, unpacked into $(WORK), and subset from there. Only the two .woff2
 # and the hand-written CSS beside them live in the tree.
 #
-#   make fonts             build assets/fonts/*.woff2
+#   make fonts             build src/lib/assets/fonts/*.woff2
 #   make fonts-info        report size, coverage and hinting of what was built
 #   make fonts-clean       remove the built .woff2
 #   make fonts-distclean   also remove the download cache
@@ -18,7 +18,7 @@
 # download, the extraction and both subsets fall out of date together.
 
 IOSEVKA_VERSION ?= 34.8.1
-FONT_DIR        ?= assets/fonts
+FONT_DIR        ?= src/lib/assets/fonts
 WORK            ?= .fontbuild
 
 # PkgTTF is the smallest release asset that is still hinted (83.7 MB, against
