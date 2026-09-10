@@ -44,7 +44,6 @@
     onchange?: (content: string) => void;
     /** Cmd/Ctrl+P, forwarded from inside the editor where it is swallowed. */
     onquickopen?: () => void;
-    ontoggleinspector?: () => void;
     theme?: "light" | "dark";
   }
 
@@ -59,7 +58,6 @@
     oncancelresult,
     onchange,
     onquickopen,
-    ontoggleinspector,
     theme = "light"
   }: Props = $props();
 
@@ -677,15 +675,6 @@
       label: "Switch File",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
       run: () => onquickopen?.()
-    });
-
-    // Monaco owns this chord while the editor has focus, so it is registered
-    // here as well as on the window.
-    editor.addAction({
-      id: "trino.toggleInspector",
-      label: "Toggle Inspector",
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI],
-      run: () => ontoggleinspector?.()
     });
 
     editor.addAction({

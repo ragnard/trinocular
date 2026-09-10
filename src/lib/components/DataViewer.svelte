@@ -1,22 +1,20 @@
 <script lang="ts">
   import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
   import type { Snippet } from "svelte";
-  import { Copy, PanelRight, Search, X } from "@lucide/svelte";
+  import { Copy, PanelRight, Search } from "@lucide/svelte";
 
   interface Props {
     selection?: Selection | null;
     hideNulls?: boolean;
     hideEmpty?: boolean;
     formatValue?: Snippet<[Field, any]>;
-    onclose: () => void;
   }
 
   let {
     selection = null,
     hideNulls = true,
     hideEmpty = true,
-    formatValue,
-    onclose
+    formatValue
   }: Props = $props();
 
   let data: SelectionData | null = $state.raw(null);
@@ -142,9 +140,6 @@
     </span>
     <button class="chip square" onclick={copyAll} disabled={!documents.length} title="Copy selection as JSON">
       <Copy size={14} />
-    </button>
-    <button class="chip square" onclick={onclose} title="Close inspector">
-      <X size={14} />
     </button>
   </div>
 

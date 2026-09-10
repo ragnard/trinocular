@@ -8,7 +8,6 @@
   import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
 
   import { SplitPane } from "./split-pane";
-  import type { Length } from "./split-pane/types";
   import Logo from "./Logo.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
@@ -35,26 +34,14 @@
   /**
    * The inspector is a pane of the window, not a region of the results: it
    * reads whatever is selected, at full height, so a block selection is a
-   * stack of whole documents rather than a peephole. Closed, it costs
-   * nothing — the strip under the table already carries the anchor cell.
+   * stack of whole documents rather than a peephole.
    *
-   * "100%" is how SplitPane says "no second pane", divider included, so the
-   * toggle is just a remembered position.
+   * It is always on screen. It used to be closable, which meant a remembered
+   * position and "100%" — SplitPane's way of saying "no second pane, divider
+   * included" — standing in for closed. The divider still moves; what it
+   * cannot do any more is reach 100%, because a pane you can drag shut with
+   * no button left to reopen it is a trap rather than a layout.
    */
-  const INSPECTOR_DEFAULT: Length = "66%";
-  let inspectorPos: Length = $state("100%");
-  let lastInspectorPos: Length = INSPECTOR_DEFAULT;
-  let inspectorOpen = $derived(inspectorPos !== "100%");
-
-  function toggleInspector() {
-    if (inspectorPos === "100%") {
-      inspectorPos = lastInspectorPos;
-    } else {
-      lastInspectorPos = inspectorPos;
-      inspectorPos = "100%";
-    }
-  }
-
   let theme: "light" | "dark" = $state("light");
   let manualOverride = $state(false);
 
@@ -138,7 +125,7 @@
 {/snippet}
 
 {#snippet inspector()}
-  <DataViewer {selection} onclose={toggleInspector}>
+  <DataViewer {selection}>
     {#snippet formatValue(field, value)}
       {#if field.dataType === "binary"}
         <pre>{decodeBinary(value)}</pre>
@@ -163,34 +150,23 @@
     oncancelresult={(result) => workspace.cancel(result)}
     onchange={handleEditorChange}
     onquickopen={() => (switcherOpen = true)}
-    ontoggleinspector={toggleInspector}
     {theme}
   />
 {/snippet}
 
 {#snippet results()}
-  <Result
-    result={activeResult}
-    bind:selection
-    {inspectorOpen}
-    onToggleInspector={toggleInspector}
-  />
+  <Result result={activeResult} bind:selection />
 {/snippet}
 
-<!-- Monaco owns these chords while the editor has focus and handles them
-     there; this catches them everywhere else, and keeps the browser's print
-     dialog out of Cmd+P either way. -->
+<!-- Monaco owns this chord while the editor has focus and handles it there;
+     this catches it everywhere else, and keeps the browser's print dialog out
+     of Cmd+P either way. -->
 <svelte:window
   onkeydown={(e) => {
     if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-    const key = e.key.toLowerCase();
-    if (key === "p") {
-      e.preventDefault();
-      switcherOpen = true;
-    } else if (key === "i") {
-      e.preventDefault();
-      toggleInspector();
-    }
+    if (e.key.toLowerCase() !== "p") return;
+    e.preventDefault();
+    switcherOpen = true;
   }}
 />
 
@@ -198,7 +174,7 @@
   <div class="workspace">
     <SplitPane type="horizontal" min="180px" max="40%" pos="19%" a={browser}>
       {#snippet b()}
-        <SplitPane type="horizontal" min="35%" max="100%" bind:pos={inspectorPos} b={inspector}>
+        <SplitPane type="horizontal" min="35%" max="85%" pos="66%" b={inspector}>
           {#snippet a()}
             <div class="document">
               <DocumentHeader

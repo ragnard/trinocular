@@ -45,6 +45,13 @@
     return length;
   }
 
+  /** A bound written as a percentage, as a fraction. `px` and the `-` form
+   *  cannot be resolved without measuring, and are left to the CSS clamp. */
+  function fraction(length: string): number | null {
+    const match = /^(\d+(?:\.\d+)?)%$/.exec(length);
+    return match ? Number(match[1]) / 100 : null;
+  }
+
   function update(x: number, y: number) {
     if (disabled) return;
 
@@ -54,6 +61,19 @@
 
     if (p < 0) p = 0;
     if (p > 1) p = 1;
+
+    // Hold `pos` inside its own bounds, rather than leaving that to the CSS
+    // clamp below. The clamp fixes what the pane *looks* like, but `pos` is
+    // also the value `{#if pos != "100%"}` reads to decide whether the second
+    // section exists at all — so a drag to the far edge used to unmount a pane
+    // whose `max` said it should never get there, and with no toggle left it
+    // could not be brought back. It is a bindable prop besides: a caller
+    // reading a position outside the range it asked for is being told
+    // something untrue.
+    const lower = fraction(min);
+    const upper = fraction(max);
+    if (lower !== null && p < lower) p = lower;
+    if (upper !== null && p > upper) p = upper;
 
     pos = `${100 * p}%`;
   }

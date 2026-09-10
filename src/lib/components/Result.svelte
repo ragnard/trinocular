@@ -4,7 +4,7 @@
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
-  import { Download, PanelRight, TriangleAlert } from "@lucide/svelte";
+  import { Download, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import Dropdown from "./Dropdown.svelte";
@@ -13,11 +13,9 @@
   interface Props {
     result: ResultModel | null;
     selection?: Selection | null;
-    inspectorOpen: boolean;
-    onToggleInspector: () => void;
   }
 
-  let { result, selection = $bindable(null), inspectorOpen, onToggleInspector }: Props = $props();
+  let { result, selection = $bindable(null) }: Props = $props();
 
   const toSchema = (columns?: Columns): Schema | undefined =>
     columns && {
@@ -67,16 +65,6 @@
         {/each}
       {/snippet}
     </Dropdown>
-    <button
-      class="chip"
-      aria-pressed={inspectorOpen}
-      onclick={onToggleInspector}
-      title="Inspect the selection"
-    >
-      <PanelRight size={14} />
-      Inspector
-      <kbd>&#8984;I</kbd>
-    </button>
   </div>
 
   {#if !result}
