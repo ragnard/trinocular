@@ -100,7 +100,6 @@ export class Result {
   }
 
   queryState?: State = $derived(this.stats?.state as State);
-  schema?: Columns = $derived(this.columns);
   completed?: boolean = $derived(this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState)))
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data.length);
@@ -563,10 +562,6 @@ export class Workspace {
     const rank = new Map(order.map((id, i) => [id, i]));
     const at = (file: SqlFile) => rank.get(file.id) ?? Number.MAX_SAFE_INTEGER;
     this.files = [...this.files].sort((a, b) => at(a) - at(b));
-  }
-
-  cancel(result: Result) {
-    void result.cancel();
   }
 
   showResult(result: Result) {

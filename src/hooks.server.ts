@@ -1,4 +1,4 @@
-import { type Handle } from "@sveltejs/kit";
+import { type Handle, type HandleServerError } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
 import { config, forbiddenPath, isAuthPath, loginPath, type Config } from "$lib/server/config";
@@ -6,6 +6,7 @@ import { env } from "$env/dynamic/private";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
+import { SecurityHeadersHandler } from "$lib/server/securityHeaders";
 import { AccessHandler, createAuthorizer } from "$lib/server/authz";
 import { logConnectionAuthz } from "$lib/server/connectionAuthz";
 import { logger } from "$lib/server/logging";
@@ -49,6 +50,9 @@ const createHandle = async () => {
   logConnectionAuthz();
 
   return sequence(
+    // Outermost, so the headers reach every response the rest of the chain
+    // returns, refusals included.
+    SecurityHeadersHandler(),
     await LoggingHandler(),
     await SessionHandler(sessionStore, {
       cookieName: config.session.cookie.name,
@@ -69,3 +73,30 @@ const createHandle = async () => {
 };
 
 export const handle: Handle = await createHandle();
+
+/**
+ * Where a server error actually surfaces.
+ *
+ * An exception thrown by a route or a load never reaches the `catch` in
+ * `LoggingHandler`: SvelteKit catches it inside `resolve`, calls this, and
+ * turns it into a 500 response — so without this hook the only trace of a
+ * crashed endpoint was an unstructured stack on stderr and a "request
+ * completed" line at info. Alerting on level >= error saw nothing.
+ *
+ * What is returned becomes the body the client is shown, so it carries the
+ * request id and nothing else: the message and stack are for the log, and the
+ * id is what lets somebody quoting an error be found in it.
+ */
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+  const child = event.locals.logger ?? logger;
+  // SvelteKit calls this for a 404 as well as for a crash, so the severity has
+  // to come from the status. Logging "no such route" at error level would put
+  // every bot probing for /wp-admin in front of whoever watches for real
+  // failures, which is the same way round as the problem this hook fixes.
+  const log = status >= 500 ? child.error.bind(child) : child.warn.bind(child);
+  log(
+    { err: error, status, method: event.request.method, url: event.request.url },
+    status >= 500 ? "unhandled server error" : "request failed"
+  );
+  return { message, requestId: event.locals.requestId };
+};

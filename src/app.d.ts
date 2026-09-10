@@ -6,7 +6,11 @@ import type { Identity } from "$lib/server/identity";
 
 declare global {
   namespace App {
-    // interface Error {}
+    interface Error {
+      message: string;
+      /** Ties what the user was shown to the line in the log. */
+      requestId?: string;
+    }
     interface Locals {
       logger: Logger;
       requestId: string;

@@ -147,7 +147,7 @@
     onexecutesql={(sql, startLine, anchorId, replacesId) =>
       workspace.run(sql, startLine, anchorId, replacesId)}
     onshowresult={(result) => workspace.showResult(result)}
-    oncancelresult={(result) => workspace.cancel(result)}
+    oncancelresult={(result) => void result.cancel()}
     onchange={handleEditorChange}
     onquickopen={() => (switcherOpen = true)}
     {theme}

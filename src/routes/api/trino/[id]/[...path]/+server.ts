@@ -169,7 +169,10 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     });
   }
 
-  event.locals.logger.debug({ id, target }, "proxying request");
+  // The id, not the whole connection: `target` carries the cluster's `authz`
+  // policy now, and the request's own URL is already on the completion line
+  // that LoggingHandler writes.
+  event.locals.logger.debug({ id }, "proxying request");
 
   const url = toTargetUrl(event, target);
   const headers = createUpstreamHeaders(event, identity);

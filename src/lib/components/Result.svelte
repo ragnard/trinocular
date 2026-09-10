@@ -22,7 +22,7 @@
       fields: columns.map((col) => fieldFromTypeSignature(col.typeSignature, col.name, col.type))
     };
 
-  let schema = $derived(toSchema(result?.schema));
+  let schema = $derived(toSchema(result?.columns));
   let hasRows = $derived((result?.data?.length ?? 0) > 0);
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
