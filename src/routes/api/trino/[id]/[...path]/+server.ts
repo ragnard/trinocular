@@ -4,6 +4,7 @@ import { config, type Connection } from "$lib/server/config";
 import { error } from "$lib/server/errors";
 import type { Identity } from "$lib/server/identity";
 import { isTrinoHeader } from "$lib/trino";
+import { mayUseConnection, connectionDenialReason } from "$lib/server/connectionAuthz";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
@@ -147,6 +148,23 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   if (!identity) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // The application-wide policy passed at the gate; this cluster may still
+  // have one of its own. Checked here rather than in the hook because the hook
+  // runs before routing and has no connection id to check against, and checked
+  // even though the connection list the browser was given is already filtered
+  // — that list is a menu, not a lock, and this route takes its id from the
+  // URL.
+  if (!mayUseConnection(identity, id)) {
+    event.locals.logger.warn(
+      { userId: identity.userId, connection: id, reason: connectionDenialReason(identity, id) },
+      "connection authz denied"
+    );
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
       headers: { "Content-Type": "application/json" }
     });
   }

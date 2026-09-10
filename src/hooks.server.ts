@@ -6,9 +6,10 @@ import { env } from "$env/dynamic/private";
 import { SessionHandler, InMemoryStore } from "$lib/server/session";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
-import { AccessHandler, AllowAll, RequireRole, type Authorizer } from "$lib/server/authz";
+import { AccessHandler, createAuthorizer } from "$lib/server/authz";
+import { logConnectionAuthz } from "$lib/server/connectionAuthz";
 import { logger } from "$lib/server/logging";
-import { parseClaimPath, type Claims } from "$lib/server/identity";
+import { type Claims } from "$lib/server/identity";
 
 const NoAuthnHandler = async (opts: { user: string; claims: Claims }): Promise<Handle> => {
   return async ({ event, resolve }) => {
@@ -36,39 +37,16 @@ const authnHandler = async (config: Config) => {
   }
 };
 
-/** Turns the configured policy into an authorizer. The one thing authz borrows
- *  from authn is the default client for a role lookup: "the role I granted
- *  Trinette" means the roles of the client Trinette signs in as. */
-const authorizer = (config: Config): Authorizer => {
-  const authz = config.authz;
-
-  switch (authz.kind) {
-    case "allow":
-      return AllowAll();
-    case "require-role": {
-      if (authz.claim) {
-        return RequireRole({ role: authz.role, claimPath: parseClaimPath(authz.claim) });
-      }
-      const client =
-        authz.client ?? (config.authn.kind === "oidc" ? config.authn.clientId : undefined);
-      if (!client) {
-        logger.error(
-          "authz require-role needs a `client` or `claim`: there is no OIDC clientId to default to"
-        );
-        process.exit(1);
-      }
-      // Segments, not `resource_access.${client}.roles`: a clientId may itself
-      // contain a dot, and interpolating one into a dotted path would send the
-      // lookup down levels that do not exist.
-      return RequireRole({ role: authz.role, claimPath: ["resource_access", client, "roles"] });
-    }
-  }
-};
-
 const createHandle = async () => {
   const sessionStore = new InMemoryStore();
-  const authz = authorizer(config);
+  const authz = createAuthorizer(config.authz, {
+    defaultClient: config.authn.kind === "oidc" ? config.authn.clientId : undefined,
+    where: "authz"
+  });
   logger.info({ authn: config.authn.kind, authz: authz.name }, "auth configured");
+  // Also builds the per-connection authorizers, so a policy that cannot be
+  // built exits here rather than on whichever request first reaches it.
+  logConnectionAuthz();
 
   return sequence(
     await LoggingHandler(),

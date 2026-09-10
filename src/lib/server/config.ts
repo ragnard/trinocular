@@ -5,10 +5,7 @@ import { z } from "zod";
 import { logger } from "./logging";
 import { env } from "$env/dynamic/private";
 
-const ConnectionSchema = z.object({
-  name: z.string(),
-  uri: z.url(),
-});
+
 
 const CookieSchema = z.object({
   name: z.string().default("trinette-session"),
@@ -79,12 +76,26 @@ const RequireRoleAuthzSchema = z.object({
   claim: z.string().optional(),
 });
 
+/** The same policy vocabulary wherever a policy is written — once at the top
+ *  level for the application, and optionally again under a connection. */
+const AuthzSchema = z.discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema]);
+
+export type AuthzConfig = z.infer<typeof AuthzSchema>;
+
+const ConnectionSchema = z.object({
+  name: z.string(),
+  uri: z.url(),
+  // Who may use *this cluster*, on top of the application-wide rule rather
+  // than instead of it: a connection rule can only ever narrow. Absent means
+  // the connection adds no condition of its own, which is not the same as
+  // "anyone" — the top-level policy has already been applied.
+  authz: AuthzSchema.optional(),
+});
+
 const ConfigSchema = z.object({
   session: SessionSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
-  authz: z
-    .discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema])
-    .default({ kind: "allow" }),
+  authz: AuthzSchema.default({ kind: "allow" }),
   connections: z.record(z.string(), ConnectionSchema).optional(),
 });
 

@@ -1,6 +1,15 @@
 import { redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 
-import { claim, formatClaimPath, stringList, type ClaimPath, type Identity } from "./identity";
+import {
+  claim,
+  formatClaimPath,
+  parseClaimPath,
+  stringList,
+  type ClaimPath,
+  type Identity
+} from "./identity";
+import type { AuthzConfig } from "./config";
+import { logger } from "./logging";
 
 /** Why a request was refused. The reason is written to the log and never to
  *  the response: it names claims the user cannot change and would only tell an
@@ -41,6 +50,44 @@ export const RequireRole = (opts: { role: string; claimPath: ClaimPath }): Autho
       };
     }
   };
+};
+
+/**
+ * Turns a written policy into an authorizer. The one thing authz borrows from
+ * authn is the default client for a role lookup: "the role I granted Trinette"
+ * means the roles of the client Trinette signs in as.
+ *
+ * `where` names what the policy governs, for the startup log and for the error
+ * a misconfiguration exits on — there is more than one policy now, and "which
+ * one" is the first thing you need to know.
+ */
+export const createAuthorizer = (
+  authz: AuthzConfig,
+  opts: { defaultClient?: string; where: string }
+): Authorizer => {
+  switch (authz.kind) {
+    case "allow":
+      return AllowAll();
+    case "require-role": {
+      if (authz.claim) {
+        return RequireRole({ role: authz.role, claimPath: parseClaimPath(authz.claim) });
+      }
+      const client = authz.client ?? opts.defaultClient;
+      if (!client) {
+        // At startup, not at the first request: a policy that cannot be built
+        // would otherwise refuse everyone at runtime with nothing said about
+        // why.
+        logger.error(
+          `${opts.where}: require-role needs a \`client\` or \`claim\`, and there is no OIDC clientId to default to`
+        );
+        process.exit(1);
+      }
+      // Segments, not `resource_access.${client}.roles`: a clientId may itself
+      // contain a dot, and interpolating one into a dotted path would send the
+      // lookup down levels that do not exist.
+      return RequireRole({ role: authz.role, claimPath: ["resource_access", client, "roles"] });
+    }
+  }
 };
 
 interface AccessOptions {
