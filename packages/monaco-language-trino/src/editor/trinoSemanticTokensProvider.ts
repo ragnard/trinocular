@@ -145,12 +145,44 @@ export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSem
           ? lexerToken.column + stmt.startCol
           : lexerToken.column;
 
-        allTokens.push({
-          line: docLine,
-          start: docCol,
-          length: tokenText.length,
-          tokenType: semanticIndex,
-        });
+        // A semantic token may not cross a line break, nor end past the end of
+        // its own line; monaco checks both and logs "Invalid Semantic Tokens
+        // Data From Extension" when they do not hold. Two of Trino's lexer
+        // rules produce text that does. SIMPLE_COMMENT is
+        // `'--' ~[\r\n]* '\r'? '\n'?`, so a line comment swallows the line
+        // break that ends it and reaches one character past the line (two on
+        // CRLF). BRACKETED_COMMENT is `'/*' .*? '*/'`, which spans as many
+        // lines as it likes. Both arrive here, because comments are
+        // highlighted, and both put that error in the console on every
+        // keystroke. Emitting one token per line the text actually covers is
+        // the whole fix: the run after a line comment's break is empty, which
+        // is how its newline stops being highlighted.
+        if (tokenText.indexOf('\n') === -1 && tokenText.indexOf('\r') === -1) {
+          allTokens.push({
+            line: docLine,
+            start: docCol,
+            length: tokenText.length,
+            tokenType: semanticIndex,
+          });
+          continue;
+        }
+
+        let pieceLine = docLine;
+        let pieceStart = docCol;
+        for (const piece of tokenText.split('\n')) {
+          // A '\r' at the end belongs to the line break, not to the line.
+          const length = piece.endsWith('\r') ? piece.length - 1 : piece.length;
+          if (length > 0) {
+            allTokens.push({
+              line: pieceLine,
+              start: pieceStart,
+              length,
+              tokenType: semanticIndex,
+            });
+          }
+          pieceLine++;
+          pieceStart = 0;
+        }
       }
     }
 
