@@ -107,14 +107,13 @@ export class Result {
   /** Trino reports a killed query as a USER_CANCELED failure. */
   canceled?: boolean = $derived(this.error?.errorName === "USER_CANCELED");
 
-  elapsedTimeSeconds = $derived.by(() => {
-    const elapsedMillis = this.stats?.elapsedTimeMillis;
-    if (elapsedMillis) {
-      return (elapsedMillis / 1000).toFixed(1);
-    } else {
-      return 0;
-    }
-  });
+  /** Always a string, always one decimal. It renders straight into the results
+   *  rail as `{elapsedTimeSeconds} s`, and returning the number 0 before Trino
+   *  has reported any timing drew "0 s" among readings that all otherwise read
+   *  "12.3 s" — a different shape for the one value that is not yet news. */
+  elapsedTimeSeconds: string = $derived(
+    ((this.stats?.elapsedTimeMillis ?? 0) / 1000).toFixed(1)
+  );
 
   async execute() {
     try {
