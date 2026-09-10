@@ -540,7 +540,7 @@
   }
 
   td.row-num.selected {
-    background: var(--accent-bg);
+    background: linear-gradient(var(--accent-bg), var(--accent-bg)), var(--s1);
     color: var(--accent);
   }
 
