@@ -2,13 +2,12 @@
   import type { Result as ResultModel, Workspace } from "$lib/State.svelte";
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
-  import { onMount } from "svelte";
-  import { Moon, Sun } from "@lucide/svelte";
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
   import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
+  import { theme } from "$lib/theme.svelte";
 
   import { SplitPane } from "./split-pane";
-  import Logo from "./Logo.svelte";
+  import Account from "./Account.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
@@ -30,43 +29,18 @@
   let connections: { id: string; name: string }[] = $derived(page.data.connections ?? []);
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);
+  let logoutPath = $derived(page.data.logoutPath);
 
-  /**
-   * The inspector is a pane of the window, not a region of the results: it
-   * reads whatever is selected, at full height, so a block selection is a
-   * stack of whole documents rather than a peephole.
-   *
-   * It is always on screen. It used to be closable, which meant a remembered
-   * position and "100%" — SplitPane's way of saying "no second pane, divider
-   * included" — standing in for closed. The divider still moves; what it
-   * cannot do any more is reach 100%, because a pane you can drag shut with
-   * no button left to reopen it is a trap rather than a layout.
-   */
-  let theme: "light" | "dark" = $state("light");
-  let manualOverride = $state(false);
+  // What is chosen lives in `theme`; what is drawn is this. The OS preference
+  // is only followed while the effect is mounted, and painting `<html>` is the
+  // one thing that has to happen wherever the choice came from.
+  let palette = $derived(theme.resolved);
 
-  onMount(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    theme = mq.matches ? "dark" : "light";
-
-    const handler = (e: MediaQueryListEvent) => {
-      if (!manualOverride) {
-        theme = e.matches ? "dark" : "light";
-      }
-    };
-    mq.addEventListener("change", handler);
-
-    return () => mq.removeEventListener("change", handler);
-  });
+  $effect(() => theme.watch());
 
   $effect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.theme = palette;
   });
-
-  function toggleTheme() {
-    manualOverride = true;
-    theme = theme === "light" ? "dark" : "light";
-  }
 
   // One delegate per connection, swapped when the active document points
   // somewhere else, so completions describe the cluster it actually runs on.
@@ -107,8 +81,22 @@
 {/snippet}
 
 {#snippet inspector()}
-  <!-- How a field is drawn is a property of the document, so it travels with
-       the file rather than with the result being inspected. -->
+  <!--
+    The inspector is a pane of the window, not a region of the results: it
+    reads whatever is selected, at full height, so a block selection is a stack
+    of whole documents rather than a peephole.
+
+    It is always on screen. It used to be closable, which meant a remembered
+    position and "100%" — SplitPane's way of saying "no second pane, divider
+    included" — standing in for closed. The divider still moves; what it cannot
+    do any more is reach 100%, because a pane you can drag shut with no button
+    left to reopen it is a trap rather than a layout.
+
+    How a field is drawn is a property of the document, so it travels with the
+    file rather than with the result being inspected. The account chip is the
+    pane's only tenant: it is here because this rail's right edge is the
+    window's, not because the inspector has anything to do with it.
+  -->
   <DataViewer
     {selection}
     formats={workspace.activeFile?.viewFormats ?? {}}
@@ -116,7 +104,11 @@
       const file = workspace.activeFile;
       if (file) workspace.setViewFormat(file, path, formatId);
     }}
-  />
+  >
+    {#snippet actions()}
+      <Account {userId} {logoutPath} />
+    {/snippet}
+  </DataViewer>
 {/snippet}
 
 {#snippet editor()}
@@ -131,7 +123,7 @@
     oncancelresult={(result) => void result.cancel()}
     onchange={handleEditorChange}
     onquickopen={() => (switcherOpen = true)}
-    {theme}
+    theme={palette}
   />
 {/snippet}
 
@@ -169,19 +161,6 @@
     </SplitPane>
   </div>
 
-  <!-- Brand and identity live here rather than bracketing the schema tree,
-       which is what let that pane's header become one line. -->
-  <footer>
-    <Logo />
-    <span>Oink</span>
-    <span class="fill"></span>
-    <span class="ell user">{userId}</span>
-    <span class="rule"></span>
-    <button class="chip square" onclick={toggleTheme} title="Toggle dark mode">
-      {#if theme === "light"}<Moon size={12} />{:else}<Sun size={12} />{/if}
-    </button>
-  </footer>
-
   {#if switcherOpen}
     <FileSwitcher {workspace} {connections} onclose={() => (switcherOpen = false)} />
   {/if}
@@ -212,37 +191,5 @@
   .document-body {
     flex: 1;
     min-height: 0;
-  }
-
-  footer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    height: 26px;
-    padding: 0 6px 0 12px;
-    background: var(--s1);
-    border-top: 1px solid var(--line-strong);
-    color: var(--fg-3);
-    font-size: var(--text-sm);
-  }
-
-  footer .fill {
-    flex: 1;
-  }
-
-  .user {
-    max-width: 24em;
-  }
-
-  .rule {
-    width: 1px;
-    height: 12px;
-    background: var(--line-strong);
-  }
-
-  footer .chip {
-    height: 20px;
-    width: 20px;
   }
 </style>

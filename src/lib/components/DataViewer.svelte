@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
   import { Copy, Eye, PanelRight, Search } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
@@ -18,6 +19,13 @@
     /** How to draw each field, by its path. See `SqlFile.viewFormats`. */
     formats?: Record<string, string>;
     onpick?: (path: string, formatId: string) => void;
+    /**
+     * Whatever the app wants at the far end of the rail. This pane's right
+     * edge is the window's, which is the only thing that makes it the place
+     * for something that has nothing to do with the selection — the pane does
+     * not learn what it is being handed.
+     */
+    actions?: Snippet;
   }
 
   let {
@@ -25,7 +33,8 @@
     hideNulls = true,
     hideEmpty = true,
     formats = {},
-    onpick
+    onpick,
+    actions
   }: Props = $props();
 
   let data: SelectionData | null = $state.raw(null);
@@ -202,6 +211,10 @@
     >
       <Copy size={14} />
     </button>
+    {#if actions}
+      <span class="rule"></span>
+      {@render actions()}
+    {/if}
   </div>
 
   <div class="filter">
@@ -308,6 +321,16 @@
 
   .rail {
     padding-right: 6px;
+  }
+
+  /* The same rule the document header puts between the file and its
+     connection: what follows is a different kind of fact, not the next
+     control along. */
+  .rule {
+    width: 1px;
+    height: 16px;
+    margin: 0 2px;
+    background: var(--line-strong);
   }
 
   .title {
