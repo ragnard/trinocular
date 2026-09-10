@@ -2,6 +2,7 @@ import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
+import { underPath } from "$lib/viewFormats";
 import {
   loadWorkspace,
   writeFile,
@@ -424,11 +425,28 @@ export class Workspace {
     this.persist();
   }
 
-  /** Records how the inspector is to draw a field of this document. */
+  /**
+   * Records how the inspector is to draw a field of this document — either one
+   * element (`items[3]`) or every element of an array (`items[]`).
+   *
+   * Choosing for the array clears the elements that were chosen out of it one
+   * at a time, because the element is what wins when both are set: leaving
+   * them would mean picking `Text` for every element and watching three of
+   * them stay JSON, with the menu quietly showing both as chosen.
+   */
   setViewFormat(file: SqlFile, path: string, formatId: string) {
-    if (file.viewFormats[path] === formatId) return;
-    file.viewFormats[path] = formatId;
-    this.persist();
+    let changed = false;
+    for (const key of Object.keys(file.viewFormats)) {
+      if (underPath(key, path)) {
+        delete file.viewFormats[key];
+        changed = true;
+      }
+    }
+    if (file.viewFormats[path] !== formatId) {
+      file.viewFormats[path] = formatId;
+      changed = true;
+    }
+    if (changed) this.persist();
   }
 
   #restoreFiles() {

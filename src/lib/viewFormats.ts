@@ -118,6 +118,23 @@ const JSON_FORMAT: ViewFormat = {
 
 export const VIEW_FORMATS: ViewFormat[] = [TEXT, JSON_FORMAT];
 
+/**
+ * Whether a stored key is one element of what `path` names — `items[3].meta`
+ * under `items[].meta` — so that choosing for an array can clear the elements
+ * that were chosen out of it one at a time.
+ *
+ * The inspector does not need this: `flatten` builds both strings as it goes
+ * and knows which brackets it put there. This is for the stored map, where all
+ * that is left is the strings. Only the `[]` positions become wildcards and
+ * everything else is matched literally, so the only way to sweep a key that is
+ * not an element is to have a column named `x[1]` beside an array named `x`.
+ */
+export function underPath(key: string, path: string): boolean {
+  if (!path.includes("[]")) return false;
+  const literal = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${path.split("[]").map(literal).join("\\[\\d+\\]")}$`).test(key);
+}
+
 export const DEFAULT_FORMAT = TEXT.id;
 
 /** What the picker offers for a field. Fewer than two means no picker. */

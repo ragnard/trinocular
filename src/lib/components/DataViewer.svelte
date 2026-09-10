@@ -55,13 +55,21 @@
 
   interface FlatEntry {
     /**
-     * What the field is called on screen, and what a view format is remembered
-     * against: `items[3].meta`, indices and all. A varchar array can hold a
-     * JSON document in one element and a sentence in the next, so the index is
-     * part of what was picked — collapsing it to `items[]` would make one
-     * click re-type every element of the array.
+     * What the field is called on screen, and what a view format is normally
+     * remembered against: `items[3].meta`, indices and all. A varchar array
+     * can hold a JSON document in one element and a sentence in the next, so
+     * the index is part of what was picked.
      */
     key: string;
+    /**
+     * The same path with its array indices dropped — `items[].meta` — which is
+     * the other thing the picker can write, for an array whose elements do
+     * agree. It is built here rather than read back out of `key`, because
+     * `flatten` is the only thing that knows which brackets it put there.
+     * Equal to `key` when nothing along the way was an array element, and that
+     * is exactly the test for whether there is a second choice to offer.
+     */
+    path: string;
     value: any;
     field: Field;
     empty?: boolean;
@@ -77,20 +85,20 @@
 
   /** Structs and arrays become dotted paths, which is what makes a row read
       as a document rather than a handful of unopenable cells. */
-  function flatten(value: any, field: Field, key: string): FlatEntry[] {
+  function flatten(value: any, field: Field, key: string, path: string): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
-      return [{ key, value: null, field }];
+      return [{ key, path, value: null, field }];
     }
     if (isStruct(dataType) && Array.isArray(value)) {
       const entries = dataType.fields.flatMap((f, i) =>
-        flatten(value[i], f, key ? `${key}.${f.name}` : f.name)
+        flatten(value[i], f, key ? `${key}.${f.name}` : f.name, path ? `${path}.${f.name}` : f.name)
       );
-      return entries.length ? entries : [{ key, value: "{}", field, empty: true }];
+      return entries.length ? entries : [{ key, path, value: "{}", field, empty: true }];
     }
     if (isList(dataType) && Array.isArray(value)) {
       if (value.length === 0) {
-        return [{ key, value: "[]", field, empty: true }];
+        return [{ key, path, value: "[]", field, empty: true }];
       }
       const elementField: Field = {
         name: "",
@@ -98,9 +106,11 @@
         dataTypeName: field.dataTypeName,
         nullable: true
       };
-      return value.flatMap((element, i) => flatten(element, elementField, `${key}[${i + 1}]`));
+      return value.flatMap((element, i) =>
+        flatten(element, elementField, `${key}[${i + 1}]`, `${path}[]`)
+      );
     }
-    return [{ key, value, field }];
+    return [{ key, path, value, field }];
   }
 
   /**
@@ -115,7 +125,9 @@
     const needle = filter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
-      let entries = data!.fields.flatMap((field, c) => flatten(row[c], field, field.name));
+      let entries = data!.fields.flatMap((field, c) =>
+        flatten(row[c], field, field.name, field.name)
+      );
       if (hideNulls) entries = entries.filter((e) => e.value !== null);
       if (hideEmpty) entries = entries.filter((e) => !e.empty);
       if (needle) {
@@ -157,9 +169,16 @@
     anchor = button;
   }
 
-  function pick(format: ViewFormat) {
-    if (picking) onpick?.(picking.key, format.id);
+  /**
+   * `path` is either the element's own (`items[3]`) or its array's
+   * (`items[]`); the menu offers both, and the element wins when both are set.
+   */
+  function pick(format: ViewFormat, path: string) {
+    onpick?.(path, format.id);
   }
+
+  /** The element's own choice, or failing that its array's. */
+  const formatId = (entry: FlatEntry) => formats[entry.key] ?? formats[entry.path];
 
   function copy(value: string) {
     void navigator.clipboard.writeText(value);
@@ -167,7 +186,7 @@
 
   /** What the row shows, in full: the cap is on the screen, not on the value. */
   function copyValue(entry: FlatEntry) {
-    copy(render(entry.value, entry.field, formats[entry.key]).text);
+    copy(render(entry.value, entry.field, formatId(entry)).text);
   }
 
   /**
@@ -240,11 +259,11 @@
       </div>
       {#each doc.entries as entry (entry.key)}
         {@const choices = formatsFor(entry.field)}
-        {@const chosen = resolveFormat(entry.field, formats[entry.key])}
+        {@const chosen = resolveFormat(entry.field, formatId(entry))}
         {@const shown = display(
           entry.value,
           entry.field,
-          formats[entry.key],
+          formatId(entry),
           !!expanded[expansionKey(doc.row, entry.key)]
         )}
         <div class="field">
@@ -299,14 +318,30 @@
 <Menu bind:this={picker} id={menuId} {anchor}>
   {#snippet menu()}
     {#if picking}
-      {@const chosen = resolveFormat(picking.field, formats[picking.key])}
-      {#each formatsFor(picking.field) as format (format.id)}
-        <button class:selected={format === chosen} onclick={() => pick(format)}>
+      <!-- Held in a const because the buttons' handlers outlive the narrowing
+           that `{#if picking}` gives the expressions around them. -->
+      {@const entry = picking}
+      {@const choices = formatsFor(entry.field)}
+      {@const chosen = resolveFormat(entry.field, formatId(entry))}
+      {@const everyId = formats[entry.path]}
+      <p class="scope meta ell" title={entry.key}>{entry.key}</p>
+      {#each choices as format (format.id)}
+        <button class:selected={format === chosen} onclick={() => pick(format, entry.key)}>
           {format.label}
         </button>
       {/each}
-      <div class="separator"></div>
-      <p class="scope meta ell">Applies to {picking.key} in every row</p>
+      <!-- An array whose elements do agree, for the case where clicking down
+           two hundred of them is not an answer. Only offered when there is an
+           index to drop: for a plain column the two paths are one path. -->
+      {#if entry.path !== entry.key}
+        <div class="separator"></div>
+        <p class="scope meta ell" title={entry.path}>every {entry.path}</p>
+        {#each choices as format (format.id)}
+          <button class:selected={everyId === format.id} onclick={() => pick(format, entry.path)}>
+            {format.label}
+          </button>
+        {/each}
+      {/if}
     {/if}
   {/snippet}
 </Menu>
@@ -510,8 +545,11 @@
     color: var(--accent);
   }
 
+  /* Names what the buttons under it will write. Two of these when the field
+     is an array element, which is the only thing telling the two groups
+     apart. */
   .scope {
     margin: 0;
-    padding: 2px 12px 4px;
+    padding: 4px 12px 2px;
   }
 </style>
