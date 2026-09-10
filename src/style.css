@@ -9,6 +9,8 @@
  * of those swapped which one was stronger when the theme flipped, so a
  * component tuned in one theme was guessing in the other.
  */
+@import "../assets/fonts/iosevka-aile.css";
+
 :root {
   color-scheme: light;
 
@@ -60,9 +62,8 @@
 }
 
 :root {
-  /* --font: 'Iosevka Aile'; */
   /* --font-mono: 'Iosevka SS08'; */
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Iosevka Aile", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Two text sizes. There is no third. */

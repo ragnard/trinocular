@@ -1,21 +1,4 @@
-/*
- * Iosevka Aile, the two faces this UI uses. The .woff2 beside this file are
- * built by `make fonts` at the repo root, which is also where the reasoning
- * about what the subset keeps and drops lives.
- *
- * Referenced by relative URL so vite resolves and content-hashes them: this
- * file is reached through an @import from src/style.css, not served out of
- * static/, which is what earns the immutable caching.
- *
- * The family is named for the font rather than the package ("Iosevka Aile
- * Web" is what the upstream webfont CSS calls it, so a desktop install of the
- * real thing can sit beside it) because these two files are the only Aile
- * this app knows about.
- *
- * There is no italic and no 700. One `<b>` styling exists in QueryProgress
- * and it is pinned to 600; a 700 that slipped in anyway would resolve down to
- * the 600 face rather than being synthesized, which is the outcome we want.
- */
+/* Built by `make fonts`. */
 
 @font-face {
   font-family: "Iosevka Aile";
