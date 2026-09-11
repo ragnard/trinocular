@@ -5,10 +5,15 @@ export function convertRow(row: any[], fields: Field[]): any[] {
   return row.map((value, i) => convertValue(value, fields[i].dataType));
 }
 
+/** How Trino sends varbinary. */
+export function fromBase64(value: string): Uint8Array {
+  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+
 export function convertValue(value: any, dataType: DataType): any {
   if (value === null || value === undefined) return value;
   if (dataType === "binary") {
-    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    return fromBase64(value);
   }
   if (Array.isArray(dataType) && Array.isArray(value)) {
     return value.map((v) => convertValue(v, dataType[0]));

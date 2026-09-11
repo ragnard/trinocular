@@ -340,16 +340,16 @@
     const { minRow, maxRow, minCol, maxCol } = rect;
     const s = schema;
     const r = rows;
-    const vc = valueConverter;
     selection = {
       minRow, maxRow, minCol, maxCol,
+      // The rows as they were handed in, like `clipboardText` gets them: the
+      // converter is for drawing a cell, and what reads a selection decides
+      // for itself how to show a value.
       getData() {
         const fields = s.fields.slice(minCol, maxCol + 1);
         const selectedRows = r
           .slice(minRow, maxRow + 1)
-          .map((row) =>
-            fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
-          );
+          .map((row) => row.slice(minCol, maxCol + 1));
         return { fields, rows: selectedRows };
       }
     };
