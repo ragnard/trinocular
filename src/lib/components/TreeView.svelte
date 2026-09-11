@@ -14,11 +14,15 @@
     hint?: string;
     children?: TreeNode[];
     loading?: boolean;
+    /** Why the last attempt to fill `children` failed; drawn under the row while it is open. */
+    error?: string;
+    /** Offers the reload button. Only nodes whose children come from somewhere are. */
+    reloadable?: boolean;
   }
 </script>
 
 <script lang="ts">
-  import { ChevronRight, LoaderCircle } from "@lucide/svelte";
+  import { ChevronRight, LoaderCircle, RefreshCw } from "@lucide/svelte";
   import TreeView from "./TreeView.svelte";
 
   interface Props {
@@ -33,11 +37,12 @@
     expanded: Set<string>;
     ontoggle: (node: TreeNode) => void;
     onclick?: (node: TreeNode) => void;
+    onreload?: (node: TreeNode) => void;
     icon?: Snippet<[TreeNode]>;
     depth?: number;
   }
 
-  let { nodes, expanded, ontoggle, onclick, icon, depth = 0 }: Props = $props();
+  let { nodes, expanded, ontoggle, onclick, onreload, icon, depth = 0 }: Props = $props();
 </script>
 
 <ul class="tree" class:nested={depth > 0}>
@@ -46,33 +51,52 @@
     {@const isOpen = expanded.has(node.id)}
     <li class="node" class:leaf={isLeaf}>
       {#if isLeaf}
-        <button class="label leaf-label" title={node.hint} onclick={() => onclick?.(node)}>
-          <ChevronRight size={12} style="visibility: hidden;" />
-          {#if icon}{@render icon(node)}{/if}
-          <span class="node-label">{node.label}</span>
-          {#if node.detail}
-            <span class="node-detail">{node.detail}</span>
-          {/if}
-        </button>
+        <div class="row">
+          <button class="label" title={node.hint} onclick={() => onclick?.(node)}>
+            <ChevronRight size={12} style="visibility: hidden;" />
+            {#if icon}{@render icon(node)}{/if}
+            <span class="node-label">{node.label}</span>
+            {#if node.detail}
+              <span class="node-detail">{node.detail}</span>
+            {/if}
+          </button>
+        </div>
       {:else}
-        <button class="label branch-label" title={node.hint} onclick={() => ontoggle(node)}>
-          {#if node.loading}
-            <LoaderCircle size={12} class="spin" />
-          {:else}
-            <ChevronRight size={12} class={isOpen ? "toggle open" : "toggle"} />
+        <div class="row">
+          <button class="label" title={node.hint} onclick={() => ontoggle(node)}>
+            {#if node.loading}
+              <LoaderCircle size={12} class="spin" />
+            {:else}
+              <ChevronRight size={12} class={isOpen ? "toggle open" : "toggle"} />
+            {/if}
+            {#if icon}{@render icon(node)}{/if}
+            <span class="node-label">{node.label}</span>
+            {#if node.detail}
+              <span class="node-detail">{node.detail}</span>
+            {/if}
+          </button>
+          {#if onreload && node.reloadable}
+            <button
+              class="reload"
+              title="Reload"
+              aria-label="Reload {node.label}"
+              disabled={node.loading}
+              onclick={() => onreload(node)}
+            >
+              <RefreshCw size={12} />
+            </button>
           {/if}
-          {#if icon}{@render icon(node)}{/if}
-          <span class="node-label">{node.label}</span>
-          {#if node.detail}
-            <span class="node-detail">{node.detail}</span>
-          {/if}
-        </button>
+        </div>
+        {#if isOpen && node.error}
+          <div class="node-error">{node.error}</div>
+        {/if}
         {#if isOpen && node.children && node.children.length > 0}
           <TreeView
             nodes={node.children}
             {expanded}
             {ontoggle}
             {onclick}
+            {onreload}
             {icon}
             depth={depth + 1}
           />
@@ -98,12 +122,24 @@
     padding: 0;
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    height: var(--h-tree);
+    border-radius: var(--r);
+  }
+
+  .row:hover {
+    background: var(--s2);
+  }
+
   .label {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
-    height: var(--h-tree);
+    flex: 1;
+    min-width: 0;
+    height: 100%;
     padding: 0 8px;
     border: none;
     border-radius: var(--r);
@@ -115,14 +151,49 @@
     cursor: pointer;
   }
 
-  .label:hover {
-    background: var(--s2);
-  }
-
   /* Icons are furniture until they mean something. */
-  .label :global(svg) {
+  .row :global(svg) {
     flex: none;
     color: var(--fg-3);
+  }
+
+  .reload {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-right: 4px;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-kbd);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .row:hover .reload,
+  .reload:focus-visible {
+    opacity: 1;
+  }
+
+  .reload:hover:enabled :global(svg) {
+    color: var(--fg);
+  }
+
+  .reload:disabled {
+    cursor: default;
+  }
+
+  .node-error {
+    padding: 2px 8px 6px 46px;
+    color: var(--error);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .node-label {

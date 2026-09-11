@@ -12,8 +12,9 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   out.
 - Flexible value display — read a field as text or as JSON, and have the choice
   remembered.
-- Browse a cluster's catalogs, schemas, tables and columns, and search what you have
-  opened.
+- Browse a cluster's catalogs, schemas, tables and columns, search what you have
+  opened, and reload any branch the cluster has changed underneath — and see why
+  when it will not list one.
 - Support for querying multiple Trino instances — each file picks its own, so
   re-pointing one query leaves the rest alone.
 - Save any result as CSV or NDJSON without running the query again.

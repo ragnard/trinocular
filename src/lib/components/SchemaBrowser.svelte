@@ -62,7 +62,7 @@
     /** Picks the icon, and nothing else. */
     kind: NodeKind;
     /** Only the three levels that live on the cluster have anything to fetch. */
-    load?: () => void;
+    load?: (fresh?: boolean) => Promise<unknown>;
   }
 
   /**
@@ -75,6 +75,7 @@
   let tree: { nodes: TreeNode[]; meta: Map<string, NodeMeta> } = $derived.by(() => {
     const cache = workspace.catalog;
     const loading = cache.loading;
+    const errors = cache.errors;
     const meta = new Map<string, NodeMeta>();
 
     /**
@@ -103,28 +104,40 @@
     }
 
     const nodes = cache.catalogs.map((catalog) => {
-      meta.set(catalog, { kind: "catalog", load: () => cache.loadSchemas(catalog) });
+      meta.set(catalog, {
+        kind: "catalog",
+        load: (fresh) => cache.loadSchemas(catalog, fresh)
+      });
       return {
         id: catalog,
         label: catalog,
         loading: loading.has(`schemas:${catalog}`),
+        error: errors.get(`schemas:${catalog}`),
+        reloadable: true,
         children: cache.getSchemas(catalog).map((schema) => {
           const schemaId = `${catalog}${SEP}${schema}`;
-          meta.set(schemaId, { kind: "schema", load: () => cache.loadTables(catalog, schema) });
+          meta.set(schemaId, {
+            kind: "schema",
+            load: (fresh) => cache.loadTables(catalog, schema, fresh)
+          });
           return {
             id: schemaId,
             label: schema,
             loading: loading.has(`tables:${catalog}.${schema}`),
+            error: errors.get(`tables:${catalog}.${schema}`),
+            reloadable: true,
             children: cache.getTables(catalog, schema).map((table) => {
               const tableId = `${schemaId}${SEP}${table}`;
               meta.set(tableId, {
                 kind: "table",
-                load: () => cache.loadColumns(catalog, schema, table)
+                load: (fresh) => cache.loadColumns(catalog, schema, table, fresh)
               });
               return {
                 id: tableId,
                 label: table,
                 loading: loading.has(`columns:${catalog}.${schema}.${table}`),
+                error: errors.get(`columns:${catalog}.${schema}.${table}`),
+                reloadable: true,
                 children: cache.getColumns(catalog, schema, table).map((col) => {
                   const colId = `${tableId}${SEP}${col.name}`;
                   meta.set(colId, { kind: typeCategory(col.type) });
@@ -230,7 +243,32 @@
 
     // Nested fields have no `load`: their shape came down with the column's
     // type string, so opening one is a pure display change.
-    meta.get(node.id)?.load?.();
+    loadNode(node);
+  }
+
+  /**
+   * The rejection carries nothing the tree does not already draw: the cache
+   * records why under the node's key, and the node shows it. Once the list is
+   * in, every open branch under it is asked for again — answered from cache
+   * for free, and fetched only where a failure had dropped the list, so a
+   * reload of the parent is what brings a child back.
+   */
+  async function loadNode(node: TreeNode, fresh = false) {
+    const load = meta.get(node.id)?.load;
+    if (!load) return;
+    try {
+      await load(fresh);
+    } catch {
+      return;
+    }
+    const under = `${node.id}${SEP}`;
+    for (const id of open) {
+      if (id.startsWith(under)) meta.get(id)?.load?.().catch(() => {});
+    }
+  }
+
+  function handleReload(node: TreeNode) {
+    loadNode(node, true);
   }
 
   /**
@@ -274,7 +312,7 @@
   </div>
 
   <div class="tree">
-    <TreeView nodes={visible} expanded={open} ontoggle={handleToggle}>
+    <TreeView nodes={visible} expanded={open} ontoggle={handleToggle} onreload={handleReload}>
       {#snippet icon(node)}
         {@const kind = meta.get(node.id)?.kind}
         {#if kind === "catalog"}
