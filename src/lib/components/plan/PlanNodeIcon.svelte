@@ -26,7 +26,7 @@
   let { name, size = 14 }: Props = $props();
 </script>
 
-{#if name === "TableScan" || name === "ScanProject" || name === "ScanFilterProject"}
+{#if name.startsWith("Scan") || name === "TableScan"}
   <Table {size} />
 {:else if name === "Aggregate"}
   <Sigma {size} />
@@ -36,7 +36,7 @@
   <Filter {size} />
 {:else if name.endsWith("Join")}
   <Merge {size} />
-{:else if name === "Sort" || name === "TopN"}
+{:else if name === "Sort" || name.startsWith("TopN")}
   <ArrowDownUp {size} />
 {:else if name === "Limit" || name === "DistinctLimit"}
   <ListEnd {size} />

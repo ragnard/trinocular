@@ -2,6 +2,7 @@ import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
+import type { DistributedPlan } from "$lib/plan/types";
 import { underPath } from "$lib/viewFormats";
 import {
   loadWorkspace,
@@ -26,6 +27,21 @@ export type State =
   | "FAILED";
 
 const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
+
+/**
+ * What a run of a statement was asked for: its rows, or its plan. A plan is
+ * fetched by running the statement wrapped in `EXPLAIN`, so it is the same
+ * request, the same polling and the same cancel — only what the one row that
+ * comes back means is different.
+ */
+export type ResultKind = "query" | "explain";
+
+/** Always the distributed plan, as JSON: the text form is for reading, and
+ *  the logical plan leaves out the one thing the graph draws — where the
+ *  fragments split. */
+export function explainStatement(sql: string): string {
+  return `EXPLAIN (TYPE DISTRIBUTED, FORMAT JSON) ${sql}`;
+}
 
 /**
  * One reading of the query's split counts. Kept as a series, not just a latest
@@ -70,7 +86,9 @@ export class Result {
   id: string;
   anchorId: string;
   startLine: number;
+  /** What was sent to the cluster — for a plan, the statement inside its `EXPLAIN`. */
   sql: string;
+  kind: ResultKind;
   startedAt: number = Date.now();
 
   queryId?: string = $state();
@@ -92,10 +110,17 @@ export class Result {
   /** The result was dropped from its file; nothing will read further chunks. */
   #discarded = false;
 
-  constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
+  constructor(
+    client: Trino,
+    sql: string,
+    startLine: number,
+    anchorId: string,
+    kind: ResultKind = "query"
+  ) {
     this.client = client;
     this.id = crypto.randomUUID();
-    this.sql = sql;
+    this.sql = kind === "explain" ? explainStatement(sql) : sql;
+    this.kind = kind;
     this.startLine = startLine;
     this.anchorId = anchorId;
   }
@@ -115,6 +140,24 @@ export class Result {
    *  has reported any timing drew "0 s" among readings that all otherwise read
    *  "12.3 s" — a different shape for the one value that is not yet news. */
   elapsedTimeSeconds: string = $derived(((this.stats?.elapsedTimeMillis ?? 0) / 1000).toFixed(1));
+
+  /**
+   * The plan, for an `explain` run: `EXPLAIN … FORMAT JSON` answers with one
+   * varchar row holding the whole document. Read as soon as the row is here
+   * rather than when the query reports FINISHED, which is a poll later.
+   * `undefined` until then — and also for a row that is not a plan, which is
+   * what the pane says rather than this getter.
+   */
+  plan?: DistributedPlan = $derived.by(() => {
+    if (this.kind !== "explain") return undefined;
+    const cell = this.data.at(0)?.[0];
+    if (typeof cell !== "string") return undefined;
+    try {
+      return JSON.parse(cell) as DistributedPlan;
+    } catch {
+      return undefined;
+    }
+  });
 
   async execute() {
     try {
@@ -552,7 +595,14 @@ export class Workspace {
     }
   }
 
-  run(sql: string, startLine: number, anchorId: string, replacesId?: string) {
+  /**
+   * Runs a statement, for its rows or for its plan. Either way it is the
+   * statement's one result: explaining a statement that has rows showing
+   * replaces them with the plan, and running it again replaces the plan —
+   * the strip above the statement has one slot, and which of the two is
+   * there is what its status says.
+   */
+  run(sql: string, startLine: number, anchorId: string, kind: ResultKind, replacesId?: string) {
     const file = this.activeFile;
     if (!file) return;
     // One client per run: the Trino client keeps mutable session header state
@@ -561,7 +611,8 @@ export class Workspace {
       this.#createClient(this.#knownConnection(file.connectionId)),
       sql,
       startLine,
-      anchorId
+      anchorId,
+      kind
     );
     file.addResult(result, replacesId);
     void result.execute();

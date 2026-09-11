@@ -38,6 +38,14 @@ export interface Selection {
   minCol: number;
   maxCol: number;
   getData: () => SelectionData;
+  /**
+   * What the inspector calls the selection and each of its rows, for a
+   * selection that is not a block of table cells — a plan operator is one
+   * document, and "1 rows × 12 fields" over "Row 1" is not its name. A table
+   * selection leaves both unset and gets the counts.
+   */
+  title?: string;
+  rowTitle?: (row: number) => string;
 }
 
 export type CellRendererLookup = (field: Field) => Snippet<[Field, any]>;
