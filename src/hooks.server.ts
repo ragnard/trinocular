@@ -41,7 +41,7 @@ const authnHandler = async (config: Config) => {
 };
 
 const createHandle = async () => {
-  const sessionStore = await createSessionStore(config.session.store, config.session.cookie.secret);
+  const sessionStore = await createSessionStore(config.session.store);
   process.once("sveltekit:shutdown", () => {
     sessionStore.dispose?.().catch((err) => logger.warn({ err }, "session store did not close cleanly"));
   });

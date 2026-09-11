@@ -38,6 +38,7 @@ const ValkeyTlsSchema = z.union([
 
 const ValkeyCommon = {
   kind: z.literal("valkey"),
+  secret: z.string().min(32, "store secret must be at least 32 characters for adequate security"),
   keyPrefix: z.string().default("trinette:session:"),
   username: z.string().optional(),
   password: z.string().optional(),
@@ -91,6 +92,9 @@ const SessionSchema = z.object({
   cookie: CookieSchema,
   maxLifetimeSeconds: z.number().int().positive().default(86400),
   store: StoreSchema,
+}).refine((s) => s.store.kind !== "valkey" || s.store.secret !== s.cookie.secret, {
+  message: "store secret must differ from the cookie secret",
+  path: ["store", "secret"],
 });
 
 const NoAuthnSchema = z.object({
