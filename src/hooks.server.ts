@@ -8,6 +8,7 @@ import { createSessionStore } from "$lib/server/sessionStore";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
 import { SecurityHeadersHandler } from "$lib/server/securityHeaders";
+import { ProbeHandler } from "$lib/server/probes";
 import { AccessHandler, createAuthorizer } from "$lib/server/authz";
 import { logConnectionAuthz } from "$lib/server/connectionAuthz";
 import { logger } from "$lib/server/logging";
@@ -57,6 +58,9 @@ const createHandle = async () => {
     // Outermost, so the headers reach every response the rest of the chain
     // returns, refusals included.
     SecurityHeadersHandler(),
+    // Before logging and before the session: a probe is not traffic, and must
+    // not be issued a cookie or have the store read on its behalf.
+    ProbeHandler(sessionStore),
     await LoggingHandler(),
     await SessionHandler(sessionStore, {
       cookieName: config.session.cookie.name,

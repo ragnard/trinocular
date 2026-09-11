@@ -282,3 +282,29 @@ To build it yourself:
 docker build -t trinette .                          # debian slim
 docker build -t trinette --target distroless .      # distroless
 ```
+
+### Health probes
+
+Two endpoints answer without a session or a login, on the same port as everything else:
+
+| Path | Says | Checks |
+| --- | --- | --- |
+| `/livez` | the process is answering HTTP | nothing else — a store outage never fails it, since a restart would not fix one |
+| `/readyz` | this replica can serve requests | the session store answers a ping (with `store.kind: memory` that is always true) |
+
+Both return `200` with a small JSON body, or `503` from `/readyz` with `{"status":"unavailable",
+"checks":{"sessionStore":"failed"}}` — the reason is in the log, not the body. `GET` and
+`HEAD` are accepted. They are not written to the request log.
+
+Readiness deliberately does **not** check the Trino clusters or the OIDC provider: those are
+shared by every replica, so an outage there would pull every replica out of rotation at once
+and turn "cannot run a query" into "cannot reach the site", for everyone already signed in.
+
+```yaml
+livenessProbe:
+  httpGet: { path: /livez, port: 3000 }
+  periodSeconds: 10
+readinessProbe:
+  httpGet: { path: /readyz, port: 3000 }
+  periodSeconds: 10
+```
