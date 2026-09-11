@@ -112,13 +112,30 @@ function csvValue(value: unknown, dataType: DataType): string {
   return String(value);
 }
 
+function csvRow(fields: Field[], row: readonly unknown[]): string {
+  return fields.map((field, i) => csvField(csvValue(row[i], field.dataType))).join(",");
+}
+
 function serializeCsv(fields: Field[], rows: Iterable<readonly unknown[]>): string {
   const lines = [fields.map((field) => csvField(field.name)).join(",")];
   for (const row of rows) {
-    lines.push(fields.map((field, i) => csvField(csvValue(row[i], field.dataType))).join(","));
+    lines.push(csvRow(fields, row));
   }
   // CRLF, per RFC 4180. Readers that do not care accept it anyway.
   return lines.join("\r\n") + "\r\n";
+}
+
+/**
+ * What copying the table's selection puts on the clipboard. One cell is the
+ * value and nothing else — no quoting, no formula escape — because a cell is
+ * copied to be pasted somewhere as itself; a value with an inside is JSON,
+ * as it would be in a file. Anything larger is CSV rows without the header
+ * line: the header was not selected, and a block pasted beside other data
+ * should not bring a title row with it.
+ */
+export function clipboardText(fields: Field[], rows: readonly (readonly unknown[])[]): string {
+  if (rows.length === 1 && fields.length === 1) return csvValue(rows[0][0], fields[0].dataType);
+  return rows.map((row) => csvRow(fields, row)).join("\n");
 }
 
 /**

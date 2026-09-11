@@ -8,7 +8,7 @@
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import Dropdown from "./Dropdown.svelte";
-  import { EXPORT_FORMATS, downloadText, type ExportFormat } from "$lib/export";
+  import { EXPORT_FORMATS, clipboardText, downloadText, type ExportFormat } from "$lib/export";
 
   interface Props {
     result: ResultModel | null;
@@ -84,7 +84,7 @@
     {#if result.running}
       <QueryProgress {result} compact />
     {/if}
-    <Table {schema} rows={result.data} {valueConverter} bind:selection>
+    <Table {schema} rows={result.data} {valueConverter} {clipboardText} bind:selection>
       {#snippet header(field)}
         <!-- One line: the type is an icon beside the name rather than a second
              row of text under it. Spelled out, a type is mostly noise a column
