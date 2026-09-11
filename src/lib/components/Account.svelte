@@ -1,15 +1,11 @@
 <script lang="ts">
   /**
    * Who is signed in, what the app is drawn in, and the way out — one chip at
-   * the far end of the rail band.
+   * the right end of the top bar.
    *
-   * These used to be a footer: a whole band of window height spent on one
-   * string and a button nobody presses twice. The band along the top already
-   * spans the window, since the three panes each own a `.rail`, so its right
-   * end is the window's top corner and needs no chrome of its own. The theme
-   * goes inside the menu rather than beside the label because it is chosen
-   * about as often as a file is deleted, and a permanent control for it costs
-   * the same width whether or not anyone ever wants it.
+   * The theme goes inside the menu rather than beside the label because it is
+   * chosen about as often as a file is deleted, and a permanent control for
+   * it costs the same width whether or not anyone ever wants it.
    *
    * Signing out has nowhere else to be. Until this, the only `Sign out` in the
    * app was on `/auth/forbidden`, which meant everyone allowed in was stuck.
@@ -27,9 +23,9 @@
   let { userId, logoutPath }: Props = $props();
 
   /**
-   * The chip sits at the end of a pane whose width the reader sets, so it
-   * wears the part of an id that tells one person from another; the whole of
-   * it is on hover and at the head of the menu.
+   * The chip wears the part of an id that tells one person from another — the
+   * domain says the same thing for everyone on a deployment; the whole of it
+   * is on hover and at the head of the menu.
    */
   let short = $derived(userId ? userId.split("@")[0] : "Not signed in");
 

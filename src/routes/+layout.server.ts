@@ -8,6 +8,7 @@ import { authPrefix, config } from "$lib/server/config";
 
 export const load: LayoutServerLoad = async ({ locals }) => {
   return {
+    branding: config.branding,
     // Only the userId reaches the browser. The rest of the claims are what
     // authz judges on and have no reader on the client; shipping a whole token
     // payload to the page would be exposure bought for nothing.
