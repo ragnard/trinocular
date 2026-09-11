@@ -34,6 +34,13 @@
     cellRenderer?: CellRendererLookup;
     valueConverter?: ValueConverter;
     selection?: Selection | null;
+    /**
+     * What a copy of the selection puts on the clipboard, given the selected
+     * fields and the rows as they were handed in — not converted, since a
+     * value converted to be drawn is the wrong one to paste. Without it the
+     * browser's own copy stands.
+     */
+    clipboardText?: (fields: Field[], rows: readonly (readonly unknown[])[]) => string;
   }
 
   let {
@@ -47,7 +54,8 @@
     empty,
     cellRenderer: cellRendererProp,
     valueConverter = identity,
-    selection = $bindable(null)
+    selection = $bindable(null),
+    clipboardText
   }: Props = $props();
 
   let scrollContainer: HTMLDivElement = $state() as HTMLDivElement;
@@ -243,6 +251,17 @@
     scrollActiveIntoView();
   }
 
+  function handleCopy(event: ClipboardEvent) {
+    const rect = selectionRect;
+    if (!rect || !schema || !rows || !clipboardText || !event.clipboardData) return;
+    const fields = schema.fields.slice(rect.minCol, rect.maxCol + 1);
+    const selected = rows
+      .slice(rect.minRow, rect.maxRow + 1)
+      .map((row) => row.slice(rect.minCol, rect.maxCol + 1));
+    event.clipboardData.setData("text/plain", clipboardText(fields, selected));
+    event.preventDefault();
+  }
+
   function scrollActiveIntoView() {
     if (!active || !scrollContainer) return;
 
@@ -367,6 +386,7 @@
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
+    oncopy={handleCopy}
   >
     <table style:width="100%" style:min-width="{columnsWidth + spacerMinWidth}px">
       <colgroup>
