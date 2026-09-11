@@ -18,9 +18,79 @@ const CookieSchema = z.object({
   maxAge: z.number().int().positive().optional(),
 });
 
+const MemoryStoreSchema = z.object({
+  kind: z.literal("memory"),
+});
+
+const ValkeyNodeSchema = (defaultPort: number) =>
+  z.object({
+    host: z.string(),
+    port: z.number().int().positive().default(defaultPort),
+  });
+
+const ValkeyTlsSchema = z.union([
+  z.boolean(),
+  z.object({
+    // Path to a PEM bundle for a private CA. `true` alone trusts the system's.
+    ca: z.string().optional(),
+  }),
+]);
+
+const ValkeyCommon = {
+  kind: z.literal("valkey"),
+  keyPrefix: z.string().default("trinette:session:"),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  tls: ValkeyTlsSchema.default(false),
+  connectTimeoutMs: z.number().int().positive().default(10_000),
+  commandTimeoutMs: z.number().int().positive().default(5_000),
+};
+
+const ValkeySingleSchema = z.object({
+  ...ValkeyCommon,
+  mode: z.literal("single"),
+  host: z.string().default("127.0.0.1"),
+  port: z.number().int().positive().default(6379),
+  db: z.number().int().nonnegative().default(0),
+});
+
+const ValkeyClusterSchema = z.object({
+  ...ValkeyCommon,
+  mode: z.literal("cluster"),
+  nodes: z.array(ValkeyNodeSchema(6379)).min(1),
+});
+
+const ValkeySentinelSchema = z.object({
+  ...ValkeyCommon,
+  mode: z.literal("sentinel"),
+  sentinels: z.array(ValkeyNodeSchema(26379)).min(1),
+  name: z.string(),
+  // Sentinels are often secured separately from the nodes they watch.
+  sentinelUsername: z.string().optional(),
+  sentinelPassword: z.string().optional(),
+  db: z.number().int().nonnegative().default(0),
+});
+
+// `mode` is required rather than defaulting to `single`: zod matches a
+// discriminator against the raw input, so a defaulted one never matches an
+// absent key.
+const ValkeyStoreSchema = z.discriminatedUnion("mode", [
+  ValkeySingleSchema,
+  ValkeyClusterSchema,
+  ValkeySentinelSchema,
+]);
+
+const StoreSchema = z
+  .discriminatedUnion("kind", [MemoryStoreSchema, ValkeyStoreSchema])
+  .default({ kind: "memory" });
+
+export type StoreConfig = z.infer<typeof StoreSchema>;
+export type ValkeyStoreConfig = z.infer<typeof ValkeyStoreSchema>;
+
 const SessionSchema = z.object({
   cookie: CookieSchema,
   maxLifetimeSeconds: z.number().int().positive().default(86400),
+  store: StoreSchema,
 });
 
 const NoAuthnSchema = z.object({

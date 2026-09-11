@@ -3,7 +3,8 @@ import { sequence } from "@sveltejs/kit/hooks";
 
 import { config, forbiddenPath, isAuthPath, loginPath, type Config } from "$lib/server/config";
 import { env } from "$env/dynamic/private";
-import { SessionHandler, InMemoryStore } from "$lib/server/session";
+import { SessionHandler } from "$lib/server/session";
+import { createSessionStore } from "$lib/server/sessionStore";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
 import { SecurityHeadersHandler } from "$lib/server/securityHeaders";
@@ -39,7 +40,10 @@ const authnHandler = async (config: Config) => {
 };
 
 const createHandle = async () => {
-  const sessionStore = new InMemoryStore();
+  const sessionStore = await createSessionStore(config.session.store, config.session.cookie.secret);
+  process.once("sveltekit:shutdown", () => {
+    sessionStore.dispose?.().catch((err) => logger.warn({ err }, "session store did not close cleanly"));
+  });
   const authz = createAuthorizer(config.authz, {
     defaultClient: config.authn.kind === "oidc" ? config.authn.clientId : undefined,
     where: "authz"

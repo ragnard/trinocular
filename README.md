@@ -20,6 +20,7 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Keep your files between visits and jump between them with a keystroke.
 - Read it light or dark, following your system or whichever you prefer.
 - Put a login in front of it, and decide who gets to reach which cluster.
+- Run more than one copy of it, and restart it, without signing anyone out.
 
 ## Running locally
 
@@ -94,7 +95,7 @@ session:
 | Option | Default | Description |
 | --- | --- | --- |
 | `maxLifetimeSeconds` | `86400` | How long a session lives, in seconds. |
-| `cookie.secret` | **required** | Key the session cookie is encrypted with. At least 32 characters. Sessions themselves are held in memory, so a restart signs everyone out. |
+| `cookie.secret` | **required** | Key the session cookie is encrypted with, and the key sessions in a `valkey` store are encrypted with. At least 32 characters. |
 | `cookie.name` | `trinette-session` | Cookie name. |
 | `cookie.path` | `/` | Cookie path. |
 | `cookie.httpOnly` | `true` | Hide the cookie from scripts. |
@@ -102,6 +103,63 @@ session:
 | `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
 | `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
 | `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |
+| `store.kind` | `memory` | Where sessions are kept: `memory` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinette. |
+
+#### `store.kind: valkey`
+
+Sessions in [Valkey](https://valkey.io) or Redis, so they survive a restart and any
+number of copies of Trinette can serve them. Each session is one key, encrypted with
+`cookie.secret` — a copy of the store gives away nothing without it, and changing the
+secret signs everyone out (as it already does through the cookie).
+
+```yaml
+session:
+  store:
+    kind: valkey
+    mode: single           # or cluster, or sentinel
+    host: valkey.example
+    port: 6379
+    db: 0
+    password: ...
+    tls: true
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `mode` | **required** | `single`, `cluster` or `sentinel`. |
+| `keyPrefix` | `trinette:session:` | Prefix on every key, if the store is shared with something else. |
+| `username` | — | ACL user (Valkey 6 or later). |
+| `password` | — | Password for the nodes. |
+| `tls` | `false` | `true` to connect over TLS trusting the system's CAs, or `{ ca: <path> }` for a PEM bundle of your own. In `sentinel` mode this applies to the sentinels too. |
+| `connectTimeoutMs` | `10000` | How long to wait for a connection. |
+| `commandTimeoutMs` | `5000` | How long to wait for an answer. A request that has to wait longer fails rather than hanging. |
+
+With `mode: single`:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `host` | `127.0.0.1` | |
+| `port` | `6379` | |
+| `db` | `0` | Database number. |
+
+With `mode: cluster`:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `nodes` | **required** | A list of `{ host, port }` (port defaults to `6379`). One reachable node is enough to discover the rest. |
+
+With `mode: sentinel`:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `sentinels` | **required** | A list of `{ host, port }` (port defaults to `26379`). |
+| `name` | **required** | The master's name as the sentinels know it. |
+| `sentinelUsername` | — | ACL user for the sentinels, if they are secured separately from the nodes. |
+| `sentinelPassword` | — | Password for the sentinels. |
+| `db` | `0` | Database number. |
+
+Trinette refuses to start if it cannot reach the store, for the same reason it refuses
+a config it cannot validate.
 
 ### `authn` — who the user is
 

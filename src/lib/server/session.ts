@@ -19,6 +19,7 @@ export interface SessionStore {
   load(sessionId: SessionID): Promise<SessionData | null>;
   save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void>;
   destroy(sessionId: SessionID): Promise<void>;
+  dispose?(): Promise<void>;
 }
 
 export class Session {
@@ -152,7 +153,7 @@ export class InMemoryStore implements SessionStore {
     }
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     clearInterval(this.#sweepInterval);
   }
 }
@@ -160,8 +161,7 @@ export class InMemoryStore implements SessionStore {
 type HandlerFactory = (store: SessionStore, opts: SessionOptions) => Promise<Handle>;
 
 export const SessionHandler: HandlerFactory = async (store, opts) => {
-  const cookieKey = await EncryptedCookie.createKey(opts.cookieSecret, opts.cookieName);
-  const cookie = new EncryptedCookie(opts.cookieName, cookieKey);
+  const cookie = await EncryptedCookie.create(opts.cookieName, opts.cookieSecret);
 
   return async ({ event, resolve }) => {
     let sessionId: string | null = null;
