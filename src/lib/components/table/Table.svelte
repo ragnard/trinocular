@@ -252,6 +252,7 @@
   }
 
   function handleCopy(event: ClipboardEvent) {
+    if (document.activeElement !== scrollContainer) return;
     const rect = selectionRect;
     if (!rect || !schema || !rows || !clipboardText || !event.clipboardData) return;
     const fields = schema.fields.slice(rect.minCol, rect.maxCol + 1);
@@ -377,6 +378,8 @@
   });
 </script>
 
+<svelte:document oncopy={handleCopy} />
+
 {#if schema}
   <div
     class="table-container"
@@ -386,7 +389,6 @@
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
-    oncopy={handleCopy}
   >
     <table style:width="100%" style:min-width="{columnsWidth + spacerMinWidth}px">
       <colgroup>
