@@ -96,7 +96,7 @@ session:
 | Option | Default | Description |
 | --- | --- | --- |
 | `maxLifetimeSeconds` | `86400` | How long a session lives, in seconds. |
-| `cookie.secret` | **required** | Key the session cookie is encrypted with, and the key sessions in a `valkey` store are encrypted with. At least 32 characters. |
+| `cookie.secret` | **required** | Key the session cookie is encrypted with. At least 32 characters. |
 | `cookie.name` | `trinette-session` | Cookie name. |
 | `cookie.path` | `/` | Cookie path. |
 | `cookie.httpOnly` | `true` | Hide the cookie from scripts. |
@@ -110,13 +110,16 @@ session:
 
 Sessions in [Valkey](https://valkey.io) or Redis, so they survive a restart and any
 number of copies of Trinette can serve them. Each session is one key, encrypted with
-`cookie.secret` — a copy of the store gives away nothing without it, and changing the
-secret signs everyone out (as it already does through the cookie).
+the store's own `secret` — a copy of the store gives away nothing without it, and
+changing it signs everyone out. It is deliberately not `cookie.secret`: the cookie
+secret guards what the browser holds and this one guards what the store holds, and
+either can be rotated without touching the other.
 
 ```yaml
 session:
   store:
     kind: valkey
+    secret: <at least 32 characters>
     mode: single           # or cluster, or sentinel
     host: valkey.example
     port: 6379
@@ -128,6 +131,7 @@ session:
 | Option | Default | Description |
 | --- | --- | --- |
 | `mode` | **required** | `single`, `cluster` or `sentinel`. |
+| `secret` | **required** | Key sessions in the store are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
 | `keyPrefix` | `trinette:session:` | Prefix on every key, if the store is shared with something else. |
 | `username` | — | ACL user (Valkey 6 or later). |
 | `password` | — | Password for the nodes. |

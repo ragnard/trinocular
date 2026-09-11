@@ -75,7 +75,7 @@ export const describe = (cfg: ValkeyStoreConfig) => {
 };
 
 /** Sessions in Valkey (or Redis), one key per session, sealed with a key
- *  derived from the cookie secret so a dump of the store yields nothing. */
+ *  derived from the store's own secret so a dump of the store yields nothing. */
 export class ValkeyStore implements SessionStore {
   #client: Client;
   #prefix: string;
@@ -93,8 +93,8 @@ export class ValkeyStore implements SessionStore {
 
   /** Connects and pings before returning, so a store that cannot be reached
    *  fails here, at startup, rather than on the first request. */
-  static async create(cfg: ValkeyStoreConfig, cookieSecret: string): Promise<ValkeyStore> {
-    const sealer = await Sealer.create(cookieSecret, "SessionStore");
+  static async create(cfg: ValkeyStoreConfig): Promise<ValkeyStore> {
+    const sealer = await Sealer.create(cfg.secret, "SessionStore");
     const client = createClient(cfg);
     const store = new ValkeyStore(client, cfg.keyPrefix, sealer);
     await client.connect();
