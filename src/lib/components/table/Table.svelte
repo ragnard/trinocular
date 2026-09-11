@@ -1,14 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type {
-    Field,
-    DataType,
-    Schema,
-    Selection,
-    CellRendererLookup,
-    RowSource,
-    ValueConverter
-  } from "./types";
+  import type { Field, DataType, Schema, Selection, CellRendererLookup, RowSource } from "./types";
   import { defaultCell } from "./snippets.svelte";
 
   const DEFAULT_ROW_HEIGHT = 30;
@@ -20,8 +12,6 @@
   const DEFAULT_SPACER_MIN_WIDTH = 100;
   const ROW_NUMBER_WIDTH = 52;
 
-  const identity: ValueConverter = (value) => value;
-
   interface Props {
     schema?: Schema;
     rows?: RowSource;
@@ -32,7 +22,6 @@
     header?: Snippet<[Field]>;
     empty?: Snippet;
     cellRenderer?: CellRendererLookup;
-    valueConverter?: ValueConverter;
     selection?: Selection | null;
     /**
      * What a copy of the selection puts on the clipboard, given the selected
@@ -53,7 +42,6 @@
     header,
     empty,
     cellRenderer: cellRendererProp,
-    valueConverter = identity,
     selection = $bindable(null),
     clipboardText
   }: Props = $props();
@@ -341,10 +329,10 @@
     const s = schema;
     const r = rows;
     selection = {
-      minRow, maxRow, minCol, maxCol,
-      // The rows as they were handed in, like `clipboardText` gets them: the
-      // converter is for drawing a cell, and what reads a selection decides
-      // for itself how to show a value.
+      minRow,
+      maxRow,
+      minCol,
+      maxCol,
       getData() {
         const fields = s.fields.slice(minCol, maxCol + 1);
         const selectedRows = r
@@ -451,10 +439,7 @@
                   class:numeric={numeric[colIdx]}
                   class:selected={flags.selected}
                   class:active={flags.isActive}
-                  >{@render renderCell(
-                    schema.fields[colIdx],
-                    valueConverter(cell, schema.fields[colIdx], colIdx)
-                  )}</td
+                  >{@render renderCell(schema.fields[colIdx], cell)}</td
                 >
               {/each}
               <td class="spacer"></td>

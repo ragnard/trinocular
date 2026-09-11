@@ -25,7 +25,6 @@ export interface Dictionary {
 
 export type DataType = "string" | "integer" | "binary" | Struct | List | Dictionary;
 
-export type ValueConverter = (value: any, field: Field, colIndex: number) => any;
 
 export interface SelectionData {
   fields: Field[];

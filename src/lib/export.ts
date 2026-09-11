@@ -8,6 +8,7 @@
  * so adding ndjson later is a serializer and an entry, and nothing in the UI.
  */
 import type { DataType, Dictionary, Field, Struct } from "./components/table/types";
+import { toBase64 } from "./trino/table";
 
 export interface ExportFormat {
   id: string;
@@ -17,10 +18,9 @@ export interface ExportFormat {
   extension: string;
   mimeType: string;
   /**
-   * The rows exactly as Trino sent them — not the converted values the table
-   * renders. Conversion exists to put a value on screen (binary becomes a
-   * `Uint8Array` so a cell can show its bytes), and every one of those
-   * decisions is the wrong one for a file: base64 is what a varbinary column
+   * The rows as the result holds them. Only one thing in them is not already
+   * a JSON value — a varbinary, decoded to a `Uint8Array` when its page
+   * arrived — and `toJson` is where it becomes base64 again, which is what it
    * arrived as and what any reader on the other side will expect back.
    */
   serialize(fields: Field[], rows: Iterable<readonly unknown[]>): string;
@@ -35,15 +35,18 @@ function isDictionary(dataType: DataType): dataType is Dictionary {
 }
 
 /**
- * A structured value shaped for JSON. Trino sends a row as an *array* of its
- * field values, so the names only exist in the type — putting them back is the
+ * A value shaped for JSON. Trino sends a row as an *array* of its field
+ * values, so the names only exist in the type — putting them back is the
  * difference between `[1,"x"]` and `{"a":1,"b":"x"}`, and only one of those can
  * be read without the query beside it. Arrays recurse into their element type,
  * and a map — already a JSON object, keys and all — into its value type, so a
- * row inside one gets its names back too.
+ * row inside one gets its names back too. Bytes become base64, at whatever
+ * depth they sit: this is the one place a value is encoded to leave, and the
+ * inspector's row copies come through it for the same reason the files do.
  */
-function toJson(value: unknown, dataType: DataType): unknown {
+export function toJson(value: unknown, dataType: DataType): unknown {
   if (value === null || value === undefined) return null;
+  if (value instanceof Uint8Array) return toBase64(value);
   if (isStruct(dataType) && Array.isArray(value)) {
     return Object.fromEntries(
       dataType.fields.map((field, i) => [field.name, toJson(value[i], field.dataType)])
@@ -98,18 +101,19 @@ function csvField(text: string): string {
 }
 
 /**
- * Anything with an inside becomes JSON — a row, an array, a map, and anything
- * else that arrives as an object. `JSON.stringify` without an indent argument
- * emits no newline of its own and escapes any newline inside a string, so a
- * nested value stays on the one line its cell occupies.
+ * Anything with an inside becomes JSON — a row, an array, a map. Bytes are the
+ * exception, being one value and not a structure: they go in as base64, bare.
+ * `JSON.stringify` without an indent argument emits no newline of its own and
+ * escapes any newline inside a string, so a nested value stays on the one
+ * line its cell occupies.
  *
  * A null becomes an empty field, which CSV cannot tell from an empty string.
  * That ambiguity is CSV's, and quoting nulls instead would only move it.
  */
 function csvValue(value: unknown, dataType: DataType): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(toJson(value, dataType));
-  return String(value);
+  const json = toJson(value, dataType);
+  return typeof json === "object" ? JSON.stringify(json) : String(json);
 }
 
 function csvRow(fields: Field[], row: readonly unknown[]): string {

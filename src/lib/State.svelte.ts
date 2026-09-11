@@ -1,5 +1,6 @@
 import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
+import { pageConverter, schemaFromColumns } from "$lib/trino/table";
 import type { Columns, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import { underPath } from "$lib/viewFormats";
@@ -91,6 +92,8 @@ export class Result {
   #cancelSent = false;
   /** The result was dropped from its file; nothing will read further chunks. */
   #discarded = false;
+  /** Decodes what Trino sends encoded (varbinary), once, as a page arrives. */
+  #convertPage?: (page: any[][]) => void;
 
   constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
     this.client = client;
@@ -129,7 +132,10 @@ export class Result {
         // Trino answers the POST still gets its DELETE sent above.
         if (this.#discarded) break;
         if (chunk.infoUri) this.infoUri = chunk.infoUri;
-        if (chunk.columns) this.columns = chunk.columns;
+        if (chunk.columns) {
+          this.columns = chunk.columns;
+          this.#convertPage = pageConverter(schemaFromColumns(chunk.columns).fields);
+        }
         if (chunk.stats) {
           this.stats = chunk.stats;
           this.#sample(chunk.stats);
@@ -139,8 +145,13 @@ export class Result {
 
         // `append` returns a new Rows sharing the pages already held, so the
         // reference changes (which is the whole of how $state.raw notices)
-        // without a row being copied.
-        if (chunk.data) this.data = this.data.append(chunk.data);
+        // without a row being copied. The page is converted in place first:
+        // it is this fetch's own parse of the response, and nothing else has
+        // seen it yet.
+        if (chunk.data) {
+          this.#convertPage?.(chunk.data);
+          this.data = this.data.append(chunk.data);
+        }
       }
     } catch (e) {
       if (e instanceof HttpError && e.status === 401) {
