@@ -19,6 +19,9 @@ export interface SessionStore {
   load(sessionId: SessionID): Promise<SessionData | null>;
   save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void>;
   destroy(sessionId: SessionID): Promise<void>;
+  /** Rejects if the store cannot currently be reached. Absent means the store
+   *  has nothing to reach, and reads as always ready. */
+  ping?(): Promise<void>;
   dispose?(): Promise<void>;
 }
 

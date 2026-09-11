@@ -130,6 +130,10 @@ export class ValkeyStore implements SessionStore {
     await this.#client.del(this.#key(sessionId));
   }
 
+  async ping(): Promise<void> {
+    await this.#client.ping();
+  }
+
   async dispose(): Promise<void> {
     await this.#client.quit();
   }
