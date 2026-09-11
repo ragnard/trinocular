@@ -7,6 +7,7 @@
   import Play from "@lucide/svelte/icons/play";
   import Table from "@lucide/svelte/icons/table";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import Workflow from "@lucide/svelte/icons/workflow";
   import X from "@lucide/svelte/icons/x";
   import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
   import {
@@ -15,7 +16,7 @@
     type MetadataProvider,
     type StatementSlice
   } from "monaco-language-trino";
-  import type { Result, SqlFile } from "$lib/State.svelte";
+  import type { Result, ResultKind, SqlFile } from "$lib/State.svelte";
 
   type Statement = StatementSlice;
 
@@ -38,7 +39,13 @@
     options?: monaco.editor.IStandaloneEditorConstructionOptions;
     metadataProvider?: MetadataProvider;
     markers?: monaco.editor.IMarkerData[];
-    onexecutesql?: (sql: string, startLine: number, anchorId: string, replacesResultId?: string) => void;
+    onexecutesql?: (
+      sql: string,
+      startLine: number,
+      anchorId: string,
+      kind: ResultKind,
+      replacesResultId?: string
+    ) => void;
     onshowresult?: (result: Result) => void;
     oncancelresult?: (result: Result) => void;
     onchange?: (content: string) => void;
@@ -288,6 +295,10 @@
     // than offering "Results" behind a table icon.
     if (result.error) return { icon: TriangleAlert, text: "Error", spin: false };
     if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
+    if (result.kind === "explain") {
+      if (result.running) return { icon: LoaderCircle, text: "Explaining…", spin: true };
+      return { icon: Workflow, text: "Plan", spin: false };
+    }
     if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
     // Just the word. The row count and the elapsed time are already on the
     // results rail, and repeating them here only made the strip above every
@@ -356,6 +367,7 @@
   interface StatementToolbar {
     node: HTMLElement;
     run: ToolbarButton;
+    explain: ToolbarButton;
     status: ToolbarButton;
     details: ToolbarButton;
     cancel: ToolbarButton;
@@ -404,6 +416,8 @@
     };
 
     const run = button("run", Play, "Run");
+    const explain = button("explain", Workflow, "Explain");
+    explain.el.title = "Show this statement's distributed plan";
     const status = button("status", null);
     // A real link rather than a role="button": it leaves for the cluster's own
     // query page, so middle-click and "copy link address" do what they look
@@ -415,7 +429,7 @@
     details.el.title = "Open this query in the Trino UI";
     const cancel = button("cancel", X, "Cancel");
     cancel.el.title = "Cancel this query";
-    node.append(run.el, status.el, details.el, cancel.el);
+    node.append(run.el, explain.el, status.el, details.el, cancel.el);
 
     const zone: monaco.editor.IViewZone = {
       afterLineNumber: 0,
@@ -428,6 +442,7 @@
     const toolbar: StatementToolbar = {
       node,
       run,
+      explain,
       status,
       details,
       cancel,
@@ -442,12 +457,14 @@
     // The handlers read the toolbar's *current* statement and result, so a
     // strip that has been reused for a different statement still acts on the
     // right one.
-    run.el.addEventListener("click", () => {
+    const runToolbarStatement = (kind: ResultKind) => {
       const model = editor?.getModel();
       if (!model || !toolbar.statement) return;
       const range = statementRange(model, toolbar.statement);
-      runRange(model, range, toolbar.statement.text.trim(), range.startLineNumber);
-    });
+      runRange(model, range, toolbar.statement.text.trim(), range.startLineNumber, kind);
+    };
+    run.el.addEventListener("click", () => runToolbarStatement("query"));
+    explain.el.addEventListener("click", () => runToolbarStatement("explain"));
     status.el.addEventListener("click", () => {
       if (toolbar.result) onshowresult?.(toolbar.result);
     });
@@ -491,7 +508,13 @@
         accessor.removeZone(toolbar.zoneId);
         editor?.removeContentWidget(toolbar.widget);
         // Each icon is a mounted component tree of its own.
-        for (const button of [toolbar.run, toolbar.status, toolbar.details, toolbar.cancel]) {
+        for (const button of [
+          toolbar.run,
+          toolbar.explain,
+          toolbar.status,
+          toolbar.details,
+          toolbar.cancel
+        ]) {
           clearIcon(button.slot);
         }
       }
@@ -594,7 +617,13 @@
     for (const toolbar of toolbars) editor.layoutContentWidget(toolbar.widget);
   }
 
-  function runRange(model: monaco.editor.ITextModel, range: monaco.IRange, sql: string, startLine: number) {
+  function runRange(
+    model: monaco.editor.ITextModel,
+    range: monaco.IRange,
+    sql: string,
+    startLine: number,
+    kind: ResultKind
+  ) {
     if (!onexecutesql || !editor) return;
     const owner = fileOfModel.get(model);
     if (!owner) return;
@@ -605,13 +634,17 @@
       collection: editor.createDecorationsCollection([{ range, options: ANCHOR_DECORATION }]),
       model
     });
-    onexecutesql(sql, startLine, anchorId, replacesId);
+    onexecutesql(sql, startLine, anchorId, kind, replacesId);
   }
 
-  function runStatement(model: monaco.editor.ITextModel, editor: monaco.editor.IStandaloneCodeEditor) {
+  function runStatement(
+    model: monaco.editor.ITextModel,
+    editor: monaco.editor.IStandaloneCodeEditor,
+    kind: ResultKind
+  ) {
     const selection = editor.getSelection();
     if (selection && !selection.isEmpty()) {
-      runRange(model, selection, model.getValueInRange(selection), selection.startLineNumber);
+      runRange(model, selection, model.getValueInRange(selection), selection.startLineNumber, kind);
       return;
     }
 
@@ -621,7 +654,7 @@
     const statement = statementAtOffset(model, model.getOffsetAt(position));
     if (!statement) return;
     const range = statementRange(model, statement);
-    runRange(model, range, statement.text.trim(), range.startLineNumber);
+    runRange(model, range, statement.text.trim(), range.startLineNumber, kind);
   }
 
   onMount(() => {
@@ -683,7 +716,17 @@
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
         const model = editor?.getModel();
-        if (model && editor) runStatement(model, editor);
+        if (model && editor) runStatement(model, editor, "query");
+      }
+    });
+
+    editor.addAction({
+      id: "trino.explainCurrentStatement",
+      label: "Explain Current Statement",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      run: () => {
+        const model = editor?.getModel();
+        if (model && editor) runStatement(model, editor, "explain");
       }
     });
 

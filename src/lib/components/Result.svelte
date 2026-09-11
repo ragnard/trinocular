@@ -8,7 +8,9 @@
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import Dropdown from "./Dropdown.svelte";
+  import FragmentGraph from "./plan/FragmentGraph.svelte";
   import { EXPORT_FORMATS, clipboardText, downloadText, type ExportFormat } from "$lib/export";
+  import { selectionForNode } from "$lib/plan/inspect";
 
   interface Props {
     result: ResultModel | null;
@@ -24,6 +26,15 @@
 
   let schema = $derived(toSchema(result?.columns));
   let hasRows = $derived((result?.data?.length ?? 0) > 0);
+  let isPlan = $derived(result?.kind === "explain");
+  let fragmentCount = $derived(result?.plan ? Object.keys(result.plan).length : 0);
+
+  // A plan's selection is an operator, made by the graph below; it belongs
+  // to that plan and not to whatever result is shown next. A table clears
+  // its own on mount, so this only has to cover the way in.
+  $effect(() => {
+    if (isPlan) selection = null;
+  });
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 
@@ -32,7 +43,7 @@
    * writing, and one that failed has neither. Saving mid-run writes the rows
    * that have arrived, which is the number the rail is showing.
    */
-  let canSave = $derived(!!schema && !result?.error);
+  let canSave = $derived(!!schema && !result?.error && !isPlan);
 
   function save(format: ExportFormat) {
     if (!schema) return;
@@ -48,7 +59,11 @@
   <div class="rail">
     {#if result}
       <span class="dot" class:failed={!!result.error} class:running={result.running}></span>
-      <span>{result.rowCount ?? 0} rows</span>
+      {#if isPlan}
+        <span>{result.plan ? `${fragmentCount} fragments` : "Plan"}</span>
+      {:else}
+        <span>{result.rowCount ?? 0} rows</span>
+      {/if}
       <span class="sep">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
     {:else}
@@ -75,6 +90,24 @@
       <p>{result.error.message}</p>
       <p class="meta">{result.error.errorName} &middot; {result.error.errorCode}</p>
     </div>
+  {:else if isPlan}
+    {#if result.plan}
+      <!-- Keyed so a different plan starts from nothing picked: the graph
+           keeps its selection for as long as it lives. -->
+      {#key result}
+        <div class="plan">
+          <FragmentGraph
+            plan={result.plan}
+            onselect={(node, fragmentId) => (selection = selectionForNode(node, fragmentId))}
+          />
+        </div>
+      {/key}
+    {:else if result.running}
+      <QueryProgress {result} />
+    {:else}
+      <!-- The row came back and was not a plan document. -->
+      <div class="message">No plan</div>
+    {/if}
   {:else if !hasRows && result.running}
     <!-- No rows to look at yet, so the pane is free to show what the cluster is
          actually doing. Once rows arrive the table takes over and progress
@@ -153,6 +186,11 @@
 
   .dot.failed {
     background: var(--error);
+  }
+
+  .plan {
+    flex: 1;
+    min-height: 0;
   }
 
   .message {

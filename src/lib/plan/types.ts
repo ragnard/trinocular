@@ -18,9 +18,19 @@ export interface PlanNode {
   children: PlanNode[];
 }
 
+/**
+ * An output column of an operator. Current Trino names it `name`; the
+ * example in the docs, and the releases it was written against, say
+ * `symbol`. Read with `symbolName`.
+ */
 export interface PlanSymbol {
-  symbol: string;
+  name?: string;
+  symbol?: string;
   type: string;
+}
+
+export function symbolName(output: PlanSymbol): string {
+  return output.name ?? output.symbol ?? "";
 }
 
 /** An unknown estimate arrives as the string `"NaN"`, not a JSON number. */

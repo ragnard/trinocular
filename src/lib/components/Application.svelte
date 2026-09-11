@@ -113,8 +113,8 @@
     files={workspace.files}
     {metadataProvider}
     markers={editorMarkers}
-    onexecutesql={(sql, startLine, anchorId, replacesId) =>
-      workspace.run(sql, startLine, anchorId, replacesId)}
+    onexecutesql={(sql, startLine, anchorId, kind, replacesId) =>
+      workspace.run(sql, startLine, anchorId, kind, replacesId)}
     onshowresult={(result) => workspace.showResult(result)}
     oncancelresult={(result) => void result.cancel()}
     onchange={handleEditorChange}

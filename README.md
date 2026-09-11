@@ -8,6 +8,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Keep many statements in one file and run any of them on its own, each with its own
   results.
 - See what a running query is actually doing, and stop it if it is doing too much.
+- Explain a statement before running it: its plan drawn as a graph of the fragments
+  the cluster will spread it over, with any operator's details a click away.
 - Inspect one or more rows of a result set, field by field, with nested values spelled
   out.
 - Flexible value display — read a field as text or as JSON, and have the choice

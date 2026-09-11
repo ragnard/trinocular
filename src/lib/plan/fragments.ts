@@ -69,11 +69,8 @@ export function sourceFragmentIds(node: PlanNode): string[] {
  */
 export function summarize(node: PlanNode): string {
   const d = node.descriptor;
+  if (node.name.startsWith("Scan") || node.name === "TableScan") return d.table ?? "";
   switch (node.name) {
-    case "TableScan":
-    case "ScanProject":
-    case "ScanFilterProject":
-      return d.table ?? "";
     case "RemoteSource":
       return (
         "← " +

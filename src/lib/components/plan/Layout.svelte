@@ -8,6 +8,7 @@
    */
   import { useNodesInitialized, useSvelteFlow } from "@xyflow/svelte";
   import type { Point, Size } from "$lib/plan/layout";
+  import { FIT } from "./fit";
 
   interface Props {
     place: (sizeOf: (id: string) => Size) => Map<string, Point>;
@@ -31,6 +32,6 @@
     );
     const positions = place((id) => sizes.get(id) ?? { width: 0, height: 0 });
     for (const [id, position] of positions) updateNode(id, { position });
-    fitView({ padding: 0.1 }).then(onready);
+    fitView(FIT).then(onready);
   });
 </script>

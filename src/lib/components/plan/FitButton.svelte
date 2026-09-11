@@ -3,6 +3,7 @@
   // reads context, which only works while a component is being set up.
   import { useSvelteFlow } from "@xyflow/svelte";
   import { Maximize } from "@lucide/svelte";
+  import { FIT } from "./fit";
 
   const { fitView } = useSvelteFlow();
 </script>
@@ -10,7 +11,7 @@
 <button
   class="chip square"
   title="Fit the plan to the pane"
-  onclick={() => fitView({ padding: 0.1 })}
+  onclick={() => fitView(FIT)}
 >
   <Maximize size={14} />
 </button>

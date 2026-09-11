@@ -238,7 +238,9 @@
   <div class="rail">
     <Search size={14} />
     <span class="ell title">
-      {#if selection}
+      {#if selection?.title}
+        {selection.title}
+      {:else if selection}
         {documents.length} rows &times; {fieldCount} fields
       {:else}
         Inspector
@@ -262,7 +264,7 @@
     {/if}
     {#each documents as doc (doc.row)}
       <div class="doc-head">
-        <span class="caps">Row {doc.row}</span>
+        <span class="caps">{selection?.rowTitle?.(doc.row) ?? `Row ${doc.row}`}</span>
         <span class="fill"></span>
         <button
           class="chip square"
