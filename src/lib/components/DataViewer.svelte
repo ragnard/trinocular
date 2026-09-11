@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
   import type {
     Selection,
     SelectionData,
@@ -9,7 +8,8 @@
     List,
     Dictionary
   } from "./table/types";
-  import { Copy, Eye, PanelRight, Search } from "@lucide/svelte";
+  import { Copy, Eye, Search } from "@lucide/svelte";
+  import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import {
     DEFAULT_FORMAT,
@@ -27,13 +27,6 @@
     /** How to draw each field, by its path. See `SqlFile.viewFormats`. */
     formats?: Record<string, string>;
     onpick?: (path: string, formatId: string) => void;
-    /**
-     * Whatever the app wants at the far end of the rail. This pane's right
-     * edge is the window's, which is the only thing that makes it the place
-     * for something that has nothing to do with the selection — the pane does
-     * not learn what it is being handed.
-     */
-    actions?: Snippet;
   }
 
   let {
@@ -41,8 +34,7 @@
     hideNulls = true,
     hideEmpty = true,
     formats = {},
-    onpick,
-    actions
+    onpick
   }: Props = $props();
 
   let data: SelectionData | null = $state.raw(null);
@@ -244,7 +236,7 @@
 
 <div class="inspector">
   <div class="rail">
-    <PanelRight size={14} />
+    <Search size={14} />
     <span class="ell title">
       {#if selection}
         {documents.length} rows &times; {fieldCount} fields
@@ -260,16 +252,9 @@
     >
       <Copy size={14} />
     </button>
-    {#if actions}
-      <span class="rule"></span>
-      {@render actions()}
-    {/if}
   </div>
 
-  <div class="filter">
-    <Search size={12} />
-    <input type="text" placeholder="Filter fields&hellip;" bind:value={filter} spellcheck="false" />
-  </div>
+  <FilterBox bind:value={filter} placeholder="Filter fields…" label="Filter fields" />
 
   <div class="stack" onscroll={() => picker?.close()}>
     {#if !documents.length}
@@ -388,54 +373,12 @@
     padding-right: 6px;
   }
 
-  /* The same rule the document header puts between the file and its
-     connection: what follows is a different kind of fact, not the next
-     control along. */
-  .rule {
-    width: 1px;
-    height: 16px;
-    margin: 0 2px;
-    background: var(--line-strong);
-  }
-
   .title {
     flex: 1;
   }
 
   .rail :global(svg) {
     color: var(--fg-3);
-  }
-
-  .filter {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    height: var(--h-ctl);
-    margin: 8px 12px 6px;
-    padding: 0 8px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r);
-    color: var(--fg-3);
-  }
-
-  .filter:focus-within {
-    border-color: var(--accent);
-  }
-
-  .filter input {
-    flex: 1;
-    min-width: 0;
-    height: auto;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: var(--fg);
-  }
-
-  .filter input:focus-visible {
-    outline: none;
   }
 
   .stack {

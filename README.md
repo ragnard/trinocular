@@ -79,6 +79,19 @@ with half a policy.
 | `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
 | `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
 
+### `branding`
+
+```yaml
+branding:
+  name: Warehouse SQL
+  message: 'Questions? <a href="https://wiki.example/trino">#data-help</a>'
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `name` | `trinette` | The name shown at the top left of the window. |
+| `message` | — | HTML shown in the middle of the top bar: a notice, a link to where help is. It is rendered as written, so it is only ever yours; a `<script>` in it does not run, because the app's content security policy allows none. |
+
 ### `session`
 
 ```yaml

@@ -166,7 +166,17 @@ const ConnectionSchema = z.object({
   authz: AuthzSchema.optional(),
 });
 
+const BrandingSchema = z.object({
+  name: z.string().min(1).default("trinette"),
+  // HTML, shown in the middle of the top bar. It is the operator's, from the
+  // same file as the security policy, and is rendered as written.
+  message: z.string().optional(),
+});
+
+export type Branding = z.infer<typeof BrandingSchema>;
+
 const ConfigSchema = z.object({
+  branding: BrandingSchema.prefault({}),
   session: SessionSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
   authz: AuthzSchema.default({ kind: "allow" }),

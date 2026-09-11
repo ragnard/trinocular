@@ -3,7 +3,8 @@
   import type { TreeNode } from "./TreeView.svelte";
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
-  import { Box, Database, HardDrive, Search, Table } from "@lucide/svelte";
+  import { Box, Database, Globe, HardDrive, Table } from "@lucide/svelte";
+  import FilterBox from "./FilterBox.svelte";
   import TreeView from "./TreeView.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import { page } from "$app/state";
@@ -289,19 +290,12 @@
 </script>
 
 <div class="browser">
-  <!-- The filter IS the header. It used to be a third stacked row under a
-       brand and a section label, which is how this pane ended up 112px of
-       chrome deep against the document header's 40. -->
   <div class="rail">
-    <Search size={14} />
-    <input
-      type="text"
-      placeholder="Filter&hellip;"
-      bind:value={filter}
-      spellcheck="false"
-      aria-label="Filter schema"
-    />
+    <Globe size={14} />
+    <span class="ell title">Data browser</span>
   </div>
+
+  <FilterBox bind:value={filter} label="Filter schema" />
 
   <!-- Says what the tree is. The connection also appears in the document
        header, where it says what the file runs on; sitting on one band the
@@ -345,30 +339,12 @@
     background: var(--s1);
   }
 
-  /* The rail keeps the pane's own surface, so the filter reads as the pane's
-     header rather than a control sitting on one. */
-  .rail {
-    background: transparent;
+  .rail :global(svg) {
     color: var(--fg-3);
   }
 
-  .rail:focus-within {
-    color: var(--accent);
-  }
-
-  .rail input {
+  .title {
     flex: 1;
-    min-width: 0;
-    height: auto;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: var(--fg);
-  }
-
-  .rail input:focus-visible {
-    outline: none;
   }
 
   /* Body text, not `.meta`. This names the cluster every row in the tree below

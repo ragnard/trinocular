@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Result as ResultModel, Workspace } from "$lib/State.svelte";
+  import type { Branding } from "$lib/server/config";
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
@@ -7,7 +8,7 @@
   import { theme } from "$lib/theme.svelte";
 
   import { SplitPane } from "./split-pane";
-  import Account from "./Account.svelte";
+  import TopBar from "./TopBar.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
   import type { Selection } from "./table/types";
@@ -30,6 +31,7 @@
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);
   let logoutPath = $derived(page.data.logoutPath);
+  let branding: Branding = $derived(page.data.branding);
 
   // What is chosen lives in `theme`; what is drawn is this. The OS preference
   // is only followed while the effect is mounted, and painting `<html>` is the
@@ -93,9 +95,7 @@
     left to reopen it is a trap rather than a layout.
 
     How a field is drawn is a property of the document, so it travels with the
-    file rather than with the result being inspected. The account chip is the
-    pane's only tenant: it is here because this rail's right edge is the
-    window's, not because the inspector has anything to do with it.
+    file rather than with the result being inspected.
   -->
   <DataViewer
     {selection}
@@ -104,11 +104,7 @@
       const file = workspace.activeFile;
       if (file) workspace.setViewFormat(file, path, formatId);
     }}
-  >
-    {#snippet actions()}
-      <Account {userId} {logoutPath} />
-    {/snippet}
-  </DataViewer>
+  />
 {/snippet}
 
 {#snippet editor()}
@@ -144,6 +140,7 @@
 />
 
 <main>
+  <TopBar {branding} {userId} {logoutPath} />
   <div class="workspace">
     <SplitPane type="horizontal" min="180px" max="40%" pos="19%" a={browser}>
       {#snippet b()}
