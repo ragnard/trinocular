@@ -11,6 +11,10 @@
       const n = dataType.fields.length;
       return `{${n} field${n !== 1 ? "s" : ""}}`;
     }
+    if (typeof dataType === "object" && "key" in dataType) {
+      const n = typeof value === "object" ? Object.keys(value).length : 0;
+      return `{${n} ${n !== 1 ? "entries" : "entry"}}`;
+    }
     return String(value);
   }
 
