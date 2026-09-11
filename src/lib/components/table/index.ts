@@ -4,6 +4,7 @@ export type {
   Field,
   Struct,
   List,
+  Dictionary,
   DataType,
   Selection,
   SelectionData,

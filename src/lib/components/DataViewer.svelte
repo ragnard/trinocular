@@ -1,6 +1,14 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { Selection, SelectionData, DataType, Field, Struct, List } from "./table/types";
+  import type {
+    Selection,
+    SelectionData,
+    DataType,
+    Field,
+    Struct,
+    List,
+    Dictionary
+  } from "./table/types";
   import { Copy, Eye, PanelRight, Search } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
   import {
@@ -83,8 +91,15 @@
     return Array.isArray(dt);
   }
 
-  /** Structs and arrays become dotted paths, which is what makes a row read
-      as a document rather than a handful of unopenable cells. */
+  function isDictionary(dt: DataType): dt is Dictionary {
+    return typeof dt === "object" && !Array.isArray(dt) && "key" in dt;
+  }
+
+  /** Structs, maps and arrays become dotted paths, which is what makes a row
+      read as a document rather than a handful of unopenable cells. A map's
+      entries read like a row's fields, and a view format picked for one is
+      kept by key: the key is data rather than schema, but the same key in
+      another row is far more likely the same kind of value than not. */
   function flatten(value: any, field: Field, key: string, path: string): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
@@ -108,6 +123,21 @@
       };
       return value.flatMap((element, i) =>
         flatten(element, elementField, `${key}[${i + 1}]`, `${path}[]`)
+      );
+    }
+    if (isDictionary(dataType) && typeof value === "object") {
+      const entries = Object.entries(value);
+      if (entries.length === 0) {
+        return [{ key, path, value: "{}", field, empty: true }];
+      }
+      const valueField: Field = {
+        name: "",
+        dataType: dataType.value,
+        dataTypeName: field.dataTypeName,
+        nullable: true
+      };
+      return entries.flatMap(([k, v]) =>
+        flatten(v, valueField, key ? `${key}.${k}` : k, path ? `${path}.${k}` : k)
       );
     }
     return [{ key, path, value, field }];

@@ -7,7 +7,7 @@
  * A format is one entry in `EXPORT_FORMATS`. The menu is drawn from that list,
  * so adding ndjson later is a serializer and an entry, and nothing in the UI.
  */
-import type { DataType, Field, Struct } from "./components/table/types";
+import type { DataType, Dictionary, Field, Struct } from "./components/table/types";
 
 export interface ExportFormat {
   id: string;
@@ -30,12 +30,17 @@ function isStruct(dataType: DataType): dataType is Struct {
   return typeof dataType === "object" && !Array.isArray(dataType) && "fields" in dataType;
 }
 
+function isDictionary(dataType: DataType): dataType is Dictionary {
+  return typeof dataType === "object" && !Array.isArray(dataType) && "key" in dataType;
+}
+
 /**
  * A structured value shaped for JSON. Trino sends a row as an *array* of its
  * field values, so the names only exist in the type — putting them back is the
  * difference between `[1,"x"]` and `{"a":1,"b":"x"}`, and only one of those can
- * be read without the query beside it. Arrays recurse into their element type;
- * a map already arrives as a JSON object and is left alone.
+ * be read without the query beside it. Arrays recurse into their element type,
+ * and a map — already a JSON object, keys and all — into its value type, so a
+ * row inside one gets its names back too.
  */
 function toJson(value: unknown, dataType: DataType): unknown {
   if (value === null || value === undefined) return null;
@@ -46,6 +51,11 @@ function toJson(value: unknown, dataType: DataType): unknown {
   }
   if (Array.isArray(dataType) && Array.isArray(value)) {
     return value.map((element) => toJson(element, dataType[0]));
+  }
+  if (isDictionary(dataType) && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, toJson(v, dataType.value)])
+    );
   }
   return value;
 }

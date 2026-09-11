@@ -1,5 +1,5 @@
 import type { TypeSignature } from "./index";
-import type { Field, DataType, Struct } from "$lib/components/table/types";
+import type { Field, DataType, Struct, Dictionary } from "$lib/components/table/types";
 
 export function convertRow(row: any[], fields: Field[]): any[] {
   return row.map((value, i) => convertValue(value, fields[i].dataType));
@@ -15,6 +15,11 @@ export function convertValue(value: any, dataType: DataType): any {
   }
   if (typeof dataType === "object" && "fields" in dataType && Array.isArray(value)) {
     return value.map((v, i) => convertValue(v, dataType.fields[i].dataType));
+  }
+  if (typeof dataType === "object" && "key" in dataType && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, convertValue(v, dataType.value)])
+    );
   }
   return value;
 }
@@ -37,6 +42,10 @@ function toField(sig: TypeSignature, name: string): Field {
   };
 }
 
+function typeArguments(sig: TypeSignature): TypeSignature[] {
+  return sig.arguments.flatMap((a) => (a.kind === "TYPE" ? [a.value] : []));
+}
+
 function formatTypeName(sig: TypeSignature): string {
   switch (sig.rawType) {
     case "row": {
@@ -53,6 +62,13 @@ function formatTypeName(sig: TypeSignature): string {
         return `array(${formatTypeName(typeArg.value)})`;
       }
       return "array";
+    }
+    case "map": {
+      const [key, value] = typeArguments(sig);
+      if (key && value) {
+        return `map(${formatTypeName(key)}, ${formatTypeName(value)})`;
+      }
+      return "map";
     }
     default:
       return sig.rawType;
@@ -79,6 +95,14 @@ function toDataType(sig: TypeSignature): DataType {
         return [toDataType(typeArg.value)];
       }
       return ["string" as DataType];
+    }
+    case "map": {
+      const [key, value] = typeArguments(sig);
+      const dictionary: Dictionary = {
+        key: key ? toDataType(key) : "string",
+        value: value ? toDataType(value) : "string"
+      };
+      return dictionary;
     }
     case "integer":
     case "bigint":

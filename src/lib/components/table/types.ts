@@ -17,7 +17,13 @@ export interface Struct {
 
 export type List = DataType[];
 
-export type DataType = "string" | "integer" | "binary" | Struct | List;
+/** A Trino map. Its keys arrive as the strings JSON object keys have to be. */
+export interface Dictionary {
+  key: DataType;
+  value: DataType;
+}
+
+export type DataType = "string" | "integer" | "binary" | Struct | List | Dictionary;
 
 export type ValueConverter = (value: any, field: Field, colIndex: number) => any;
 

@@ -93,12 +93,12 @@ const TEXT: ViewFormat = {
 const JSON_FORMAT: ViewFormat = {
   id: "json",
   label: "JSON",
-  // A map arrives as an object already and Trino types it varchar, so both of
-  // these can hold something worth indenting. Nothing else can.
+  // Text and bytes are the two things that can hold a JSON document. Rows,
+  // arrays and maps are flattened before they get here, so nothing else can.
   applies: (field) => field.dataType === "string" || field.dataType === "binary",
   render: (value) => {
     if (value === null || value === undefined) return { text: "null" };
-    // Already structured (a map): there is nothing to parse, only to indent.
+    // Already structured: there is nothing to parse, only to indent.
     if (typeof value === "object" && !(value instanceof Uint8Array)) {
       return { text: JSON.stringify(value, null, 2), pre: true };
     }
