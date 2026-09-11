@@ -8,7 +8,6 @@
     List,
     Dictionary
   } from "./table/types";
-  import { toJson } from "$lib/export";
   import { Copy, Eye, Search } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
@@ -213,23 +212,19 @@
   }
 
   /**
-   * A document and a whole selection copy the values as a file would hold
-   * them, not as the pane drew them: a view choice says how to read a field
-   * here, and has no business deciding what lands in somebody's clipboard as
-   * JSON. `toJson` is the same encoding `export.ts` writes, which is where a
-   * varbinary becomes base64.
+   * A document and a whole selection copy the values Trino sent, not the ones
+   * the pane drew. A view choice says how to read a field here; it has no
+   * business deciding what lands in somebody's clipboard as JSON — the same
+   * line `export.ts` draws.
    */
-  const asJson = (entries: FlatEntry[]) =>
-    Object.fromEntries(entries.map((e) => [e.key, toJson(e.value, e.field.dataType)]));
-
   function copyDocument(entries: FlatEntry[]) {
-    copy(JSON.stringify(asJson(entries), null, 2));
+    copy(JSON.stringify(Object.fromEntries(entries.map((e) => [e.key, e.value])), null, 2));
   }
 
   function copyAll() {
     copy(
       JSON.stringify(
-        documents.map((d) => asJson(d.entries)),
+        documents.map((d) => Object.fromEntries(d.entries.map((e) => [e.key, e.value]))),
         null,
         2
       )

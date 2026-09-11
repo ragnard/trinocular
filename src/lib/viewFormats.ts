@@ -23,6 +23,7 @@
  * with no way to say so.
  */
 import type { Field } from "./components/table/types";
+import { fromBase64 } from "./trino/table";
 
 export interface Rendered {
   text: string;
@@ -72,9 +73,17 @@ function decodeBytes(bytes: Uint8Array): string {
   }
 }
 
-function asText(value: unknown): string {
+/**
+ * The value as the inspector received it: what Trino sent, so a varbinary is
+ * still its base64 here and is decoded by the field's type, not by sniffing
+ * the value. That is what lets the row's copy buttons hand over base64 — the
+ * table's `getData` does not convert, for the same reason `export.ts` does not.
+ */
+function asText(value: unknown, field: Field): string {
   if (value === null || value === undefined) return "null";
-  if (value instanceof Uint8Array) return decodeBytes(value);
+  if (field.dataType === "binary" && typeof value === "string") {
+    return decodeBytes(fromBase64(value));
+  }
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -87,7 +96,7 @@ const TEXT: ViewFormat = {
   id: "text",
   label: "Text",
   applies: () => true,
-  render: (value) => preserve(asText(value))
+  render: (value, field) => preserve(asText(value, field))
 };
 
 const JSON_FORMAT: ViewFormat = {
@@ -96,13 +105,13 @@ const JSON_FORMAT: ViewFormat = {
   // Text and bytes are the two things that can hold a JSON document. Rows,
   // arrays and maps are flattened before they get here, so nothing else can.
   applies: (field) => field.dataType === "string" || field.dataType === "binary",
-  render: (value) => {
+  render: (value, field) => {
     if (value === null || value === undefined) return { text: "null" };
     // Already structured: there is nothing to parse, only to indent.
-    if (typeof value === "object" && !(value instanceof Uint8Array)) {
+    if (typeof value === "object") {
       return { text: JSON.stringify(value, null, 2), pre: true };
     }
-    const source = asText(value);
+    const source = asText(value, field);
     if (source.length > FORMAT_LIMIT) {
       return { ...preserve(source), note: "Too large to format" };
     }

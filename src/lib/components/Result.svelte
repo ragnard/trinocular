@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Result as ResultModel } from "$lib/State.svelte";
-  import { Table } from "./table";
-  import type { Selection } from "./table/types";
-  import { schemaFromColumns } from "$lib/trino/table";
+  import { Table, fieldFromTypeSignature, convertValue } from "./table";
+  import type { Schema, Selection, ValueConverter } from "./table/types";
+  import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
   import { Download, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
@@ -17,8 +17,15 @@
 
   let { result, selection = $bindable(null) }: Props = $props();
 
-  let schema = $derived(result?.columns && schemaFromColumns(result.columns));
+  const toSchema = (columns?: Columns): Schema | undefined =>
+    columns && {
+      fields: columns.map((col) => fieldFromTypeSignature(col.typeSignature, col.name, col.type))
+    };
+
+  let schema = $derived(toSchema(result?.columns));
   let hasRows = $derived((result?.data?.length ?? 0) > 0);
+
+  const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 
   /**
    * Columns are enough to save: a result with no rows still has a header worth
@@ -77,7 +84,7 @@
     {#if result.running}
       <QueryProgress {result} compact />
     {/if}
-    <Table {schema} rows={result.data} {clipboardText} bind:selection>
+    <Table {schema} rows={result.data} {valueConverter} {clipboardText} bind:selection>
       {#snippet header(field)}
         <!-- One line: the type is an icon beside the name rather than a second
              row of text under it. Spelled out, a type is mostly noise a column

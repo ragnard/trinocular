@@ -8,5 +8,7 @@ export type {
   DataType,
   Selection,
   SelectionData,
-  CellRendererLookup
+  CellRendererLookup,
+  ValueConverter
 } from "./types";
+export { fieldFromTypeSignature, convertValue, convertRow } from "$lib/trino/table";
