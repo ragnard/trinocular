@@ -1,0 +1,22 @@
+# Deny everything, then allow back exactly what the build reads. The previous
+# denylist shipped whatever appeared next to it: .env (ORIGIN, TRINETTE_CONFIG)
+# and .claude/worktrees (411 MB of checkouts) were both in the build context,
+# and `cache-to: mode=max` exports the builder stage — .env included — to the
+# shared GitHub Actions cache. An allowlist fails loudly instead of silently.
+*
+
+!bun.lock
+!package.json
+!.npmrc
+!svelte.config.ts
+!vite.config.ts
+!tsconfig.json
+!src/
+!static/
+!packages/
+
+# Re-exclude build state nested inside the allowed trees.
+**/node_modules
+**/.svelte-kit
+**/dist
+**/*.timestamp-*

@@ -1,0 +1,39 @@
+node_modules
+dist
+src/**/*.js
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Iosevka release archive and the TTF extracted from it, both rebuildable by
+# `make fonts`. The two built .woff2 under src/lib/assets are checked in on
+# purpose: a build should not need 84 MB of network and a python toolchain to
+# produce two files that change only when IOSEVKA_VERSION does.
+.fontbuild/
+
+# Local-only: the dev/preview configs hold cookie and client secrets, and
+# hack/ holds a TLS key and connector properties for a local stack.
+/config.*.yaml
+/hack/
+
+# Worktrees and other per-machine state from Claude Code sessions.
+/.claude/worktrees/
