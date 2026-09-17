@@ -1,6 +1,6 @@
 import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
-import type { Columns, QueryError, QueryStats } from "$lib/trino";
+import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import { underPath } from "$lib/viewFormats";
 import {
@@ -13,6 +13,16 @@ import {
 } from "$lib/fileStorage";
 
 const MAX_RESULTS_PER_FILE = 10;
+
+export const DEFAULT_ROW_LIMIT = 1000;
+
+/** Must stay under Trino's `query.client.timeout`, five minutes by default. */
+const HEARTBEAT_MS = 30_000;
+
+/** A held query keeps its memory and resource-group slot on the cluster. */
+export const MAX_HOLD_MS = 10 * 60_000;
+
+type Resume = "more" | "all" | "stop";
 
 export type State =
   | "QUEUED"
@@ -92,17 +102,43 @@ export class Result {
   /** The result was dropped from its file; nothing will read further chunks. */
   #discarded = false;
 
-  constructor(client: Trino, sql: string, startLine: number, anchorId: string) {
+  /** Rows to show before pausing to ask, or null for all of them. */
+  limit: number | null = $state(null);
+  #step: number;
+  /** Paused at the cap with more rows to be had; heartbeats keep the query alive. */
+  held: boolean = $state(false);
+  /** Stopped at the cap, by the reader or by the hold running out. */
+  stopped: false | "user" | "expired" = $state(false);
+  /** The part of the page that crossed the cap; `fetchMore` takes from it first. */
+  #pending: readonly QueryData[] = [];
+  #resume?: (action: Resume) => void;
+  #heldUri?: string;
+
+  constructor(
+    client: Trino,
+    sql: string,
+    startLine: number,
+    anchorId: string,
+    limit: number | null = null
+  ) {
     this.client = client;
     this.id = crypto.randomUUID();
     this.sql = sql;
     this.startLine = startLine;
     this.anchorId = anchorId;
+    this.limit = limit;
+    this.#step = limit ?? DEFAULT_ROW_LIMIT;
+  }
+
+  get step(): number {
+    return this.#step;
   }
 
   queryState?: State = $derived(this.stats?.state as State);
   completed?: boolean = $derived(
-    this.error != null || (this.queryState && COMPLETED_STATES.has(this.queryState))
+    this.error != null ||
+      this.stopped !== false ||
+      (this.queryState && COMPLETED_STATES.has(this.queryState))
   );
   running?: boolean = $derived(!this.completed);
   rowCount?: number = $derived(this.data.length);
@@ -137,10 +173,17 @@ export class Result {
         if (chunk.warnings) this.warnings = chunk.warnings;
         if (chunk.error) this.error = chunk.error;
 
-        // `append` returns a new Rows sharing the pages already held, so the
-        // reference changes (which is the whole of how $state.raw notices)
-        // without a row being copied.
-        if (chunk.data) this.data = this.data.append(chunk.data);
+        if (chunk.data) this.#take(chunk.data);
+
+        // A loop: the held-back tail can exceed the step a resume adds, in
+        // which case the query is held again without another page requested.
+        while (this.#atCap(chunk.nextUri)) {
+          const action = await this.#hold(chunk.nextUri);
+          if (action === "stop") return;
+          const pending = this.#pending;
+          this.#pending = [];
+          this.#take(pending);
+        }
       }
     } catch (e) {
       if (e instanceof HttpError && e.status === 401) {
@@ -156,6 +199,91 @@ export class Result {
         failureInfo: { type: "ClientError", message, suppressed: [], stack: [] }
       };
     }
+  }
+
+  /**
+   * Appends a page, cut at the cap: a page is sized in bytes, and one of
+   * narrow rows can run to tens of thousands. `append` returns a new Rows
+   * sharing the pages already held, which is how $state.raw notices.
+   */
+  #take(page: readonly QueryData[]) {
+    const room = this.limit == null ? Infinity : this.limit - this.data.length;
+    if (page.length <= room) {
+      this.data = this.data.append(page);
+      return;
+    }
+    this.data = this.data.append(page.slice(0, room));
+    this.#pending = page.slice(room);
+  }
+
+  #atCap(nextUri: string | undefined): boolean {
+    return (
+      this.limit != null &&
+      this.data.length >= this.limit &&
+      (this.#pending.length > 0 || !!nextUri)
+    );
+  }
+
+  /**
+   * Not asking for the next page is what holds the query; the heartbeat is
+   * what keeps the cluster from reading that silence as an abandoned client.
+   * With no `nextUri` the last page has already arrived and there is nothing
+   * on the cluster to keep alive or to stop.
+   */
+  #hold(nextUri: string | undefined): Promise<Resume> {
+    this.held = true;
+    this.#heldUri = nextUri;
+    const heartbeat = nextUri
+      ? setInterval(() => void this.#sendHeartbeat(nextUri), HEARTBEAT_MS)
+      : undefined;
+    const expiry = nextUri ? setTimeout(() => this.stop("expired"), MAX_HOLD_MS) : undefined;
+    return new Promise<Resume>((resolve) => {
+      this.#resume = resolve;
+    }).finally(() => {
+      clearInterval(heartbeat);
+      clearTimeout(expiry);
+      this.#resume = undefined;
+      this.#heldUri = undefined;
+      this.held = false;
+    });
+  }
+
+  async #sendHeartbeat(nextUri: string) {
+    try {
+      await this.client.heartbeat(nextUri);
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 401) {
+        window.location.href = "/auth/login";
+      }
+      // Anything else surfaces on the resumed poll, with a message.
+    }
+  }
+
+  fetchMore() {
+    if (!this.held) return;
+    this.limit = (this.limit ?? 0) + this.#step;
+    this.#resume?.("more");
+  }
+
+  fetchAll() {
+    if (!this.held) return;
+    this.limit = null;
+    this.#resume?.("all");
+  }
+
+  /**
+   * Nobody is polling a held query, so the USER_CANCELED chunk that settles
+   * every other cancel never arrives; `stopped` settles it locally instead.
+   */
+  stop(reason: "user" | "expired" = "user") {
+    if (!this.held) return;
+    this.#pending = [];
+    this.stopped = reason;
+    if (this.#heldUri) {
+      this.cancelRequested = true;
+      void this.#sendCancel();
+    }
+    this.#resume?.("stop");
   }
 
   /**
@@ -205,6 +333,7 @@ export class Result {
    * through the same path as any other failure.
    */
   async cancel() {
+    if (this.held) return this.stop();
     if (this.completed || this.cancelRequested) return;
     this.cancelRequested = true;
     await this.#sendCancel();
@@ -221,6 +350,7 @@ export class Result {
     if (this.#discarded) return;
     this.#discarded = true;
     if (this.completed) return;
+    if (this.held) return this.stop();
     // Also makes `execute` fire the DELETE if the query id has not arrived yet.
     this.cancelRequested = true;
     void this.#sendCancel();
@@ -332,6 +462,8 @@ export class Workspace {
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
+  /** Rows a new run shows before pausing to ask, or null for all of them. */
+  rowLimit: number | null = $state(DEFAULT_ROW_LIMIT);
 
   /**
    * One catalog cache per connection, kept for the session. Browsing a Trino
@@ -561,7 +693,8 @@ export class Workspace {
       this.#createClient(this.#knownConnection(file.connectionId)),
       sql,
       startLine,
-      anchorId
+      anchorId,
+      this.rowLimit
     );
     file.addResult(result, replacesId);
     void result.execute();

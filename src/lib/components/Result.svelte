@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { Result as ResultModel } from "$lib/State.svelte";
+  import { DEFAULT_ROW_LIMIT, MAX_HOLD_MS, type Result as ResultModel } from "$lib/State.svelte";
+  import { formatCount } from "$lib/format";
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
-  import { Download, TriangleAlert } from "@lucide/svelte";
+  import { Download, ListEnd, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import Dropdown from "./Dropdown.svelte";
@@ -13,9 +14,11 @@
   interface Props {
     result: ResultModel | null;
     selection?: Selection | null;
+    /** Rows the next run shows before pausing to ask, or null for all. */
+    rowLimit?: number | null;
   }
 
-  let { result, selection = $bindable(null) }: Props = $props();
+  let { result, selection = $bindable(null), rowLimit = $bindable(null) }: Props = $props();
 
   const toSchema = (columns?: Columns): Schema | undefined =>
     columns && {
@@ -55,6 +58,18 @@
       <span class="soft">No result</span>
     {/if}
     <span class="fill"></span>
+    <!-- What the *next* run does; a run already made carries its own cap. -->
+    <button
+      class="chip"
+      aria-pressed={rowLimit != null}
+      title={rowLimit != null
+        ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
+        : "New runs fetch every row"}
+      onclick={() => (rowLimit = rowLimit == null ? DEFAULT_ROW_LIMIT : null)}
+    >
+      <ListEnd size={14} />
+      {rowLimit != null ? `Limit ${formatCount(rowLimit)}` : "No limit"}
+    </button>
     <Dropdown icon={Download} label="Save" title="Save these results to a file" disabled={!canSave}>
       {#snippet menu()}
         {#each EXPORT_FORMATS as format (format.id)}
@@ -81,7 +96,33 @@
          carries on in the strip above it. -->
     <QueryProgress {result} />
   {:else if schema}
-    {#if result.running}
+    {#if result.held}
+      <!-- In place of the progress strip: nothing is polled while held, so
+           the stats it would draw from stop moving. -->
+      <div class="notice">
+        <span class="text">
+          Showing the first {formatCount(result.rowCount)} rows. More are available; the query is paused
+          on the cluster.
+        </span>
+        <button class="chip" onclick={() => result.fetchMore()}>
+          Fetch {formatCount(result.step)} more
+        </button>
+        <button class="chip" onclick={() => result.fetchAll()}>Fetch all</button>
+        <button class="chip" onclick={() => result.stop()}>Stop</button>
+      </div>
+    {:else if result.stopped}
+      <div class="notice">
+        <span class="text">
+          Showing the first {formatCount(result.rowCount)} rows.
+          {#if result.stopped === "expired"}
+            The query was stopped after being paused for {MAX_HOLD_MS / 60_000} minutes; run it again
+            to fetch more.
+          {:else}
+            The query was stopped; run it again to fetch more.
+          {/if}
+        </span>
+      </div>
+    {:else if result.running}
       <QueryProgress {result} compact />
     {/if}
     <Table {schema} rows={result.data} {valueConverter} {clipboardText} bind:selection>
@@ -169,6 +210,27 @@
 
   .message.failed {
     color: var(--error);
+  }
+
+  .notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-height: var(--h-rail);
+    padding: 6px 12px;
+    background: var(--s1);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg-2);
+  }
+
+  .notice .text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .notice .chip {
+    flex: none;
   }
 
   .message p {

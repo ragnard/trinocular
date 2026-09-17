@@ -4,6 +4,7 @@
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
+  import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import Table from "@lucide/svelte/icons/table";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
@@ -105,6 +106,7 @@
       void result.error;
       void result.cancelling;
       void result.canceled;
+      void result.held;
       void result.infoUri;
     }
     syncToolbars();
@@ -288,6 +290,7 @@
     // than offering "Results" behind a table icon.
     if (result.error) return { icon: TriangleAlert, text: "Error", spin: false };
     if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
+    if (result.held) return { icon: Pause, text: "Paused", spin: false };
     if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
     // Just the word. The row count and the elapsed time are already on the
     // results rail, and repeating them here only made the strip above every
