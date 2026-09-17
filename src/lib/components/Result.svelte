@@ -137,16 +137,12 @@
         <button class="chip" onclick={() => result.fetchAll()}>Fetch all</button>
         <button class="chip" onclick={() => result.stop()}>Stop</button>
       </div>
-    {:else if result.stopped}
+    {:else if result.stopped === "expired"}
+      <!-- A stop the reader asked for needs no notice; one they did not does. -->
       <div class="notice">
         <span class="text">
-          Showing the first {formatCount(result.rowCount)} rows.
-          {#if result.stopped === "expired"}
-            The query was stopped after being paused for {MAX_HOLD_MS / 60_000} minutes; run it again
-            to fetch more.
-          {:else}
-            The query was stopped; run it again to fetch more.
-          {/if}
+          Showing the first {formatCount(result.rowCount)} rows. The query was stopped after being paused
+          for {MAX_HOLD_MS / 60_000} minutes; run it again to fetch more.
         </span>
       </div>
     {:else if result.running}
