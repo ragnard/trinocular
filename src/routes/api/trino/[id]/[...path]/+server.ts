@@ -190,6 +190,15 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     error(event.locals.logger, 502, "Failed to connect to upstream Trino server", "upstream request failed", { id, url, err });
   }
 
+  // A HEAD's answer carries a JSON content-type and no body.
+  if (event.request.method === "HEAD") {
+    return new Response(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: downstreamHeaders(response),
+    });
+  }
+
   if (response.status !== 200) {
     return new Response(response.body, {
       status: response.status,
@@ -231,6 +240,10 @@ function getServer(event: RequestEvent): [Connection, string] {
 }
 
 export function GET(event: RequestEvent) {
+  return proxy(event, ...getServer(event));
+}
+
+export function HEAD(event: RequestEvent) {
   return proxy(event, ...getServer(event));
 }
 

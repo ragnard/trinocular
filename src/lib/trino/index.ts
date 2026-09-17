@@ -288,8 +288,9 @@ export default class Trino {
 
     this.headers = cleanHeaders(this.headers);
 
-    // Cancelling a query answers 204 with an empty body — json() throws on it.
-    if (response.status === 204) {
+    // Cancelling a query answers 204 with an empty body, and a HEAD has none
+    // by definition — json() throws on either.
+    if (response.status === 204 || init.method === 'HEAD') {
       return undefined as T;
     }
 
@@ -318,6 +319,15 @@ export default class Trino {
     return this.request<QueryResult>(requestConfig).then(
       result => new QueryIterator(this, result)
     );
+  }
+
+  /**
+   * Keeps a query alive without advancing it: a HEAD on the current `nextUri`
+   * resets Trino's `query.client.timeout` clock, where a GET would consume the
+   * page.
+   */
+  async heartbeat(nextUri: string): Promise<void> {
+    await this.request<void>({ url: nextUri, method: 'HEAD' });
   }
 
   /**
