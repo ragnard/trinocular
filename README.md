@@ -27,7 +27,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Copy a cell as it is, or a block of cells as CSV, with the usual shortcut — nested
   values come out as JSON.
 - Save any result as CSV or NDJSON without running the query again.
-- Keep your files between visits and jump between them with a keystroke.
+- Keep your files between visits and jump between them with a keystroke — and, when the
+  server keeps them, find them from any browser you sign in from.
 - Read it light or dark, following your system or whichever you prefer.
 - Put a login in front of it, and decide who gets to reach which cluster.
 - Run more than one copy of it, and restart it, without signing anyone out.
@@ -133,6 +134,7 @@ with half a policy.
 | `ORIGIN` | for OIDC, and for the container | The URL the app is served from, e.g. `https://trinette.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
 | `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
 | `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
+| `BODY_SIZE_LIMIT` | no | The most a request body may be, `512K` by default. Raise it together with `files.maxBytes` if documents are allowed to be bigger than that. |
 
 ### `branding`
 
@@ -174,7 +176,7 @@ session:
 | `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
 | `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
 | `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |
-| `store.kind` | `memory` | Where sessions are kept: `memory` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinette. |
+| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinette. |
 
 #### `store.kind: valkey`
 
@@ -235,6 +237,58 @@ With `mode: sentinel`:
 
 Trinette refuses to start if it cannot reach the store, for the same reason it refuses
 a config it cannot validate.
+
+#### `store.kind: sqlite`
+
+Sessions in a [SQLite](https://sqlite.org) file, so they survive a restart with nothing
+else to run. It is for a single copy of Trinette: the file is opened for this process
+alone, and a second copy pointed at the same file refuses to start rather than share it.
+Sessions are encrypted with the store's own `secret`, as in Valkey, since the file is
+what a volume snapshot or a backup copies.
+
+```yaml
+session:
+  store:
+    kind: sqlite
+    path: /data/sessions.sqlite
+    secret: <at least 32 characters>
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `path` | **required** | The database file. Created if it does not exist; the directory must. |
+| `secret` | **required** | Key sessions in the file are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
+
+### `files` — where query files are kept
+
+By default a user's files live in their browser, and only there: another browser, or the
+same one with its storage cleared, starts empty. With a server store they follow the
+person instead — keyed by their user id, so what `authn` says the user's id is decides
+whose files they see — and a browser that had files of its own brings them along the
+first time it visits.
+
+```yaml
+files:
+  maxBytes: 524288
+  store:
+    kind: sqlite
+    path: /data/files.sqlite
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `maxBytes` | `524288` | The most one document may be, in bytes of its stored record. A save over it is refused, and the editor says so. The default is the server's own request body limit; raise `BODY_SIZE_LIMIT` with it. |
+| `store.kind` | `browser` | `browser`, `memory` or `sqlite`. `memory` is for development: the files are gone when the process is. |
+| `store.path` | **required** for `sqlite` | The database file. As for sessions, it is this process's alone, so a second copy of Trinette pointed at it refuses to start. |
+
+Files are not encrypted in the store — the SQL text is what a backup of the file is for.
+Sessions and files can share a directory but should be two files: the session file can
+be deleted to sign everyone out without touching a document.
+
+For Kubernetes, that is one replica, a `ReadWriteOnce` volume mounted at `/data`, and a
+Deployment with `strategy: Recreate` so an update stops the old pod before starting the
+new one — the volume can only be attached to one node at a time, and the old pod holds
+it until it is gone.
 
 ### `authn` — who the user is
 
@@ -365,11 +419,11 @@ Two endpoints answer without a session or a login, on the same port as everythin
 | Path | Says | Checks |
 | --- | --- | --- |
 | `/livez` | the process is answering HTTP | nothing else — a store outage never fails it, since a restart would not fix one |
-| `/readyz` | this replica can serve requests | the session store answers a ping (with `store.kind: memory` that is always true) |
+| `/readyz` | this replica can serve requests | the session store and the file store each answer a ping (a `memory` or `browser` store always does) |
 
 Both return `200` with a small JSON body, or `503` from `/readyz` with `{"status":"unavailable",
-"checks":{"sessionStore":"failed"}}` — the reason is in the log, not the body. `GET` and
-`HEAD` are accepted. They are not written to the request log.
+"checks":{"sessionStore":"failed","fileStore":"ok"}}` — the reason is in the log, not the
+body. `GET` and `HEAD` are accepted. They are not written to the request log.
 
 Readiness deliberately does **not** check the Trino clusters or the OIDC provider: those are
 shared by every replica, so an outage there would pull every replica out of rotation at once

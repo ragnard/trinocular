@@ -79,12 +79,21 @@ const ValkeyStoreSchema = z.discriminatedUnion("mode", [
   ValkeySentinelSchema
 ]);
 
+// A database file on a volume of this one replica. Sealed like Valkey, and for
+// the same reason: the file is what a volume snapshot or a backup copies.
+const SqliteSessionStoreSchema = z.object({
+  kind: z.literal("sqlite"),
+  path: z.string().min(1),
+  secret: z.string().min(32, "store secret must be at least 32 characters for adequate security")
+});
+
 const StoreSchema = z
-  .discriminatedUnion("kind", [MemoryStoreSchema, ValkeyStoreSchema])
+  .discriminatedUnion("kind", [MemoryStoreSchema, ValkeyStoreSchema, SqliteSessionStoreSchema])
   .default({ kind: "memory" });
 
 export type StoreConfig = z.infer<typeof StoreSchema>;
 export type ValkeyStoreConfig = z.infer<typeof ValkeyStoreSchema>;
+export type SqliteSessionStoreConfig = z.infer<typeof SqliteSessionStoreSchema>;
 
 const SessionSchema = z
   .object({
@@ -92,10 +101,37 @@ const SessionSchema = z
     maxLifetimeSeconds: z.number().int().positive().default(86400),
     store: StoreSchema
   })
-  .refine((s) => s.store.kind !== "valkey" || s.store.secret !== s.cookie.secret, {
+  .refine((s) => s.store.kind === "memory" || s.store.secret !== s.cookie.secret, {
     message: "store secret must differ from the cookie secret",
     path: ["store", "secret"]
   });
+
+// Where users' query files live. `browser` is this browser's localStorage,
+// which is where they have always been; the other two are the server's, keyed
+// by the signed-in user, so a file follows the person and not the machine.
+const FileStoreSchema = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("browser") }),
+    z.object({ kind: z.literal("memory") }),
+    z.object({ kind: z.literal("sqlite"), path: z.string().min(1) })
+  ])
+  .default({ kind: "browser" });
+
+export type FileStoreConfig = z.infer<typeof FileStoreSchema>;
+export type SqliteFileStoreConfig = Extract<FileStoreConfig, { kind: "sqlite" }>;
+
+const FilesSchema = z
+  .object({
+    // The most one document's record may be, in bytes of JSON. A write over
+    // it is refused with a 413 and reported, the way the browser's quota is.
+    // The default is adapter-node's own request body limit; raising this
+    // means raising BODY_SIZE_LIMIT with it, or the adapter refuses first.
+    maxBytes: z.number().int().positive().default(524_288),
+    store: FileStoreSchema
+  })
+  .prefault({});
+
+export type FilesConfig = z.infer<typeof FilesSchema>;
 
 const NoAuthnSchema = z.object({
   kind: z.literal("none"),
@@ -180,6 +216,7 @@ export type Branding = z.infer<typeof BrandingSchema>;
 const ConfigSchema = z.object({
   branding: BrandingSchema.prefault({}),
   session: SessionSchema,
+  files: FilesSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
   authz: AuthzSchema.default({ kind: "allow" }),
   connections: z.record(z.string(), ConnectionSchema).optional()

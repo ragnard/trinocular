@@ -1,13 +1,14 @@
 /**
- * Where a workspace's documents live between visits. localStorage today; the
- * shape here is meant to be the seam a server store slots into, which is part
- * of why a file is its own record rather than a row inside one blob.
+ * The workspace in this browser's localStorage: the `WorkspaceStore` a
+ * deployment without a server file store uses, and where the server store
+ * imports from on its first visit.
  *
  * One key per file:
  *
  *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, connectionId,
  *                                                       viewFormats}
  *     trinette:workspace:<workspaceId>:ui              {activeFileId, order}
+ *     trinette:workspace:<workspaceId>:imported        set once the server has them
  *
  * It used to be a single `:files` key holding every document, which made three
  * separate failures share one fate. A parse error lost the whole workspace
@@ -20,119 +21,61 @@
  * The file keys are the truth. `:ui` is advisory — it records what to reopen
  * and the order to list in, and anything it says about files that are not
  * there is ignored, so the two cannot disagree in a way that needs repairing.
+ *
+ * A record's version is its own serialized text: what a tab last wrote or
+ * read is exactly what it expects to find there next time, and the `storage`
+ * event keeps that expectation current while other tabs write.
  */
 
-export interface StoredFile {
-  id: string;
-  name: string;
-  content: string;
-  connectionId: string;
-  /** Inspector view formats, by field path. See `SqlFile.viewFormats`. */
-  viewFormats: Record<string, string>;
-}
-
-export interface StoredUi {
-  activeFileId?: string;
-  /** File ids, in the order the switcher should list them. */
-  order: string[];
-}
-
-export interface StoredWorkspace {
-  files: StoredFile[];
-  activeFileId?: string;
-}
+import {
+  orderFiles,
+  toStoredFile,
+  toStoredUi,
+  type FileRecord,
+  type StoredFile,
+  type StoredUi
+} from "./workspaceRecord";
+import type {
+  LoadedWorkspace,
+  PutOutcome,
+  WorkspaceStore,
+  WorkspaceWatcher
+} from "./workspaceStore";
 
 const prefix = (workspaceId: string) => `trinette:workspace:${workspaceId}:`;
 const filePrefix = (workspaceId: string) => `${prefix(workspaceId)}file:`;
 const fileKey = (workspaceId: string, fileId: string) => filePrefix(workspaceId) + fileId;
 const uiKey = (workspaceId: string) => `${prefix(workspaceId)}ui`;
+const importedKey = (workspaceId: string) => `${prefix(workspaceId)}imported`;
 
 /** The file id a storage key names, or null if the key is not a file of this
  *  workspace. Used to read the `storage` event, which hands over a key. */
-export function fileIdFromKey(workspaceId: string, key: string): string | null {
+function fileIdFromKey(workspaceId: string, key: string): string | null {
   const p = filePrefix(workspaceId);
   return key.startsWith(p) ? key.slice(p.length) : null;
 }
 
-export const isUiKey = (workspaceId: string, key: string) => key === uiKey(workspaceId);
-
-/**
- * A stored record, or null if it is not one. Every field is checked rather
- * than cast: the point of a key per file is that one unreadable record costs
- * one document, and a half-checked record would put an `undefined` name into
- * the switcher instead.
- */
-export function toStoredFile(value: unknown): StoredFile | null {
-  if (typeof value !== "object" || value === null) return null;
-  const file = value as Record<string, unknown>;
-  if (typeof file.id !== "string" || file.id === "") return null;
-  if (typeof file.name !== "string") return null;
-  if (typeof file.content !== "string") return null;
-  return {
-    id: file.id,
-    name: file.name,
-    content: file.content,
-    // An unknown connection is healed against the config by the caller.
-    connectionId: typeof file.connectionId === "string" ? file.connectionId : "",
-    viewFormats: toViewFormats(file.viewFormats)
-  };
-}
-
-/**
- * Whatever of a `path: formatId` map survives being read. A record written
- * before the field existed has none, which is the empty map rather than a
- * broken document. Format ids are not checked against the ones this build
- * knows: that is `viewFormats.ts`'s to decide at render time, and dropping an
- * id here would mean a newer tab's choices being erased by an older one every
- * time it saved.
- */
-function toViewFormats(value: unknown): Record<string, string> {
-  if (typeof value !== "object" || value === null) return {};
-  return Object.fromEntries(
-    Object.entries(value).filter(([, format]) => typeof format === "string")
-  ) as Record<string, string>;
-}
-
-function parseFile(raw: string | null): StoredFile | null {
+function parseRecord(raw: string | null): FileRecord | null {
   if (raw === null) return null;
   try {
-    return toStoredFile(JSON.parse(raw));
+    const file = toStoredFile(JSON.parse(raw));
+    return file && { ...file, version: raw };
   } catch {
     return null;
   }
 }
 
-export function readFile(workspaceId: string, fileId: string): StoredFile | null {
-  try {
-    return parseFile(localStorage.getItem(fileKey(workspaceId, fileId)));
-  } catch {
-    return null;
-  }
-}
-
-function readUi(workspaceId: string): StoredUi {
+function readUi(workspaceId: string): StoredUi | null {
   try {
     const raw = localStorage.getItem(uiKey(workspaceId));
-    if (raw) {
-      const parsed = JSON.parse(raw) as StoredUi;
-      if (Array.isArray(parsed.order)) {
-        return {
-          activeFileId: typeof parsed.activeFileId === "string" ? parsed.activeFileId : undefined,
-          order: parsed.order.filter((id): id is string => typeof id === "string")
-        };
-      }
-    }
-  } catch {}
-  return { order: [] };
+    return raw ? toStoredUi(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Every document of the workspace. The file keys decide what exists; `:ui`
- * only decides the order, and ids in it that name nothing are dropped while
- * files it does not mention go on the end by name — so a stale or missing
- * `:ui` is a cosmetic difference rather than a lost document.
- */
-export function loadWorkspace(workspaceId: string): StoredWorkspace {
+/** Every document of the workspace, in listing order. */
+export function loadWorkspace(workspaceId: string): LoadedWorkspace {
   let keys: string[] = [];
   try {
     keys = Object.keys(localStorage).filter((k) => k.startsWith(filePrefix(workspaceId)));
@@ -140,102 +83,110 @@ export function loadWorkspace(workspaceId: string): StoredWorkspace {
     return { files: [] };
   }
 
-  const byId = new Map<string, StoredFile>();
+  const files: FileRecord[] = [];
   for (const key of keys) {
-    let file: StoredFile | null = null;
+    let file: FileRecord | null = null;
     try {
-      file = parseFile(localStorage.getItem(key));
+      file = parseRecord(localStorage.getItem(key));
     } catch {}
-    if (file) byId.set(file.id, file);
+    if (file) files.push(file);
   }
 
   const ui = readUi(workspaceId);
-  const files: StoredFile[] = [];
-  for (const id of ui.order) {
-    const file = byId.get(id);
-    if (file) {
-      files.push(file);
-      byId.delete(id);
+  return { files: orderFiles(files, ui), activeFileId: ui?.activeFileId };
+}
+
+/** Whether this browser's documents have been handed to the server already.
+ *  Once per browser, not per account: another browser of the same person has
+ *  its own localStorage and its own documents to bring. */
+export function markImported(workspaceId: string, imported = true): boolean {
+  try {
+    if (imported) localStorage.setItem(importedKey(workspaceId), "1");
+    return localStorage.getItem(importedKey(workspaceId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export class LocalWorkspaceStore implements WorkspaceStore {
+  #workspaceId: string;
+
+  constructor(workspaceId: string) {
+    this.#workspaceId = workspaceId;
+  }
+
+  async load(): Promise<LoadedWorkspace> {
+    return loadWorkspace(this.#workspaceId);
+  }
+
+  /**
+   * Writes one document. A refusal is almost always the ~5MB quota. The caller
+   * is told rather than the failure being swallowed: silently not saving is
+   * the worst of the available behaviours, and with a key per file the refusal
+   * is confined to the document that caused it instead of taking every other
+   * document's edits down with it.
+   */
+  async put(file: StoredFile, expected: string | null): Promise<PutOutcome> {
+    const key = fileKey(this.#workspaceId, file.id);
+    let current: string | null = null;
+    try {
+      current = localStorage.getItem(key);
+    } catch {}
+    if (current !== expected) return { status: "conflict", current: parseRecord(current) };
+
+    const version = JSON.stringify(file);
+    try {
+      localStorage.setItem(key, version);
+      return { status: "saved", version };
+    } catch {
+      return { status: "refused", reason: "storage is full" };
     }
   }
-  const rest = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
-  files.push(...rest);
 
-  return { files, activeFileId: ui.activeFileId };
-}
-
-/**
- * Writes one document. Returns false if the browser refused it, which is
- * almost always the ~5MB quota. The caller is told rather than the failure
- * being swallowed: silently not saving is the worst of the available
- * behaviours, and with a key per file the refusal is now confined to the
- * document that caused it instead of taking every other document's edits down
- * with it.
- */
-export function writeFile(workspaceId: string, file: StoredFile): boolean {
-  try {
-    localStorage.setItem(fileKey(workspaceId, file.id), JSON.stringify(file));
-    return true;
-  } catch {
-    return false;
+  async remove(fileId: string): Promise<void> {
+    try {
+      localStorage.removeItem(fileKey(this.#workspaceId, fileId));
+    } catch {}
   }
-}
 
-export function removeFile(workspaceId: string, fileId: string): void {
-  try {
-    localStorage.removeItem(fileKey(workspaceId, fileId));
-  } catch {}
-}
-
-export function writeUi(workspaceId: string, ui: StoredUi): boolean {
-  try {
-    localStorage.setItem(uiKey(workspaceId), JSON.stringify(ui));
-    return true;
-  } catch {
-    return false;
+  async putUi(ui: StoredUi): Promise<void> {
+    try {
+      localStorage.setItem(uiKey(this.#workspaceId), JSON.stringify(ui));
+    } catch {}
   }
-}
 
-export interface WorkspaceWatcher {
-  /** A file was written by another tab. */
-  onFile(file: StoredFile): void;
-  /** A file key was removed by another tab. */
-  onFileRemoved(fileId: string): void;
-  /** Another tab rewrote the listing order. */
-  onOrder(order: string[]): void;
-}
+  /**
+   * The `storage` event fires only in the tabs that did *not* write, which is
+   * exactly the audience, and it is the piece that turns "tabs no longer
+   * overwrite each other" into "tabs agree about which documents exist".
+   *
+   * A null key means another tab called `localStorage.clear()`. There is no
+   * sensible merge for that — this tab's documents are still in memory and
+   * rewriting them would undo whatever the clear was for — so it is left alone.
+   */
+  watch(watcher: WorkspaceWatcher): () => void {
+    const workspaceId = this.#workspaceId;
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key === null) return;
 
-/**
- * Reports what other tabs do to this workspace. The `storage` event fires only
- * in the tabs that did *not* write, which is exactly the audience, and it is
- * the piece that turns "tabs no longer overwrite each other" into "tabs agree
- * about which documents exist".
- *
- * A null key means another tab called `localStorage.clear()`. There is no
- * sensible merge for that — this tab's documents are still in memory and
- * rewriting them would undo whatever the clear was for — so it is left alone.
- */
-export function watchWorkspace(workspaceId: string, watcher: WorkspaceWatcher): () => void {
-  const onStorage = (event: StorageEvent) => {
-    if (event.storageArea !== localStorage) return;
-    if (event.key === null) return;
-
-    const fileId = fileIdFromKey(workspaceId, event.key);
-    if (fileId !== null) {
-      if (event.newValue === null) watcher.onFileRemoved(fileId);
-      else {
-        const file = parseFile(event.newValue);
-        if (file) watcher.onFile(file);
+      const fileId = fileIdFromKey(workspaceId, event.key);
+      if (fileId !== null) {
+        if (event.newValue === null) watcher.onFileRemoved(fileId);
+        else {
+          const file = parseRecord(event.newValue);
+          if (file) watcher.onFile(file);
+        }
+        return;
       }
-      return;
-    }
 
-    if (isUiKey(workspaceId, event.key)) {
-      const ui = readUi(workspaceId);
-      watcher.onOrder(ui.order);
-    }
-  };
+      if (event.key === uiKey(workspaceId)) {
+        const ui = readUi(workspaceId);
+        if (ui) watcher.onOrder(ui.order);
+      }
+    };
 
-  window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }
 }

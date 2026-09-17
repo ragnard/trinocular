@@ -8,6 +8,11 @@ export default defineConfig({
       allow: ["packages"]
     }
   },
+  ssr: {
+    // The runtime's own module: nothing to bundle, and adapter-node's rollup
+    // would otherwise go looking for it.
+    external: ["bun:sqlite"]
+  },
   optimizeDeps: {
     // monaco-language-trino is this repo's own source, symlinked in by the
     // workspace. Pre-bundling it would cache a copy in node_modules/.vite that

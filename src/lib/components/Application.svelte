@@ -23,10 +23,21 @@
   let switcherOpen = $state(false);
   let editorRef: ReturnType<typeof Editor> | undefined = $state();
 
-  // Other tabs share this workspace's storage; the `storage` event is how this
-  // one hears about documents they add, rename or delete. The effect's return
-  // value unsubscribes.
-  $effect(() => workspace.watchOtherTabs());
+  // Other tabs, and with the server store other browsers, share this
+  // workspace; the store is how this tab hears about documents they add,
+  // rename or delete. The effect's return value unsubscribes.
+  $effect(() => workspace.watchStore());
+
+  // A save waits half a second after the last keystroke; a tab closed inside
+  // that window would lose it. `pagehide` is the last moment to send it.
+  $effect(() => {
+    const flush = () => {
+      clearTimeout(saveTimer);
+      workspace.flush();
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  });
 
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);

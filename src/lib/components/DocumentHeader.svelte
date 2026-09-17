@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SqlFile, Workspace } from "$lib/State.svelte";
-  import { FileText, HardDrive } from "@lucide/svelte";
+  import { CloudOff, FileText, HardDrive } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
 
   interface Props {
@@ -67,6 +67,16 @@
 
   <span class="fill"></span>
 
+  {#if workspace.saveFailed}
+    <span
+      class="unsaved"
+      title="A save failed and is being retried. Your edits are only in this tab until it succeeds."
+    >
+      <CloudOff size={14} />
+      Not saved
+    </span>
+  {/if}
+
   <button class="chip" onclick={onquickopen}>
     <kbd>&#8984;P</kbd>
     Switch file
@@ -83,6 +93,17 @@
     height: 16px;
     margin: 0 8px;
     background: var(--line-strong);
+  }
+
+  /* Shown only once a save has failed and is being retried: the half-second
+     between a keystroke and its save is not worth a flicker. */
+  .unsaved {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    color: var(--error);
+    font-size: var(--text-sm);
   }
 
   button.danger:hover {

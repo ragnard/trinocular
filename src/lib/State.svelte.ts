@@ -4,14 +4,9 @@ import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import type { ClientConnection } from "$lib/server/connectionAuthz";
 import { underPath } from "$lib/viewFormats";
-import {
-  loadWorkspace,
-  writeFile,
-  removeFile,
-  writeUi,
-  watchWorkspace,
-  type StoredFile
-} from "$lib/fileStorage";
+import type { FileRecord, StoredFile } from "$lib/workspaceRecord";
+import type { LoadedWorkspace, WorkspaceStore } from "$lib/workspaceStore";
+import { WorkspaceSaver } from "$lib/workspaceSaver";
 
 const MAX_RESULTS_PER_FILE = 10;
 
@@ -492,18 +487,16 @@ export class Workspace {
    */
   #catalogs = new Map<string, CatalogCache>();
 
+  #store: WorkspaceStore;
   /**
-   * What this tab last wrote for each file, serialized, so `persist` can write
-   * only the documents that actually changed.
-   *
-   * Seeded from what was loaded, which is the whole of why two tabs no longer
+   * What sends the documents to the store, and only the ones that changed.
+   * Seeded from what was loaded, which is the whole of why two tabs do not
    * overwrite each other: a tab that has not touched a document never writes
-   * its key, so it cannot put back the copy it happened to load. The old
-   * single-blob `persist` rewrote every document from this tab's memory on
-   * every save, and the last tab to save won for all of them.
+   * it, so it cannot put back the copy it happened to load.
    */
-  #lastWritten = new Map<string, string>();
-  #lastUi = "";
+  #saver: WorkspaceSaver;
+  /** A save has failed and is being retried: the edit is still only here. */
+  saveFailed = $state(false);
 
   /**
    * `connections` is the configured set, newest config wins: a file restored
@@ -511,9 +504,24 @@ export class Workspace {
    * pointed back at the default, since its own id can only ever 404 at the
    * proxy.
    */
-  constructor(connections: readonly ClientConnection[], id: string = "default") {
+  constructor(
+    connections: readonly ClientConnection[],
+    store: WorkspaceStore,
+    loaded: LoadedWorkspace,
+    id: string = "default"
+  ) {
     this.id = id;
     this.connections = connections;
+    this.#store = store;
+    this.#saver = new WorkspaceSaver(store, {
+      isActive: (fileId) => this.activeFile?.id === fileId,
+      applyRemote: (record) => this.#applyRemoteFile(record),
+      applyRemoved: (fileId) => this.#applyRemoteRemoval(fileId),
+      onTrouble: (failing) => {
+        if (this.saveFailed !== failing) this.saveFailed = failing;
+      },
+      report: (message) => console.error(`trinette: ${message}`)
+    });
     this.#connectionIds = new Set(connections.map((c) => c.id));
     this.defaultConnectionId = connections[0]?.id ?? "";
     // Every id `#knownConnection` can hand back, so `catalogFor` is a lookup
@@ -523,7 +531,7 @@ export class Workspace {
     for (const id of [...this.#connectionIds, this.defaultConnectionId]) {
       this.#catalogs.set(id, new CatalogCache(this.#createClient(id)));
     }
-    this.#restoreFiles();
+    this.#restoreFiles(loaded);
   }
 
   #knownConnection(connectionId: string | undefined): string {
@@ -595,9 +603,8 @@ export class Workspace {
     if (changed) this.persist();
   }
 
-  #restoreFiles() {
-    const stored = loadWorkspace(this.id);
-    for (const file of stored.files) this.#lastWritten.set(file.id, JSON.stringify(file));
+  #restoreFiles(stored: LoadedWorkspace) {
+    this.#saver.seed(stored.files);
 
     this.files = stored.files.map(
       (f) =>
@@ -622,37 +629,22 @@ export class Workspace {
   }
 
   /**
-   * Writes the documents whose contents differ from what this tab last wrote,
-   * and removes the keys of documents that have gone. Called on a debounce
-   * while typing, so the comparison is what keeps a keystroke from rewriting
-   * every open document -- and, more importantly, from rewriting documents
-   * this tab has not touched at all.
+   * Hands every document to the saver, which writes the ones whose contents
+   * differ from what it last wrote and removes the ones that have gone.
+   * Called on a debounce while typing, so the comparison is what keeps a
+   * keystroke from rewriting every open document -- and, more importantly,
+   * from rewriting documents this tab has not touched at all.
    */
   persist() {
-    const live = new Set<string>();
-    for (const file of this.files) {
-      live.add(file.id);
-      const record = this.#record(file);
-      const serialized = JSON.stringify(record);
-      if (this.#lastWritten.get(file.id) === serialized) continue;
-      if (writeFile(this.id, record)) {
-        this.#lastWritten.set(file.id, serialized);
-      } else {
-        // Almost always the quota. Losing the write silently is what the old
-        // `catch {}` did; at least say so, and only this document is affected.
-        console.error(`trinette: could not save "${file.name}" — storage is full`);
-      }
-    }
+    this.#saver.update(
+      this.files.map((file) => this.#record(file)),
+      { activeFileId: this.activeFile?.id, order: this.files.map((f) => f.id) }
+    );
+  }
 
-    for (const id of [...this.#lastWritten.keys()]) {
-      if (live.has(id)) continue;
-      removeFile(this.id, id);
-      this.#lastWritten.delete(id);
-    }
-
-    const ui = { activeFileId: this.activeFile?.id, order: this.files.map((f) => f.id) };
-    const serializedUi = JSON.stringify(ui);
-    if (serializedUi !== this.#lastUi && writeUi(this.id, ui)) this.#lastUi = serializedUi;
+  /** The page is going away: what the debounce is holding goes out now. */
+  flush() {
+    this.#saver.flush(() => this.persist());
   }
 
   openFile(file: SqlFile) {
@@ -730,17 +722,17 @@ export class Workspace {
    *  - A name or connection change is applied in place, since neither is
    *    something monaco holds.
    */
-  watchOtherTabs(): () => void {
-    return watchWorkspace(this.id, {
+  watchStore(): () => void {
+    return this.#store.watch({
       onFile: (record) => this.#applyRemoteFile(record),
       onFileRemoved: (fileId) => this.#applyRemoteRemoval(fileId),
       onOrder: (order) => this.#applyRemoteOrder(order)
     });
   }
 
-  #applyRemoteFile(record: StoredFile) {
+  #applyRemoteFile(record: FileRecord) {
     // Record it as seen, so this tab does not write the value straight back.
-    this.#lastWritten.set(record.id, JSON.stringify(record));
+    this.#saver.noteRemote(record);
     const connectionId = this.#knownConnection(record.connectionId);
     const existing = this.files.find((f) => f.id === record.id);
 
@@ -771,7 +763,7 @@ export class Workspace {
   }
 
   #applyRemoteRemoval(fileId: string) {
-    this.#lastWritten.delete(fileId);
+    this.#saver.noteRemoved(fileId);
     const index = this.files.findIndex((f) => f.id === fileId);
     if (index === -1) return;
 
