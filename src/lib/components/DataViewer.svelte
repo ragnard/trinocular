@@ -13,7 +13,6 @@
   import Menu from "./Menu.svelte";
   import {
     DEFAULT_FORMAT,
-    display,
     formatsFor,
     render,
     resolveFormat,
@@ -41,8 +40,6 @@
 
   $effect(() => {
     const sel = selection;
-    // What was expanded belongs to values that are no longer on screen.
-    expanded = {};
     if (!sel) {
       data = null;
       return;
@@ -165,16 +162,6 @@
   let fieldCount = $derived(documents[0]?.entries.length ?? 0);
 
   /**
-   * Which values have been asked for in full, by row and display key — one
-   * value at a time rather than one column, since it is a particular cell that
-   * turned out to be worth reading and the one below it may be megabytes.
-   * Session-only: it says what you are looking at, not what the field means.
-   */
-  let expanded: Record<string, true> = $state({});
-
-  const expansionKey = (row: number, key: string) => `${row}\u001f${key}`;
-
-  /**
    * The picker: one menu for the whole pane, pointed at by every row's button.
    * A `Dropdown` per field would put a popover element behind every row of
    * every selected document, and only one of them can ever be open.
@@ -230,8 +217,6 @@
       )
     );
   }
-
-  const count = (n: number) => n.toLocaleString();
 </script>
 
 <div class="inspector">
@@ -275,17 +260,14 @@
       {#each doc.entries as entry (entry.key)}
         {@const choices = formatsFor(entry.field)}
         {@const chosen = resolveFormat(entry.field, formatId(entry))}
-        {@const shown = display(
-          entry.value,
-          entry.field,
-          formatId(entry),
-          !!expanded[expansionKey(doc.row, entry.key)]
-        )}
+        {@const { view } = render(entry.value, entry.field, formatId(entry))}
         <div class="field">
           <span class="key ell" title={entry.key}>{entry.key}</span>
-          <span class="value mono" class:null={entry.value === null}>
-            {#if shown.pre}<pre>{shown.text}</pre>{:else}{shown.text}{/if}{#if shown.truncated}&hellip;{/if}
-          </span>
+          <!-- Whatever the format drew: text with its own cap, a frame, an
+               image. This row does not know which, and does not need to. -->
+          <div class="value" class:null={entry.value === null}>
+            <view.component {...view.props} title={entry.key} />
+          </div>
           <div class="controls">
             {#if choices.length > 1}
               <button
@@ -297,32 +279,11 @@
               >
                 <Eye size={12} />
               </button>
-            {:else}
-              <span class="no-pick"></span>
             {/if}
             <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
               <Copy size={12} />
             </button>
           </div>
-          {#if shown.note || shown.truncated}
-            <p class="note meta">
-              {#if shown.note}<span class="warn">{shown.note}</span>{/if}
-              {#if shown.truncated}
-                <span>
-                  Showing {count(shown.text.length)} of {count(shown.total)} characters
-                  {#if !shown.expandable}&mdash; copy for the whole value{/if}
-                </span>
-                {#if shown.expandable}
-                  <button
-                    class="more"
-                    onclick={() => (expanded[expansionKey(doc.row, entry.key)] = true)}
-                  >
-                    Show more
-                  </button>
-                {/if}
-              {/if}
-            </p>
-          {/if}
         </div>
       {/each}
     {/each}
@@ -420,8 +381,9 @@
   }
 
   .field {
+    position: relative;
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr) auto;
+    grid-template-columns: 150px minmax(0, 1fr);
     gap: 0 10px;
     align-items: start;
     padding: 6px 12px 6px 12px;
@@ -446,51 +408,26 @@
     font-style: italic;
   }
 
-  .value pre {
-    margin: 0;
-    font: inherit;
-    white-space: pre-wrap;
-  }
-
-  /* Why the value is not all of itself, or not what the format promised. Under
-     the value rather than beside it: the columns to the right are 24px of
-     button. */
-  .note {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 8px;
-    grid-column: 2 / -1;
-    margin: 4px 0 0;
-  }
-
-  .note .warn {
-    color: var(--error);
-  }
-
-  .note .more {
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  /* One track for both buttons rather than one each: as grid columns they were
-     a gutter apart, which read as two unrelated controls that happened to
-     share a row. Beside the field, too, not beside the middle of it — a value
-     can be two hundred lines tall and its controls belong up where its name
-     is. */
+  /* Over the value's top-right corner rather than in a column of their own:
+     a column cost every row 58px of width for two buttons that are only
+     there on hover. Up where the field's name is, not beside the middle of
+     it — a value can be two hundred lines tall. Each button carries the
+     pane's surface so the text under it is covered rather than overprinted,
+     and a hidden button hides its surface with it, so the one that stays
+     lit (below) masks its own 24px and nothing more. */
   .controls {
+    position: absolute;
+    top: 4px;
+    right: 8px;
     display: flex;
-    align-self: start;
   }
 
-  /* Holds the picker's place so `Copy` stays on the same edge down the pane
-     whether or not a field has a format to choose. */
-  .no-pick {
-    width: var(--h-ctl);
+  .controls .chip {
+    background: var(--s1);
+  }
+
+  .controls .chip:hover {
+    background: var(--s2);
   }
 
   /* Revealed on hover so twenty fields are not forty buttons — except a picker
