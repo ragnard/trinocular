@@ -3,17 +3,21 @@
   import type { TreeNode } from "./TreeView.svelte";
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
-  import { Box, Database, Globe, HardDrive, Table } from "@lucide/svelte";
+  import { selectStatement, type TableRef } from "$lib/trino/statements";
+  import { Box, Database, Ellipsis, Globe, HardDrive, Table, X } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
+  import Menu from "./Menu.svelte";
   import TreeView from "./TreeView.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import { page } from "$app/state";
 
   interface Props {
     workspace: Workspace;
+    /** Puts a statement into the active document. Without it the menu only copies. */
+    oninsert?: (sql: string) => void;
   }
 
-  let { workspace }: Props = $props();
+  let { workspace, oninsert }: Props = $props();
 
   let connectionName = $derived(
     page.data.connections?.find((c: { id: string }) => c.id === workspace.connectionId)?.name ||
@@ -64,6 +68,8 @@
     kind: NodeKind;
     /** Only the three levels that live on the cluster have anything to fetch. */
     load?: (fresh?: boolean) => Promise<unknown>;
+    /** The parts of a table's name, for the statements written about it. */
+    table?: TableRef;
   }
 
   /**
@@ -77,6 +83,7 @@
     const cache = workspace.catalog;
     const loading = cache.loading;
     const errors = cache.errors;
+    const working = busy;
     const meta = new Map<string, NodeMeta>();
 
     /**
@@ -131,12 +138,14 @@
               const tableId = `${schemaId}${SEP}${table}`;
               meta.set(tableId, {
                 kind: "table",
-                load: (fresh) => cache.loadColumns(catalog, schema, table, fresh)
+                load: (fresh) => cache.loadColumns(catalog, schema, table, fresh),
+                table: { catalog, schema, table }
               });
               return {
                 id: tableId,
                 label: table,
-                loading: loading.has(`columns:${catalog}.${schema}.${table}`),
+                loading:
+                  loading.has(`columns:${catalog}.${schema}.${table}`) || working.has(tableId),
                 error: errors.get(`columns:${catalog}.${schema}.${table}`),
                 reloadable: true,
                 children: cache.getColumns(catalog, schema, table).map((col) => {
@@ -273,6 +282,54 @@
   }
 
   /**
+   * The statements a table's menu offers. One menu for the whole tree, pointed
+   * at by every table row's button, for the same reason the inspector shares
+   * one: only one can be open. The CREATE is the cluster's own DDL and costs a
+   * query; the SELECT is written from the columns the tree already holds, or
+   * fetches them, which is the same fetch opening the row does.
+   */
+  const menuId = $props.id();
+  let target: TreeNode | null = $state.raw(null);
+  let anchor: HTMLElement | null = $state(null);
+  let menuOpen = $state(false);
+
+  /** Table rows with a statement on the way; drawn as the row loading. */
+  let busy: Set<string> = $state.raw(new Set());
+  let actionError: string | null = $state(null);
+
+  function startAction(node: TreeNode, button: HTMLElement) {
+    target = node;
+    anchor = button;
+  }
+
+  type StatementKind = "CREATE" | "SELECT";
+
+  async function statementFor(ref: TableRef, kind: StatementKind): Promise<string> {
+    const cache = workspace.catalog;
+    if (kind === "CREATE") return cache.showCreate(ref.catalog, ref.schema, ref.table);
+    return selectStatement(ref, await cache.loadColumns(ref.catalog, ref.schema, ref.table));
+  }
+
+  async function act(node: TreeNode, kind: StatementKind, how: "copy" | "insert") {
+    const ref = meta.get(node.id)?.table;
+    if (!ref) return;
+    actionError = null;
+    busy = new Set(busy).add(node.id);
+    try {
+      const sql = await statementFor(ref, kind);
+      if (how === "copy") await navigator.clipboard.writeText(sql);
+      else oninsert?.(sql);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      actionError = `Could not ${how} ${kind} statement for ${node.label}: ${reason}`;
+    } finally {
+      const next = new Set(busy);
+      next.delete(node.id);
+      busy = next;
+    }
+  }
+
+  /**
    * The catalog list is the one fetch nobody asks for, so it is also the one
    * whose failure has nowhere to surface. An unreachable cluster — or one no
    * longer in the config — rejects here, and without this the only trace is an
@@ -307,6 +364,19 @@
 
   <div class="tree">
     <TreeView nodes={visible} expanded={open} ontoggle={handleToggle} onreload={handleReload}>
+      {#snippet actions(node)}
+        {#if meta.get(node.id)?.kind === "table"}
+          <button
+            popovertarget={menuId}
+            aria-pressed={menuOpen && target?.id === node.id}
+            aria-haspopup="true"
+            title="Statements for {node.label}"
+            onclick={(e) => startAction(node, e.currentTarget)}
+          >
+            <Ellipsis size={12} />
+          </button>
+        {/if}
+      {/snippet}
       {#snippet icon(node)}
         {@const kind = meta.get(node.id)?.kind}
         {#if kind === "catalog"}
@@ -329,7 +399,35 @@
       </div>
     {/if}
   </div>
+
+  <!-- Below the tree rather than under the row: the row's own error line is
+       drawn only while the row is open, and a statement is asked for from a
+       closed one as often as not. -->
+  {#if actionError}
+    <div class="notice">
+      <span>{actionError}</span>
+      <button class="chip square" title="Dismiss" onclick={() => (actionError = null)}>
+        <X size={12} />
+      </button>
+    </div>
+  {/if}
 </div>
+
+<!-- One menu, shared. `target` is whichever table's button last opened it. -->
+<Menu id={menuId} {anchor} onopenchange={(o) => (menuOpen = o)}>
+  {#snippet menu()}
+    {#if target}
+      {@const node = target}
+      <button onclick={() => act(node, "CREATE", "copy")}>Copy CREATE statement</button>
+      <button onclick={() => act(node, "SELECT", "copy")}>Copy SELECT statement</button>
+      {#if oninsert}
+        <div class="separator"></div>
+        <button onclick={() => act(node, "CREATE", "insert")}>Insert CREATE statement</button>
+        <button onclick={() => act(node, "SELECT", "insert")}>Insert SELECT statement</button>
+      {/if}
+    {/if}
+  {/snippet}
+</Menu>
 
 <style>
   .browser {
@@ -377,5 +475,23 @@
 
   .hint.error {
     color: var(--error);
+  }
+
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex: none;
+    padding: 6px 8px 8px 12px;
+    border-top: 1px solid var(--line);
+    color: var(--error);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .notice span {
+    flex: 1;
+    min-width: 0;
   }
 </style>

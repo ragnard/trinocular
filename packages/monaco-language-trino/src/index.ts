@@ -18,3 +18,6 @@ export { StaticMetadataProvider } from './editor/metadataProvider';
 // Utilities
 export { splitStatements } from './editor/splitStatements';
 export type { StatementSlice } from './editor/splitStatements';
+
+// Writing names back into SQL
+export { isReservedWord, quoteIdentifier, qualifiedName } from './editor/identifiers';
