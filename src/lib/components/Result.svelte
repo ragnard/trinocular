@@ -85,9 +85,9 @@
       </button>
       {#if limitRows}
         <input
-          type="number"
-          min="1"
-          step="1"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
           value={rowLimit}
           aria-label="Rows to show before pausing"
           onchange={(e) => setLimit(e.currentTarget)}
@@ -271,25 +271,9 @@
   }
 
   .limit input {
-    width: 10ch;
-    height: var(--h-ctl);
-    padding: 0 6px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r);
-    background: var(--s0);
-    color: inherit;
-    font: inherit;
+    width: 9ch;
     font-variant-numeric: tabular-nums;
     text-align: right;
-  }
-
-  .limit input::-webkit-inner-spin-button {
-    margin-left: 6px;
-  }
-
-  .limit input:focus-visible {
-    outline: 1px solid var(--accent);
-    outline-offset: -1px;
   }
 
   /* The extension is the answer to "what will the file be called", so it sits
