@@ -32,7 +32,7 @@ services:
         required: false
 
   trino:
-    image: trinodb/trino:480
+    image: trinodb/trino:483
     # This is the conditional: `${TRINO_URL:+external}` is "external" when
     # TRINO_URL is set and empty when it is not, and compose reads an empty
     # profile as none at all — so the service is ordinary when you have no
