@@ -5,7 +5,7 @@
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
   import { abbreviateType, typeCategory } from "$lib/trino/typeString";
-  import { Download, ListEnd, TriangleAlert } from "@lucide/svelte";
+  import { Copy, Download, ListEnd, TriangleAlert } from "@lucide/svelte";
   import QueryProgress from "./QueryProgress.svelte";
   import TypeIcon from "./TypeIcon.svelte";
   import Dropdown from "./Dropdown.svelte";
@@ -39,6 +39,18 @@
 
   let schema = $derived(toSchema(result?.columns));
   let hasRows = $derived((result?.data?.length ?? 0) > 0);
+
+  const ERROR_LIMIT = 1_000;
+  let expanded: ResultModel | null = $state.raw(null);
+  let errorText = $derived.by(() => {
+    const message = result?.error?.message ?? "";
+    if (message.length <= ERROR_LIMIT || expanded === result) return { text: message };
+    return { text: message.slice(0, ERROR_LIMIT) + "…", total: message.length };
+  });
+
+  function copyError() {
+    if (result?.error) void navigator.clipboard.writeText(result.error.message);
+  }
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
 
@@ -114,8 +126,19 @@
   {:else if result.error}
     <div class="message failed">
       <TriangleAlert size={20} />
-      <p>{result.error.message}</p>
-      <p class="meta">{result.error.errorName} &middot; {result.error.errorCode}</p>
+      <p class="error-text">{errorText.text}</p>
+      {#if errorText.total}
+        <p class="note meta">
+          Showing {ERROR_LIMIT.toLocaleString()} of {errorText.total.toLocaleString()} characters
+          <button class="more" onclick={() => (expanded = result)}>Show more</button>
+        </p>
+      {/if}
+      <p class="meta">
+        {result.error.errorName} &middot; {result.error.errorCode}
+        <button class="chip square" onclick={copyError} title="Copy the error message">
+          <Copy size={12} />
+        </button>
+      </p>
     </div>
   {:else if !hasRows && result.running}
     <!-- No rows to look at yet, so the pane is free to show what the cluster is
@@ -232,6 +255,9 @@
   }
 
   .message.failed {
+    min-height: 0;
+    overflow-y: auto;
+    justify-content: safe center;
     color: var(--error);
   }
 
@@ -270,6 +296,26 @@
     width: 9ch;
     font-variant-numeric: tabular-nums;
     text-align: right;
+  }
+
+  .error-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .message.failed .meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .note .more {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
   }
 
   /* The extension is the answer to "what will the file be called", so it sits
