@@ -1,5 +1,6 @@
 import type { Handle } from "@sveltejs/kit";
 
+import type { FileStore } from "./fileStore";
 import { logger } from "./logging";
 import type { SessionStore } from "./session";
 
@@ -39,9 +40,10 @@ const probeResponse = (status: number, body: unknown, method: string): Response 
  * outage must not fail it: restarting a pod does not bring Valkey back, and a
  * fleet restarting in a loop is how a store outage becomes an app outage.
  *
- * Readiness asks whether this replica should be receiving traffic, and the one
- * dependency a request here cannot do without is the session store — every
- * OIDC request reads the session, and a `load` that rejects is a 500. The Trino
+ * Readiness asks whether this replica should be receiving traffic, and the
+ * dependencies a request here cannot do without are the stores this replica
+ * holds open — every OIDC request reads the session, every save writes a
+ * file, and a `load` that rejects is a 500. The Trino
  * clusters and the identity provider are deliberately *not* checked: they are
  * shared by every replica, so failing readiness on them would take every
  * replica out of rotation together and turn "cannot run a query" into "cannot
@@ -56,8 +58,14 @@ const probeResponse = (status: number, body: unknown, method: string): Response 
  * is worth writing down, a refused readiness and why, this handler writes
  * itself.
  */
-export const ProbeHandler = (store: SessionStore): Handle => {
+export const ProbeHandler = (store: SessionStore, fileStore: FileStore | null = null): Handle => {
   const log = logger.child({ component: "probes" });
+  // Each dependency a request cannot be served without, by the name the body
+  // reports it under. Null means there is nothing to reach.
+  const checks: [name: string, ping: (() => Promise<void>) | undefined][] = [
+    ["sessionStore", store.ping?.bind(store)],
+    ["fileStore", fileStore?.ping?.bind(fileStore)]
+  ];
 
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
@@ -72,16 +80,21 @@ export const ProbeHandler = (store: SessionStore): Handle => {
       return probeResponse(200, { status: "ok" }, method);
     }
 
-    try {
-      if (store.ping) await withDeadline(store.ping(), READY_DEADLINE_MS);
-      return probeResponse(200, { status: "ok", checks: { sessionStore: "ok" } }, method);
-    } catch (err) {
-      log.warn({ err }, "not ready: session store did not answer");
-      return probeResponse(
-        503,
-        { status: "unavailable", checks: { sessionStore: "failed" } },
-        method
-      );
+    const results: Record<string, "ok" | "failed"> = {};
+    for (const [name, ping] of checks) {
+      try {
+        if (ping) await withDeadline(ping(), READY_DEADLINE_MS);
+        results[name] = "ok";
+      } catch (err) {
+        log.warn({ err, check: name }, "not ready: store did not answer");
+        results[name] = "failed";
+      }
     }
+    const ready = Object.values(results).every((r) => r === "ok");
+    return probeResponse(
+      ready ? 200 : 503,
+      { status: ready ? "ok" : "unavailable", checks: results },
+      method
+    );
   };
 };

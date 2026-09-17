@@ -10,6 +10,20 @@ export const createSessionStore = async (cfg: StoreConfig): Promise<SessionStore
     case "memory":
       logger.info({ store: "memory" }, "session store configured");
       return new InMemoryStore();
+    case "sqlite": {
+      const { SqliteSessionStore } = await import("./sqliteSessionStore");
+      try {
+        const store = await SqliteSessionStore.create(cfg, {
+          onUnreadable: (sessionId, err) =>
+            logger.warn({ err, sessionId: sessionId.slice(0, 8) }, "unreadable session, dropping")
+        });
+        logger.info({ store: "sqlite", path: cfg.path }, "session store configured");
+        return store;
+      } catch (err) {
+        logger.error({ err, path: cfg.path }, "failed to open the session store");
+        process.exit(1);
+      }
+    }
     case "valkey": {
       const { ValkeyStore, describe } = await import("./valkeyStore");
       const where = describe(cfg);

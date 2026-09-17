@@ -5,6 +5,7 @@ import { config, forbiddenPath, isAuthPath, loginPath, type Config } from "$lib/
 import { env } from "$env/dynamic/private";
 import { SessionHandler } from "$lib/server/session";
 import { createSessionStore } from "$lib/server/sessionStore";
+import { fileStore } from "$lib/server/fileStore";
 import { OIDCHandler } from "$lib/server/oidc";
 import { LoggingHandler } from "$lib/server/logging";
 import { SecurityHeadersHandler } from "$lib/server/securityHeaders";
@@ -46,6 +47,7 @@ const createHandle = async () => {
     sessionStore
       .dispose?.()
       .catch((err) => logger.warn({ err }, "session store did not close cleanly"));
+    fileStore?.dispose?.().catch((err) => logger.warn({ err }, "file store did not close cleanly"));
   });
   const authz = createAuthorizer(config.authz, {
     defaultClient: config.authn.kind === "oidc" ? config.authn.clientId : undefined,
@@ -62,7 +64,7 @@ const createHandle = async () => {
     SecurityHeadersHandler(),
     // Before logging and before the session: a probe is not traffic, and must
     // not be issued a cookie or have the store read on its behalf.
-    ProbeHandler(sessionStore),
+    ProbeHandler(sessionStore, fileStore),
     LoggingHandler(),
     await SessionHandler(sessionStore, {
       cookieName: config.session.cookie.name,

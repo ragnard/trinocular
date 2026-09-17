@@ -17,6 +17,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     // same thing again per request — this list is what the switcher draws, not
     // what enforces anything.
     connections: visibleConnections(locals.identity),
+    // Where the browser keeps the documents: its own localStorage, or the
+    // server's file store behind /api/workspace.
+    fileStorage: config.files.store.kind === "browser" ? "browser" : "server",
     // Where the account menu's — and the forbidden page's — `Sign out` posts.
     logoutPath
   };
