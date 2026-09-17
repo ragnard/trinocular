@@ -9,8 +9,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   results.
 - See what a running query is actually doing, and stop it if it is doing too much.
 - Keep a big result from flooding the screen: a run pauses after the first thousand
-  rows and asks before fetching more, or all of them. Switch the cap off for runs that
-  should not stop.
+  rows, or however many you set, and asks before fetching more, or all of them. Switch
+  the cap off for runs that should not stop.
 - Inspect one or more rows of a result set, field by field, with nested values spelled
   out.
 - Flexible value display — read a field as text or as JSON, and have the choice

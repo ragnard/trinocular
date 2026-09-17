@@ -177,7 +177,7 @@ export class Result {
 
         // A loop: the held-back tail can exceed the step a resume adds, in
         // which case the query is held again without another page requested.
-        while (this.#atCap(chunk.nextUri)) {
+        while (this.#atCap()) {
           const action = await this.#hold(chunk.nextUri);
           if (action === "stop") return;
           const pending = this.#pending;
@@ -216,12 +216,13 @@ export class Result {
     this.#pending = page.slice(room);
   }
 
-  #atCap(nextUri: string | undefined): boolean {
-    return (
-      this.limit != null &&
-      this.data.length >= this.limit &&
-      (this.#pending.length > 0 || !!nextUri)
-    );
+  /**
+   * Held only once rows have actually been held back, not the moment the
+   * count reaches the cap: with rows still to come the next page settles it
+   * either way, and a query of exactly the cap ends instead of claiming more.
+   */
+  #atCap(): boolean {
+    return this.limit != null && this.data.length >= this.limit && this.#pending.length > 0;
   }
 
   /**
@@ -462,8 +463,9 @@ export class Workspace {
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
-  /** Rows a new run shows before pausing to ask, or null for all of them. */
-  rowLimit: number | null = $state(DEFAULT_ROW_LIMIT);
+  /** Rows a new run shows before pausing to ask, when `limitRows` is on. */
+  rowLimit: number = $state(DEFAULT_ROW_LIMIT);
+  limitRows: boolean = $state(true);
 
   /**
    * One catalog cache per connection, kept for the session. Browsing a Trino
@@ -694,7 +696,7 @@ export class Workspace {
       sql,
       startLine,
       anchorId,
-      this.rowLimit
+      this.limitRows ? this.rowLimit : null
     );
     file.addResult(result, replacesId);
     void result.execute();

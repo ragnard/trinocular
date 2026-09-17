@@ -125,7 +125,12 @@
 {/snippet}
 
 {#snippet results()}
-  <Result result={activeResult} bind:selection bind:rowLimit={workspace.rowLimit} />
+  <Result
+    result={activeResult}
+    bind:selection
+    bind:rowLimit={workspace.rowLimit}
+    bind:limitRows={workspace.limitRows}
+  />
 {/snippet}
 
 {#snippet doc()}
