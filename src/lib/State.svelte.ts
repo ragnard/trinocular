@@ -41,6 +41,11 @@ export type State =
 
 const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
 
+/** What a run and the schema browser both say when the server offered no clusters. */
+export const NO_CONNECTIONS =
+  "No connections are configured. Name a cluster under `connections` in the config file, " +
+  "or start Trinette with TRINO_URL.";
+
 /**
  * One reading of the query's split counts. Kept as a series, not just a latest
  * value, because the split total is *discovered* while the query runs rather
@@ -191,15 +196,19 @@ export class Result {
       }
     } catch (e) {
       if (signedOut(e)) return;
-      const message = e instanceof Error ? e.message : String(e);
-      this.error = {
-        message,
-        errorCode: 0,
-        errorName: "CLIENT_ERROR",
-        errorType: "CLIENT_ERROR",
-        failureInfo: { type: "ClientError", message, suppressed: [], stack: [] }
-      };
+      this.fail(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /** Settles the result on a failure of ours rather than the cluster's. */
+  fail(message: string) {
+    this.error = {
+      message,
+      errorCode: 0,
+      errorName: "CLIENT_ERROR",
+      errorType: "CLIENT_ERROR",
+      failureInfo: { type: "ClientError", message, suppressed: [], stack: [] }
+    };
   }
 
   /**
@@ -458,6 +467,12 @@ export class Workspace {
   /** Connection for new files, and for any whose stored one no longer exists. */
   defaultConnectionId: string;
   #connectionIds: Set<string>;
+  /**
+   * False when the server offered no clusters at all. Every id then heals to
+   * `""`, which is a proxy path that can only 404, so the places that would
+   * ask the cluster something say so instead of asking.
+   */
+  readonly hasConnections: boolean;
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
@@ -523,6 +538,7 @@ export class Workspace {
       report: (message) => console.error(`trinette: ${message}`)
     });
     this.#connectionIds = new Set(connections.map((c) => c.id));
+    this.hasConnections = connections.length > 0;
     this.defaultConnectionId = connections[0]?.id ?? "";
     // Every id `#knownConnection` can hand back, so `catalogFor` is a lookup
     // that always hits. `defaultConnectionId` is already one of the configured
@@ -699,6 +715,10 @@ export class Workspace {
       this.limitRows ? this.rowLimit : null
     );
     file.addResult(result, replacesId);
+    if (!this.hasConnections) {
+      result.fail(NO_CONNECTIONS);
+      return;
+    }
     void result.execute();
   }
 
