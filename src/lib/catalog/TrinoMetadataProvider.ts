@@ -28,3 +28,13 @@ export class TrinoMetadataProvider implements MetadataProvider {
     return this.#cache.loadTables(catalog, schema);
   }
 }
+
+/** For a workspace with no connections: completion has no cluster to ask, and
+ *  asking the proxy for one would be a 404 behind every popup. */
+export const NOTHING_TO_DESCRIBE: MetadataProvider = {
+  getDefaultCatalog: async () => undefined,
+  getDefaultSchema: async () => undefined,
+  getCatalogs: async () => [],
+  getSchemas: async () => [],
+  getTables: async () => []
+};

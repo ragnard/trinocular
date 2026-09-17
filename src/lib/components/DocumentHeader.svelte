@@ -61,6 +61,8 @@
         >
           {connection.name}
         </button>
+      {:else}
+        <button disabled>No connections configured</button>
       {/each}
     {/snippet}
   </Dropdown>
@@ -104,6 +106,15 @@
     padding: 0 8px;
     color: var(--error);
     font-size: var(--text-sm);
+  }
+
+  button:disabled {
+    color: var(--fg-3);
+    cursor: default;
+  }
+
+  button:disabled:hover {
+    background: transparent;
   }
 
   button.danger:hover {

@@ -3,7 +3,7 @@
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
-  import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
+  import { NOTHING_TO_DESCRIBE, TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
   import { theme } from "$lib/theme.svelte";
   import { untrack } from "svelte";
 
@@ -63,7 +63,9 @@
   );
 
   $effect(() => {
-    metadataProvider.delegate = new TrinoMetadataProvider(workspace.catalogFor(connectionId));
+    metadataProvider.delegate = workspace.hasConnections
+      ? new TrinoMetadataProvider(workspace.catalogFor(connectionId))
+      : NOTHING_TO_DESCRIBE;
   });
 
   let activeResult: ResultModel | null = $derived(workspace.activeFile?.activeResult ?? null);

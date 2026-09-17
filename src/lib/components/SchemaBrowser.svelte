@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Workspace } from "$lib/State.svelte";
+  import { NO_CONNECTIONS, type Workspace } from "$lib/State.svelte";
   import type { TreeNode } from "./TreeView.svelte";
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
@@ -340,6 +340,7 @@
   $effect(() => {
     const cache = workspace.catalog;
     loadError = null;
+    if (!workspace.hasConnections) return;
     cache.loadCatalogs().catch((e) => {
       loadError = e instanceof Error ? e.message : String(e);
     });
@@ -390,7 +391,9 @@
         {/if}
       {/snippet}
     </TreeView>
-    {#if loadError}
+    {#if !workspace.hasConnections}
+      <div class="hint meta">{NO_CONNECTIONS}</div>
+    {:else if loadError}
       <div class="hint small warn">Could not list catalogs: {loadError}</div>
     {:else if filtering}
       <div class="hint meta">
