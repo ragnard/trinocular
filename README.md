@@ -15,6 +15,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Browse a cluster's catalogs, schemas, tables and columns, search what you have
   opened, and reload any branch the cluster has changed underneath — and see why
   when it will not list one.
+- Take a ready-made SELECT of every column, or the CREATE statement the cluster itself
+  writes, for any table in the browser — copied, or dropped straight into your file.
 - Support for querying multiple Trino instances — each file picks its own, so
   re-pointing one query leaves the rest alone.
 - Copy a cell as it is, or a block of cells as CSV, with the usual shortcut — nested

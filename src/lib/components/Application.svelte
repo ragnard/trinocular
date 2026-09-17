@@ -21,6 +21,7 @@
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
+  let editorRef: ReturnType<typeof Editor> | undefined = $state();
 
   // Other tabs share this workspace's storage; the `storage` event is how this
   // one hears about documents they add, rename or delete. The effect's return
@@ -79,7 +80,7 @@
 </script>
 
 {#snippet browser()}
-  <SchemaBrowser {workspace} />
+  <SchemaBrowser {workspace} oninsert={(sql) => editorRef?.insert(sql)} />
 {/snippet}
 
 {#snippet inspector()}
@@ -108,6 +109,7 @@
 
 {#snippet editor()}
   <Editor
+    bind:this={editorRef}
     file={workspace.activeFile}
     files={workspace.files}
     {metadataProvider}

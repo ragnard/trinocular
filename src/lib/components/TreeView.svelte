@@ -39,10 +39,15 @@
     onclick?: (node: TreeNode) => void;
     onreload?: (node: TreeNode) => void;
     icon?: Snippet<[TreeNode]>;
+    /**
+     * Per-row controls, revealed on hover beside the reload button. The
+     * snippet decides which rows get any; an empty render costs nothing.
+     */
+    actions?: Snippet<[TreeNode]>;
     depth?: number;
   }
 
-  let { nodes, expanded, ontoggle, onclick, onreload, icon, depth = 0 }: Props = $props();
+  let { nodes, expanded, ontoggle, onclick, onreload, icon, actions, depth = 0 }: Props = $props();
 </script>
 
 <ul class="tree" class:nested={depth > 0}>
@@ -60,6 +65,9 @@
               <span class="node-detail">{node.detail}</span>
             {/if}
           </button>
+          {#if actions}
+            <span class="actions">{@render actions(node)}</span>
+          {/if}
         </div>
       {:else}
         <div class="row">
@@ -75,6 +83,9 @@
               <span class="node-detail">{node.detail}</span>
             {/if}
           </button>
+          {#if actions}
+            <span class="actions">{@render actions(node)}</span>
+          {/if}
           {#if onreload && node.reloadable}
             <button
               class="reload"
@@ -98,6 +109,7 @@
             {onclick}
             {onreload}
             {icon}
+            {actions}
             depth={depth + 1}
           />
         {/if}
@@ -157,7 +169,8 @@
     color: var(--fg-3);
   }
 
-  .reload {
+  .reload,
+  .actions :global(button) {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -179,7 +192,25 @@
     opacity: 1;
   }
 
-  .reload:hover:enabled :global(svg) {
+  /* Same reveal as the reload button, and held while a menu one of them
+     opened is up — the pointer is on the menu by then, not the row. */
+  .actions {
+    display: contents;
+  }
+
+  .actions :global(button) {
+    opacity: 0;
+  }
+
+  .row:hover .actions :global(button),
+  .actions :global(button:focus-visible),
+  .actions :global(button[aria-pressed="true"]) {
+    opacity: 1;
+  }
+
+  .reload:hover:enabled :global(svg),
+  .actions :global(button:hover svg),
+  .actions :global(button[aria-pressed="true"] svg) {
     color: var(--fg);
   }
 

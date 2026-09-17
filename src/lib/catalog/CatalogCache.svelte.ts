@@ -1,5 +1,6 @@
 import type Trino from "$lib/trino";
 import type { QueryError } from "$lib/trino";
+import { qualifiedName } from "monaco-language-trino";
 
 export type ColumnInfo = { name: string; type: string };
 
@@ -47,6 +48,11 @@ async function collectRows(
     }
   }
   return result;
+}
+
+function first(rows: string[]): string {
+  if (rows.length === 0) throw new Error("The cluster returned nothing.");
+  return rows[0];
 }
 
 function without<K, V>(map: Map<K, V>, key: K): Map<K, V> {
@@ -165,6 +171,28 @@ export class CatalogCache {
       },
       () => (this.#columns = without(this.#columns, key))
     );
+  }
+
+  /**
+   * The DDL Trino itself writes for the table, uncached: it is one click and
+   * one query, and a stale copy would have no reload to clear it. `SHOW TABLES`
+   * lists views too, and `SHOW CREATE TABLE` refuses those saying which kind
+   * of relation it met, so the refusal is what picks the statement that does
+   * answer. The name is quoted only where it has to be, because a view's DDL
+   * comes back naming the view the way it was asked for.
+   */
+  async showCreate(catalog: string, schema: string, table: string): Promise<string> {
+    const name = qualifiedName(catalog, schema, table);
+    try {
+      return await collectColumn(this.#client, `SHOW CREATE TABLE ${name}`, 0).then(first);
+    } catch (e) {
+      const kind =
+        e instanceof CatalogQueryError &&
+        /is an? (materialized view|view), not a table/i.exec(e.message)?.[1];
+      if (!kind) throw e;
+      const statement = `SHOW CREATE ${kind.toUpperCase()} ${name}`;
+      return collectColumn(this.#client, statement, 0).then(first);
+    }
   }
 
   getSchemas(catalog: string): string[] {

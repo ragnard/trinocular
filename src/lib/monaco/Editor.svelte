@@ -63,6 +63,36 @@
 
   let container: HTMLDivElement;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
+
+  /**
+   * Puts `text` into the document at the caret, replacing a selection if there
+   * is one, and set off by a blank line from any text on the caret's line: a
+   * statement dropped mid-line would run into whatever was there. What is
+   * inserted is complete already; nothing here adds a terminator. One undo
+   * step, and the editor takes focus so the next keystroke lands after it.
+   */
+  export function insert(text: string) {
+    const model = editor?.getModel();
+    const selection = editor?.getSelection();
+    if (!editor || !model || !selection) return;
+    const line = model.getLineContent(selection.startLineNumber);
+    const before = line.slice(0, selection.startColumn - 1).trim().length > 0;
+    const after =
+      model
+        .getLineContent(selection.endLineNumber)
+        .slice(selection.endColumn - 1)
+        .trim().length > 0;
+    const gap = model.getEOL().repeat(2);
+    const value = `${before ? gap : ""}${text}${after ? gap : ""}`;
+    const start = model.getOffsetAt(selection.getStartPosition());
+    editor.pushUndoStop();
+    editor.executeEdits("trinette", [{ range: selection, text: value, forceMoveMarkers: true }]);
+    editor.pushUndoStop();
+    const end = model.getPositionAt(start + value.length);
+    editor.setPosition(end);
+    editor.revealPositionInCenterIfOutsideViewport(end);
+    editor.focus();
+  }
   let editorReady = $state(false);
   let editorModel: monaco.editor.ITextModel | undefined = $state();
 
