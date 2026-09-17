@@ -283,6 +283,10 @@
     text-align: right;
   }
 
+  .limit input::-webkit-inner-spin-button {
+    margin-left: 6px;
+  }
+
   .limit input:focus-visible {
     outline: 1px solid var(--accent);
     outline-offset: -1px;
