@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DEFAULT_ROW_LIMIT, MAX_HOLD_MS, type Result as ResultModel } from "$lib/State.svelte";
+  import { MAX_HOLD_MS, type Result as ResultModel } from "$lib/State.svelte";
   import { formatCount } from "$lib/format";
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
@@ -14,11 +14,23 @@
   interface Props {
     result: ResultModel | null;
     selection?: Selection | null;
-    /** Rows the next run shows before pausing to ask, or null for all. */
-    rowLimit?: number | null;
+    /** Rows the next run shows before pausing to ask, while `limitRows` is on. */
+    rowLimit?: number;
+    limitRows?: boolean;
   }
 
-  let { result, selection = $bindable(null), rowLimit = $bindable(null) }: Props = $props();
+  let {
+    result,
+    selection = $bindable(null),
+    rowLimit = $bindable(1000),
+    limitRows = $bindable(true)
+  }: Props = $props();
+
+  function setLimit(input: HTMLInputElement) {
+    const n = Math.floor(Number(input.value));
+    if (Number.isFinite(n) && n >= 1) rowLimit = n;
+    input.value = String(rowLimit);
+  }
 
   const toSchema = (columns?: Columns): Schema | undefined =>
     columns && {
@@ -59,17 +71,32 @@
     {/if}
     <span class="fill"></span>
     <!-- What the *next* run does; a run already made carries its own cap. -->
-    <button
-      class="chip"
-      aria-pressed={rowLimit != null}
-      title={rowLimit != null
-        ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
-        : "New runs fetch every row"}
-      onclick={() => (rowLimit = rowLimit == null ? DEFAULT_ROW_LIMIT : null)}
-    >
-      <ListEnd size={14} />
-      {rowLimit != null ? `Limit ${formatCount(rowLimit)}` : "No limit"}
-    </button>
+    <div class="limit">
+      <button
+        class="chip"
+        aria-pressed={limitRows}
+        title={limitRows
+          ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
+          : "New runs fetch every row"}
+        onclick={() => (limitRows = !limitRows)}
+      >
+        <ListEnd size={14} />
+        {limitRows ? "Limit" : "No limit"}
+      </button>
+      {#if limitRows}
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={rowLimit}
+          aria-label="Rows to show before pausing"
+          onchange={(e) => setLimit(e.currentTarget)}
+          onkeydown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+        />
+      {/if}
+    </div>
     <Dropdown icon={Download} label="Save" title="Save these results to a file" disabled={!canSave}>
       {#snippet menu()}
         {#each EXPORT_FORMATS as format (format.id)}
@@ -235,6 +262,30 @@
 
   .message p {
     max-width: 46em;
+  }
+
+  .limit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .limit input {
+    width: 10ch;
+    height: var(--h-ctl);
+    padding: 0 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    background: var(--s0);
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .limit input:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
   }
 
   /* The extension is the answer to "what will the file be called", so it sits
