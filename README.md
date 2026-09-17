@@ -32,6 +32,47 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Put a login in front of it, and decide who gets to reach which cluster.
 - Run more than one copy of it, and restart it, without signing anyone out.
 
+## Trying it
+
+[`demo/compose.yaml`](demo/compose.yaml) runs Trinette with nothing to configure. If you
+have no Trino, it starts one:
+
+```bash
+cd demo
+docker compose up
+```
+
+If you have one, name it and no second Trino is started:
+
+```bash
+TRINO_URL=http://host.docker.internal:8080 docker compose up
+```
+
+Either way, Trinette is on [http://localhost:3000](http://localhost:3000). There is no
+login — everyone is `alice` — and nothing survives the containers. The bundled Trino is a
+large image that wants a couple of gigabytes of memory, and it comes with the `tpch`,
+`tpcds`, `memory` and `jmx` catalogs, so there is something to run straight away:
+
+```sql
+SELECT * FROM tpch.tiny.nation
+```
+
+Without compose, the same thing is one `docker run`:
+
+```bash
+docker run --rm -p 3000:3000 \
+  --add-host host.docker.internal:host-gateway \
+  -e TRINO_URL=http://host.docker.internal:8080 \
+  -e ORIGIN=http://localhost:3000 \
+  ghcr.io/ragnard/trinette:latest
+```
+
+`ORIGIN` is not optional here even though there is no login: without it the server assumes
+https and hands the browser follow-up URLs on a scheme nothing is listening on. Otherwise
+`TRINO_URL` is the whole configuration. For anything more than a look —
+a login, more than one cluster, sessions that outlive a restart — write a config file
+instead; see [Configuration](#configuration).
+
 ## Running locally
 
 Requires [bun](https://bun.sh).
@@ -41,8 +82,14 @@ bun install
 bun run dev      # http://localhost:5173
 ```
 
-Trinette needs a config file and its own address. Point `TRINETTE_CONFIG` at the file
-and set `ORIGIN` to the URL the app is served from — both can go in `.env`:
+For a look around, one variable is enough and there is no file to write:
+
+```bash
+TRINO_URL=http://localhost:8080 bun run dev
+```
+
+Otherwise Trinette needs a config file and its own address. Point `TRINETTE_CONFIG` at the
+file and set `ORIGIN` to the URL the app is served from — both can go in `.env`:
 
 ```
 ORIGIN=http://localhost:5173
@@ -81,8 +128,9 @@ with half a policy.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `TRINETTE_CONFIG` | no | Path to the config file. Without it the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
-| `ORIGIN` | for OIDC | The URL the app is served from, e.g. `https://trinette.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://`). |
+| `TRINETTE_CONFIG` | no | Path to the config file. Without it, and without `TRINO_URL`, the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
+| `TRINO_URL` | no | One Trino cluster's base URL, standing in for a config file — no login, sessions in memory, a cookie secret generated afresh on every start, and the cluster named after the URL's host. It is read **only** when `TRINETTE_CONFIG` is unset: setting both stops the server, since a config file is where a connection belongs once there is one. |
+| `ORIGIN` | for OIDC, and for the container | The URL the app is served from, e.g. `https://trinette.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
 | `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
 | `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
 
@@ -122,7 +170,7 @@ session:
 | `cookie.name` | `trinette-session` | Cookie name. |
 | `cookie.path` | `/` | Cookie path. |
 | `cookie.httpOnly` | `true` | Hide the cookie from scripts. |
-| `cookie.secure` | from `ORIGIN` | Send the cookie over HTTPS only. Defaults to true unless `ORIGIN` is `http://`. |
+| `cookie.secure` | from `ORIGIN` | Send the cookie over HTTPS only. Defaults to true unless `ORIGIN` is `http://` (with no config file, an absent `ORIGIN` defaults it to false instead). |
 | `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
 | `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
 | `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |

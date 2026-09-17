@@ -194,9 +194,25 @@ const DEFAULT_CONFIG = {
   session: {
     cookie: {
       secret: crypto.randomUUID().replace(/-/g, ""),
+      // Nothing has been configured, so this is somebody's laptop until ORIGIN
+      // says otherwise — and a Secure cookie is never sent back over plain http.
+      secure: env.ORIGIN?.startsWith("https") ?? false,
     },
   },
 };
+
+/** The whole configuration, from the one thing the app cannot guess. Offered
+ *  only when there is no config file: `TRINO_URL` stands in for one rather than
+ *  overriding it. */
+function quickStartConfig(trinoUrl: string): unknown {
+  let name = trinoUrl;
+  try {
+    name = new URL(trinoUrl).host;
+  } catch {
+    // ConfigSchema is what reports a URL that will not parse.
+  }
+  return { ...DEFAULT_CONFIG, connections: { trino: { name, uri: trinoUrl } } };
+}
 
 function parseFile(content: string, filePath: string): unknown {
   if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
@@ -205,12 +221,36 @@ function parseFile(content: string, filePath: string): unknown {
   return JSON.parse(content);
 }
 
-function loadConfig(configPath?: string): Config {
+function validate(raw: unknown, source: string): Config {
+  const result = ConfigSchema.safeParse(raw);
+  if (!result.success) {
+    logger.error(`Config validation failed (${source}):\n` + z.prettifyError(result.error));
+    process.exit(1);
+  }
+  return result.data;
+}
+
+function loadConfig(configPath?: string, trinoUrl?: string): Config {
+  if (configPath && trinoUrl) {
+    logger.error(
+      "TRINETTE_CONFIG and TRINO_URL are both set. TRINO_URL stands in for a config file; " +
+        "write the connection into the file and unset it."
+    );
+    process.exit(1);
+  }
+
   if (!configPath) {
+    if (trinoUrl) {
+      logger.warn(
+        { trinoUrl },
+        "No config path specified, using TRINO_URL: one connection, no login, sessions in memory"
+      );
+      return validate(quickStartConfig(trinoUrl), "TRINO_URL");
+    }
     logger.warn(
       "No config path specified, using defaults with random cookie secret (sessions will not persist across restarts)"
     );
-    return ConfigSchema.parse(DEFAULT_CONFIG);
+    return validate(DEFAULT_CONFIG, "defaults");
   }
 
   const resolvedPath = path.resolve(configPath);
@@ -224,16 +264,10 @@ function loadConfig(configPath?: string): Config {
     process.exit(1);
   }
 
-  const result = ConfigSchema.safeParse(raw);
-  if (!result.success) {
-    logger.error("Config validation failed:\n" + z.prettifyError(result.error));
-    process.exit(1);
-  }
-
-  return result.data;
+  return validate(raw, resolvedPath);
 }
 
-export const config: Config = loadConfig(env.TRINETTE_CONFIG);
+export const config: Config = loadConfig(env.TRINETTE_CONFIG, env.TRINO_URL);
 
 /** The auth pages — login, error, forbidden — are SvelteKit routes, so they sit
  *  at a fixed `/auth/*` however `paths.prefix` is configured. Only the paths the
