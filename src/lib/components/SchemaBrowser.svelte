@@ -3,8 +3,8 @@
   import type { TreeNode } from "./TreeView.svelte";
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
-  import { selectStatement, type TableRef } from "$lib/trino/statements";
-  import { Box, Database, Ellipsis, Globe, HardDrive, Table, X } from "@lucide/svelte";
+  import { selectStatement, terminated, type TableRef } from "$lib/trino/statements";
+  import { Box, Code, Database, Globe, HardDrive, Table, X } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import TreeView from "./TreeView.svelte";
@@ -306,7 +306,8 @@
 
   async function statementFor(ref: TableRef, kind: StatementKind): Promise<string> {
     const cache = workspace.catalog;
-    if (kind === "CREATE") return cache.showCreate(ref.catalog, ref.schema, ref.table);
+    if (kind === "CREATE")
+      return terminated(await cache.showCreate(ref.catalog, ref.schema, ref.table));
     return selectStatement(ref, await cache.loadColumns(ref.catalog, ref.schema, ref.table));
   }
 
@@ -370,10 +371,10 @@
             popovertarget={menuId}
             aria-pressed={menuOpen && target?.id === node.id}
             aria-haspopup="true"
-            title="Statements for {node.label}"
+            title="SQL for {node.label}"
             onclick={(e) => startAction(node, e.currentTarget)}
           >
-            <Ellipsis size={12} />
+            <Code size={14} />
           </button>
         {/if}
       {/snippet}

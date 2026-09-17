@@ -67,7 +67,8 @@
   /**
    * Puts `text` into the document at the caret, replacing a selection if there
    * is one, and set off by a blank line from any text on the caret's line: a
-   * statement dropped mid-line would run into whatever was there. One undo
+   * statement dropped mid-line would run into whatever was there. What is
+   * inserted is complete already; nothing here adds a terminator. One undo
    * step, and the editor takes focus so the next keystroke lands after it.
    */
   export function insert(text: string) {
