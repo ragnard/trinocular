@@ -4,7 +4,7 @@
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
   import { selectStatement, terminated, type TableRef } from "$lib/trino/statements";
-  import { Box, Code, Database, Globe, HardDrive, Table, X } from "@lucide/svelte";
+  import { Box, Database, EllipsisVertical, Globe, HardDrive, Table, X } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import TreeView from "./TreeView.svelte";
@@ -374,7 +374,7 @@
             title="SQL for {node.label}"
             onclick={(e) => startAction(node, e.currentTarget)}
           >
-            <Code size={14} />
+            <EllipsisVertical size={14} />
           </button>
         {/if}
       {/snippet}
