@@ -13,8 +13,10 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   the cap off for runs that should not stop.
 - Inspect one or more rows of a result set, field by field, with nested values spelled
   out.
-- Flexible value display — read a field as text or as JSON, and have the choice
-  remembered.
+- Flexible value display — read a field as text, as a hex dump, as JSON, as rendered
+  Markdown or HTML, or see the image a binary column holds, and have the choice
+  remembered. Rendered
+  documents are sandboxed: nothing in a result can run script or reach the network.
 - Browse a cluster's catalogs, schemas, tables and columns, search what you have
   opened, and reload any branch the cluster has changed underneath — and see why
   when it will not list one.

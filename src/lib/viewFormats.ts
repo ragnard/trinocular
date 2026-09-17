@@ -11,8 +11,10 @@
  * agree about what they hold.
  *
  * A format is one entry in `VIEW_FORMATS`, the arrangement `EXPORT_FORMATS`
- * already uses: the menu is drawn from the list, so hex, base64 or markdown
- * later is a `render` and an entry and nothing in the UI. `applies` is what
+ * already uses: the menu is drawn from the list, and what a format draws is
+ * a component it names, so base64 later is a `render`, a component if it
+ * needs one, and an entry — nothing in the inspector, which mounts what it
+ * is handed and never learns what kinds of value there are. `applies` is what
  * keeps the menu honest — an integer column is not offered JSON, and a field
  * with only one format on offer gets no picker at all.
  *
@@ -21,16 +23,40 @@
  * so pretty-print it" sniff in the inspector's caller was exactly the guess
  * this replaces: one that was right often enough to be relied on and wrong
  * with no way to say so.
+ *
+ * HTML and Markdown are drawn in a sandboxed frame rather than sanitised into
+ * the pane: the point of the app's CSP is that a string in a result cell can
+ * never become script, and the browser's own sandbox (no script, no forms, no
+ * navigation, an origin that is nobody's) holds that line without a parser
+ * of ours in front of it. The frame carries a policy of its own besides,
+ * under which a document may request nothing: no image, no stylesheet, no
+ * script, from anywhere — a `data:` image and inline styles are all it gets.
  */
+import { marked } from "marked";
+import type { Component } from "svelte";
+import HtmlFrame from "./components/HtmlFrame.svelte";
+import ImageValue from "./components/ImageValue.svelte";
+import TextValue from "./components/TextValue.svelte";
 import type { Field } from "./components/table/types";
 
-export interface Rendered {
-  text: string;
-  /** Whitespace is meaningful: the value goes in a `<pre>`. */
-  pre?: boolean;
-  /** Why what you asked for is not what you got. */
-  note?: string;
+/** What the row draws: a component and what to hand it. The inspector adds
+ *  the field's display key as `title`, for the frame's and the image's sake. */
+export interface View {
+  component: Component<any>;
+  props: Record<string, unknown>;
 }
+
+export interface Rendered {
+  /** The value as text, which is what the per-field copy button hands over:
+   *  the source of a document, and what `Text` would show for an image. */
+  text: string;
+  view: View;
+}
+
+const view = <P extends Record<string, unknown>>(component: Component<P>, props: P): View => ({
+  component,
+  props
+});
 
 export interface ViewFormat {
   id: string;
@@ -41,36 +67,78 @@ export interface ViewFormat {
   render(value: unknown, field: Field): Rendered;
 }
 
-/**
- * How much of a value reaches the DOM, whatever format produced it — the one
- * cap, applied on the one path out, rather than a rule each format is trusted
- * to remember. A single varchar can be megabytes and a selection is a whole
- * block of them, laid out unvirtualised, so without this one cell decides how
- * long the inspector takes to draw.
- *
- * It is a display cap and nothing else: `render` still returns the whole value
- * and the row's copy button still hands over all of it. `EXPANDED` is what one
- * click gives you, and is still a cap — past it the browser, not the value, is
- * what you would be waiting for.
- */
-export const DISPLAY_LIMIT = 4_000;
-export const EXPANDED_LIMIT = 500_000;
-
 /** Beyond this a value is shown as it arrived rather than formatted: parsing
  *  and re-emitting half a megabyte to then show four thousand characters of it
- *  is work nobody asked for. */
+ *  (`TextValue` caps what reaches the screen) is work nobody asked for. */
 const FORMAT_LIMIT = 256_000;
+
+/** Bytes beyond which a varbinary is not handed to the image decoder. */
+const IMAGE_LIMIT = 16 * 1024 * 1024;
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
+/**
+ * Remembered per byte array: the array is the same object for as long as the
+ * selection is, and the inspector re-renders every row of it on any change,
+ * so a megabyte of hex or base64 is not something to build again each time.
+ */
+function memo<T>(compute: (bytes: Uint8Array) => T): (bytes: Uint8Array) => T {
+  const cache = new WeakMap<Uint8Array, T>();
+  return (bytes) => {
+    let value = cache.get(bytes);
+    if (value === undefined) {
+      value = compute(bytes);
+      cache.set(bytes, value);
+    }
+    return value;
+  };
+}
+
 /** Bytes as the text they spell, or as hex when they do not spell any. */
-function decodeBytes(bytes: Uint8Array): string {
+const decodeBytes = memo((bytes: Uint8Array): string => {
   try {
     return decoder.decode(bytes);
   } catch {
     return "0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
+});
+
+function base64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
 }
+
+const startsWith = (bytes: Uint8Array, at: number, ...magic: number[]) =>
+  magic.every((b, i) => bytes[at + i] === b);
+
+/**
+ * The media type for the data URL. A browser sniffs an `<img>` for the raster
+ * formats whatever it was told, so the only one that has to be right is SVG,
+ * which is XML and is not sniffed; the rest are named so the row can say what
+ * it is looking at.
+ */
+function imageType(bytes: Uint8Array): string {
+  if (startsWith(bytes, 0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (startsWith(bytes, 0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (startsWith(bytes, 0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
+  if (
+    startsWith(bytes, 0, 0x52, 0x49, 0x46, 0x46) &&
+    startsWith(bytes, 8, 0x57, 0x45, 0x42, 0x50)
+  ) {
+    return "image/webp";
+  }
+  if (startsWith(bytes, 0, 0x42, 0x4d)) return "image/bmp";
+  if (startsWith(bytes, 0, 0x00, 0x00, 0x01, 0x00)) return "image/x-icon";
+  if (startsWith(bytes, 4, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66)) return "image/avif";
+  const head = new TextDecoder().decode(bytes.subarray(0, 512));
+  if (/^\s*(<\?xml|<!--|<svg)/.test(head)) return "image/svg+xml";
+  return "application/octet-stream";
+}
+
+const dataUrl = memo((bytes: Uint8Array) => `data:${imageType(bytes)};base64,${base64(bytes)}`);
 
 function asText(value: unknown): string {
   if (value === null || value === undefined) return "null";
@@ -79,44 +147,141 @@ function asText(value: unknown): string {
   return String(value);
 }
 
-/** A value that came with newlines keeps them; one that did not is left to
- *  wrap, since `pre` on a single long line would give the pane a scrollbar. */
-const preserve = (text: string): Rendered => ({ text, pre: text.includes("\n") });
+/** As text, with a note on why when it is not what was asked for. A value that
+ *  came with newlines keeps them; one that did not is left to wrap, since
+ *  `pre` on a single long line would give the pane a scrollbar. */
+const asTextView = (text: string, note?: string, wrap = true): Rendered => ({
+  text,
+  view: view(TextValue, { text, pre: text.includes("\n"), note, wrap })
+});
+
+const NULL = asTextView("null");
 
 const TEXT: ViewFormat = {
   id: "text",
   label: "Text",
   applies: () => true,
-  render: (value) => preserve(asText(value))
+  render: (value) => asTextView(asText(value))
+};
+
+/** Text and bytes are the two things that can hold a document. Rows, arrays
+ *  and maps are flattened before they get here, so nothing else can. */
+const textual = (field: Field) => field.dataType === "string" || field.dataType === "binary";
+
+const HEX_BYTES_PER_LINE = 8;
+
+/** Bytes past which the dump stops: each line is 45 characters for 8 bytes,
+ *  so this is already more than the expanded text cap will show. */
+const HEX_LIMIT = 64 * 1024;
+
+/** `hexdump -C` at eight bytes a line, which is what fits the pane. The last
+ *  line is the length, as hexdump prints it, so an empty value still says
+ *  something. */
+function hexdump(bytes: Uint8Array): string {
+  const lines: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += HEX_BYTES_PER_LINE) {
+    const line = bytes.subarray(offset, offset + HEX_BYTES_PER_LINE);
+    const hex = Array.from(line, (b) => b.toString(16).padStart(2, "0")).join(" ");
+    const ascii = Array.from(line, (b) => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : "."));
+    lines.push(
+      `${offset.toString(16).padStart(8, "0")}  ${hex.padEnd(HEX_BYTES_PER_LINE * 3 - 1)}  |${ascii.join("")}|`
+    );
+  }
+  lines.push(bytes.length.toString(16).padStart(8, "0"));
+  return lines.join("\n");
+}
+
+const encoder = new TextEncoder();
+
+const HEX: ViewFormat = {
+  id: "hex",
+  label: "Hex",
+  applies: textual,
+  render: (value) => {
+    if (value === null || value === undefined) return NULL;
+    // A string is dumped as the UTF-8 it would be stored as, which is the
+    // view that finds a BOM or a zero-width character that Text cannot show.
+    const bytes = value instanceof Uint8Array ? value : encoder.encode(asText(value));
+    if (bytes.length > HEX_LIMIT) {
+      const note = `Showing the first ${HEX_LIMIT.toLocaleString()} of ${bytes.length.toLocaleString()} bytes`;
+      return asTextView(hexdump(bytes.subarray(0, HEX_LIMIT)), note, false);
+    }
+    return asTextView(hexdump(bytes), undefined, false);
+  }
 };
 
 const JSON_FORMAT: ViewFormat = {
   id: "json",
   label: "JSON",
-  // Text and bytes are the two things that can hold a JSON document. Rows,
-  // arrays and maps are flattened before they get here, so nothing else can.
-  applies: (field) => field.dataType === "string" || field.dataType === "binary",
+  applies: textual,
   render: (value) => {
-    if (value === null || value === undefined) return { text: "null" };
+    if (value === null || value === undefined) return NULL;
     // Already structured: there is nothing to parse, only to indent.
     if (typeof value === "object" && !(value instanceof Uint8Array)) {
-      return { text: JSON.stringify(value, null, 2), pre: true };
+      return asTextView(JSON.stringify(value, null, 2));
     }
     const source = asText(value);
-    if (source.length > FORMAT_LIMIT) {
-      return { ...preserve(source), note: "Too large to format" };
-    }
+    if (source.length > FORMAT_LIMIT) return asTextView(source, "Too large to format");
     try {
-      return { text: JSON.stringify(JSON.parse(source), null, 2), pre: true };
+      return asTextView(JSON.stringify(JSON.parse(source), null, 2));
     } catch {
       // Shown as it arrived, and said so. Drawing the raw string silently
       // would make the picker look broken rather than the value.
-      return { ...preserve(source), note: "Not valid JSON" };
+      return asTextView(source, "Not valid JSON");
     }
   }
 };
 
-export const VIEW_FORMATS: ViewFormat[] = [TEXT, JSON_FORMAT];
+/** A document in the sandboxed frame, with its source for the copy button. */
+const asDocument = (text: string, html: string): Rendered => ({
+  text,
+  view: view(HtmlFrame, { html })
+});
+
+const HTML: ViewFormat = {
+  id: "html",
+  label: "HTML",
+  applies: textual,
+  render: (value) => {
+    if (value === null || value === undefined) return NULL;
+    const text = asText(value);
+    if (text.length > FORMAT_LIMIT) return asTextView(text, "Too large to render");
+    return asDocument(text, text);
+  }
+};
+
+const MARKDOWN: ViewFormat = {
+  id: "markdown",
+  label: "Markdown",
+  applies: textual,
+  render: (value) => {
+    if (value === null || value === undefined) return NULL;
+    const text = asText(value);
+    if (text.length > FORMAT_LIMIT) return asTextView(text, "Too large to render");
+    try {
+      return asDocument(text, marked.parse(text, { async: false, gfm: true }));
+    } catch {
+      return asTextView(text, "Could not render Markdown");
+    }
+  }
+};
+
+const IMAGE: ViewFormat = {
+  id: "image",
+  label: "Image",
+  applies: (field) => field.dataType === "binary",
+  render: (value) => {
+    if (value === null || value === undefined) return NULL;
+    if (!(value instanceof Uint8Array)) return asTextView(asText(value));
+    // `text` is what Text would show: an image has no text of its own to
+    // hand the copy button.
+    const text = decodeBytes(value);
+    if (value.length > IMAGE_LIMIT) return asTextView(text, "Too large to draw");
+    return { text, view: view(ImageValue, { src: dataUrl(value) }) };
+  }
+};
+
+export const VIEW_FORMATS: ViewFormat[] = [TEXT, HEX, JSON_FORMAT, MARKDOWN, HTML, IMAGE];
 
 /**
  * Whether a stored key is one element of what `path` names — `items[3].meta`
@@ -152,37 +317,8 @@ export function resolveFormat(field: Field, id: string | undefined): ViewFormat 
   return formatsFor(field).find((format) => format.id === id) ?? TEXT;
 }
 
+/** The value as the inspector shows it and copies it. Every value on screen
+ *  goes through here. */
 export function render(value: unknown, field: Field, id: string | undefined): Rendered {
   return resolveFormat(field, id).render(value, field);
-}
-
-export interface Display extends Rendered {
-  /** Characters of the full text, so the note can say what is missing. */
-  total: number;
-  truncated: boolean;
-  /** Whether asking for more would actually show more. */
-  expandable: boolean;
-}
-
-/** The value as the inspector shows it: rendered by the chosen format, then
- *  cut to the cap. Every value on screen goes through here. */
-export function display(
-  value: unknown,
-  field: Field,
-  id: string | undefined,
-  expanded = false
-): Display {
-  const rendered = render(value, field, id);
-  const limit = expanded ? EXPANDED_LIMIT : DISPLAY_LIMIT;
-  const total = rendered.text.length;
-  if (total <= limit) {
-    return { ...rendered, total, truncated: false, expandable: false };
-  }
-  return {
-    ...rendered,
-    text: rendered.text.slice(0, limit),
-    total,
-    truncated: true,
-    expandable: !expanded
-  };
 }
