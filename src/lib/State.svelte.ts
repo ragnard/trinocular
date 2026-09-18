@@ -11,13 +11,14 @@ import { WorkspaceSaver } from "$lib/workspaceSaver";
 const MAX_RESULTS_PER_FILE = 10;
 
 /**
- * How many finished results per file keep their rows. The rest keep their
- * columns, stats and error and let the rows go: ten results a file, every
- * file, for the session, with "fetch all" among them, is how a tab comes to
- * hold a few million rows nobody is looking at. The active result and any
- * still running are never released, whatever their place in the list.
+ * Rows the workspace keeps for results nobody is looking at. Past it, the
+ * oldest finished results let their rows go — keeping their columns, stats
+ * and error — until the total is back under. A count of rows rather than of
+ * results, because twenty small queries in one file cost nothing and should
+ * all stay, while one "fetch all" is the thing that needs reclaiming. The
+ * result on screen, a running one and a held one are never released.
  */
-const RESULTS_WITH_ROWS_PER_FILE = 2;
+export const ROW_BUDGET = 500_000;
 
 export const DEFAULT_ROW_LIMIT = 1000;
 
@@ -459,23 +460,6 @@ export class SqlFile {
       this.results.pop()!.discard();
     }
     this.activeResult = result;
-    this.#releaseRows();
-  }
-
-  /**
-   * Keeps rows for the newest few results and releases the rest. Newest-first
-   * is the list's order, so the first `RESULTS_WITH_ROWS_PER_FILE` that still
-   * have rows keep them; `release` itself declines the active, the running
-   * and the held.
-   */
-  #releaseRows() {
-    let kept = 0;
-    for (const result of this.results) {
-      if (result.released !== null || result.data.length === 0) continue;
-      if (result === this.activeResult || !result.completed || result.held) continue;
-      if (kept < RESULTS_WITH_ROWS_PER_FILE) kept++;
-      else result.release();
-    }
   }
 
   /**
@@ -761,7 +745,41 @@ export class Workspace {
       result.fail(NO_CONNECTIONS);
       return;
     }
-    void result.execute();
+    // Budgeted when the run starts and again when it settles: a result's size
+    // is only known at the end, and the end is when it can push the total
+    // over.
+    this.#releaseRows();
+    void result.execute().then(() => this.#releaseRows());
+  }
+
+  /**
+   * Brings the rows held across every file back under `ROW_BUDGET`, largest
+   * result first — oldest first between equals. Largest, because the point is
+   * the memory and not the tidiness: releasing oldest-first threw away a run
+   * of three-row results before it reached the one that had put the total
+   * over. Everything with rows counts toward the total, including what cannot
+   * be released; only the finished, unheld results not on screen are
+   * candidates. `release` declines the rest anyway.
+   */
+  #releaseRows() {
+    const showing = this.activeFile?.activeResult;
+    let held = 0;
+    const candidates: Result[] = [];
+    for (const file of this.files) {
+      for (const result of file.results) {
+        if (result.released !== null) continue;
+        held += result.data.length;
+        if (result !== showing && result.completed && !result.held && result.data.length > 0) {
+          candidates.push(result);
+        }
+      }
+    }
+    candidates.sort((a, b) => b.data.length - a.data.length || a.startedAt - b.startedAt);
+    for (const result of candidates) {
+      if (held <= ROW_BUDGET) break;
+      held -= result.data.length;
+      result.release();
+    }
   }
 
   /**
