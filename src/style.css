@@ -262,8 +262,9 @@ kbd {
 /* A bare text input is unstyled: most of them sit inside a box that draws
    the border and shows the focus (the filter box, the file switcher), and
    an input that arrived bordered had to be undressed by each of those. The
-   one that stands alone wears `.textbox`. */
-input[type="text"] {
+   one that stands alone wears `.textbox`. In `:where()`, so the reset has no
+   specificity and a class on the input — `.textbox` — beats it. */
+:where(input[type="text"]) {
   appearance: none;
   min-width: 0;
   padding: 0;
@@ -272,7 +273,7 @@ input[type="text"] {
   color: inherit;
 }
 
-input[type="text"]:focus-visible {
+:where(input[type="text"]:focus-visible) {
   outline: none;
 }
 
