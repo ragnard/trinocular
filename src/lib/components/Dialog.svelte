@@ -15,7 +15,8 @@
     dialog.showModal();
   });
 
-  /** Goes through the element's own close so focus returns to where it was. */
+  /** Through the element's own close, so it ends the way Escape does: one
+   *  `close` event, whichever way it was asked for. */
   export function close() {
     dialog.close();
   }
