@@ -300,6 +300,11 @@ button:focus-visible,
   outline-offset: -1px;
 }
 
+.textbox[aria-invalid="true"] {
+  border-color: var(--error);
+  outline-color: var(--error);
+}
+
 .spin {
   animation: spin 0.8s linear infinite;
 }

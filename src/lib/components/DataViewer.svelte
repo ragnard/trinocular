@@ -8,6 +8,7 @@
     formatsFor,
     render,
     resolveFormat,
+    type Rendered,
     type ViewFormat
   } from "$lib/viewFormats";
   import { formatCount } from "$lib/format";
@@ -268,21 +269,41 @@
     }
   }
 
-  let documents: { row: number; entries: FlatEntry[] }[] = $derived.by(() => {
+  /** A case-insensitive regex, or null for an empty box or one that will not
+   *  compile — which is shown on the box, and filters nothing meanwhile. */
+  function compile(source: string): RegExp | null {
+    if (!source) return null;
+    try {
+      return new RegExp(source, "i");
+    } catch {
+      return null;
+    }
+  }
+
+  let fieldPattern = $derived(compile(fieldFilter));
+  let valuePattern = $derived(compile(valueFilter));
+  let fieldInvalid = $derived(!!fieldFilter && !fieldPattern);
+  let valueInvalid = $derived(!!valueFilter && !valuePattern);
+
+  /** An entry with what the row will draw for it, which is also what the
+   *  value filter reads: what you see is what you can search for. */
+  type Entry = FlatEntry & { rendered: Rendered };
+
+  let documents: { row: number; entries: Entry[] }[] = $derived.by(() => {
     if (!data || !selection) return [];
-    const fieldNeedle = fieldFilter.trim().toLowerCase();
-    const valueNeedle = valueFilter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
-      let entries = data!.fields.flatMap((field, c) =>
+      let flat = data!.fields.flatMap((field, c) =>
         flatten(row[c], field, String(c), field.name, field.name)
       );
-      if (hideNulls) entries = entries.filter((e) => e.value !== null);
-      if (hideEmpty) entries = entries.filter((e) => !e.empty);
-      if (fieldNeedle) entries = entries.filter((e) => e.key.toLowerCase().includes(fieldNeedle));
-      if (valueNeedle) {
-        entries = entries.filter((e) => String(e.value).toLowerCase().includes(valueNeedle));
-      }
+      if (hideNulls) flat = flat.filter((e) => e.value !== null);
+      if (hideEmpty) flat = flat.filter((e) => !e.empty);
+      if (fieldPattern) flat = flat.filter((e) => fieldPattern.test(e.key));
+      let entries = flat.map((e) => ({
+        ...e,
+        rendered: render(e.value, e.field, formatId(e))
+      }));
+      if (valuePattern) entries = entries.filter((e) => valuePattern.test(e.rendered.text));
       return { row: firstRow + i + 1, entries };
     });
   });
@@ -322,8 +343,8 @@
   }
 
   /** What the row shows, in full: the cap is on the screen, not on the value. */
-  function copyValue(entry: FlatEntry) {
-    copy(render(entry.value, entry.field, formatId(entry)).text);
+  function copyValue(entry: Entry) {
+    copy(entry.rendered.text);
   }
 
   /**
@@ -421,6 +442,8 @@
         placeholder="Filter…"
         spellcheck="false"
         aria-label="Filter fields"
+        aria-invalid={fieldInvalid}
+        title={fieldInvalid ? "Not a valid regular expression" : "Regular expression"}
         onkeydown={clearOnEscape}
       />
     </span>
@@ -432,6 +455,8 @@
         placeholder="Filter…"
         spellcheck="false"
         aria-label="Filter values"
+        aria-invalid={valueInvalid}
+        title={valueInvalid ? "Not a valid regular expression" : "Regular expression"}
         onkeydown={clearOnEscape}
       />
     </span>
@@ -461,7 +486,7 @@
       {#each doc.entries as entry (entry.id)}
         {@const choices = formatsFor(entry.field)}
         {@const chosen = resolveFormat(entry.field, formatId(entry))}
-        {@const { view } = render(entry.value, entry.field, formatId(entry))}
+        {@const { view } = entry.rendered}
         <div class="field">
           <span class="key ell" title={entry.key}>{entry.key}</span>
           <!-- Whatever the format drew: text with its own cap, a frame, an
