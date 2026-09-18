@@ -59,7 +59,7 @@
    * writing, and one that failed has neither. Saving mid-run writes the rows
    * that have arrived, which is the number the rail is showing.
    */
-  let canSave = $derived(!!schema && !result?.error);
+  let canSave = $derived(!!schema && !result?.error && result?.released === null);
 
   function save(format: ExportFormat) {
     if (!schema) return;
@@ -75,7 +75,7 @@
   <div class="rail">
     {#if result}
       <span class="dot" class:failed={!!result.error} class:running={result.running}></span>
-      <span>{result.rowCount ?? 0} rows</span>
+      <span>{result.released ?? result.rowCount ?? 0} rows</span>
       <span class="muted">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
     {:else}
@@ -146,6 +146,14 @@
          actually doing. Once rows arrive the table takes over and progress
          carries on in the strip above it. -->
     <QueryProgress {result} />
+  {:else if result.released !== null}
+    <!-- The rows went to make room; the run itself is still here to read. -->
+    <div class="message">
+      <p>
+        The {formatCount(result.released)} rows of this result were released to free memory. Run the statement
+        again to see them.
+      </p>
+    </div>
   {:else if schema}
     {#if result.held}
       <!-- In place of the progress strip: nothing is polled while held, so
