@@ -29,35 +29,35 @@ export class HttpError extends Error {
   }
 }
 
-const DEFAULT_SOURCE = 'trinette';
+const DEFAULT_SOURCE = "trinette";
 
 // Trino headers
-const TRINO_HEADER_PREFIX = 'X-Trino-';
+const TRINO_HEADER_PREFIX = "X-Trino-";
 
 export const isTrinoHeader = (name: string): boolean =>
   name.toLowerCase().startsWith(TRINO_HEADER_PREFIX.toLowerCase());
-const TRINO_PREPARED_STATEMENT_HEADER = TRINO_HEADER_PREFIX + 'Prepared-Statement';
-const TRINO_ADDED_PREPARE_HEADER = TRINO_HEADER_PREFIX + 'Added-Prepare';
-const TRINO_SOURCE_HEADER = TRINO_HEADER_PREFIX + 'Source';
-const TRINO_CATALOG_HEADER = TRINO_HEADER_PREFIX + 'Catalog';
-const TRINO_SCHEMA_HEADER = TRINO_HEADER_PREFIX + 'Schema';
-const TRINO_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Session';
-const TRINO_SET_CATALOG_HEADER = TRINO_HEADER_PREFIX + 'Set-Catalog';
-const TRINO_SET_SCHEMA_HEADER = TRINO_HEADER_PREFIX + 'Set-Schema';
-const TRINO_SET_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Set-Session';
-const TRINO_CLEAR_SESSION_HEADER = TRINO_HEADER_PREFIX + 'Clear-Session';
+const TRINO_PREPARED_STATEMENT_HEADER = TRINO_HEADER_PREFIX + "Prepared-Statement";
+const TRINO_ADDED_PREPARE_HEADER = TRINO_HEADER_PREFIX + "Added-Prepare";
+const TRINO_SOURCE_HEADER = TRINO_HEADER_PREFIX + "Source";
+const TRINO_CATALOG_HEADER = TRINO_HEADER_PREFIX + "Catalog";
+const TRINO_SCHEMA_HEADER = TRINO_HEADER_PREFIX + "Schema";
+const TRINO_SESSION_HEADER = TRINO_HEADER_PREFIX + "Session";
+const TRINO_SET_CATALOG_HEADER = TRINO_HEADER_PREFIX + "Set-Catalog";
+const TRINO_SET_SCHEMA_HEADER = TRINO_HEADER_PREFIX + "Set-Schema";
+const TRINO_SET_SESSION_HEADER = TRINO_HEADER_PREFIX + "Set-Session";
+const TRINO_CLEAR_SESSION_HEADER = TRINO_HEADER_PREFIX + "Clear-Session";
 
 export type Session = { [key: string]: string };
 
 const encodeAsString = (obj: { [key: string]: string }) => {
   return Object.entries(obj)
     .map(([key, value]) => `${key}=${value}`)
-    .join(',');
+    .join(",");
 };
 
 export type RequestHeaders = {
   [key: string]: string;
-}
+};
 
 export type ConnectionOptions = {
   /** Always this app's own proxy: `/api/trino/<connectionId>`. */
@@ -209,10 +209,10 @@ export default class Trino {
   static create(options: ConnectionOptions): Trino {
     const headers: RequestHeaders = {
       [TRINO_SOURCE_HEADER]: options.source ?? DEFAULT_SOURCE,
-      [TRINO_CATALOG_HEADER]: options.catalog ?? '',
-      [TRINO_SCHEMA_HEADER]: options.schema ?? '',
+      [TRINO_CATALOG_HEADER]: options.catalog ?? "",
+      [TRINO_SCHEMA_HEADER]: options.schema ?? "",
       [TRINO_SESSION_HEADER]: encodeAsString(options.session ?? {}),
-      ...(options.extraHeaders ?? {}),
+      ...(options.extraHeaders ?? {})
     };
 
     return new Trino(options.server, cleanHeaders(headers), options);
@@ -224,22 +224,20 @@ export default class Trino {
    * @returns The response data.
    */
   async request<T>(cfg: FetchRequestConfig): Promise<T> {
-    const url = cfg.url?.startsWith('http')
-      ? cfg.url
-      : `${this.baseURL}${cfg.url ?? ''}`;
+    const url = cfg.url?.startsWith("http") ? cfg.url : `${this.baseURL}${cfg.url ?? ""}`;
 
     const mergedHeaders: RequestHeaders = {
       ...this.headers,
-      ...(cfg.headers ?? {}),
+      ...(cfg.headers ?? {})
     };
 
     const init: globalThis.RequestInit = {
-      method: cfg.method ?? 'GET',
-      headers: mergedHeaders,
+      method: cfg.method ?? "GET",
+      headers: mergedHeaders
     };
 
     if (cfg.data !== undefined) {
-      init.body = typeof cfg.data === 'string' ? cfg.data : JSON.stringify(cfg.data);
+      init.body = typeof cfg.data === "string" ? cfg.data : JSON.stringify(cfg.data);
     }
 
     const response = await fetch(url, init);
@@ -282,15 +280,14 @@ export default class Trino {
     if (respHeaders.has(TRINO_ADDED_PREPARE_HEADER)) {
       const prep = this.headers[TRINO_PREPARED_STATEMENT_HEADER];
       const added = respHeaders.get(TRINO_ADDED_PREPARE_HEADER)!;
-      this.headers[TRINO_PREPARED_STATEMENT_HEADER] =
-        (prep ? prep + ',' : '') + added;
+      this.headers[TRINO_PREPARED_STATEMENT_HEADER] = (prep ? prep + "," : "") + added;
     }
 
     this.headers = cleanHeaders(this.headers);
 
     // Cancelling a query answers 204 with an empty body, and a HEAD has none
     // by definition — json() throws on either.
-    if (response.status === 204 || init.method === 'HEAD') {
+    if (response.status === 204 || init.method === "HEAD") {
       return undefined as T;
     }
 
@@ -303,21 +300,21 @@ export default class Trino {
    * @returns A promise that resolves to a QueryResult object.
    */
   async query(query: Query | string): Promise<QueryIterator> {
-    const req = typeof query === 'string' ? { query } : query;
+    const req = typeof query === "string" ? { query } : query;
     const headers: RequestHeaders = {
-      [TRINO_CATALOG_HEADER]: req.catalog ?? '',
-      [TRINO_SCHEMA_HEADER]: req.schema ?? '',
+      [TRINO_CATALOG_HEADER]: req.catalog ?? "",
+      [TRINO_SCHEMA_HEADER]: req.schema ?? "",
       [TRINO_SESSION_HEADER]: encodeAsString(req.session ?? {}),
       ...(req.extraHeaders ?? {})
     };
     const requestConfig: FetchRequestConfig = {
-      method: 'POST',
-      url: '/v1/statement',
+      method: "POST",
+      url: "/v1/statement",
       data: req.query,
-      headers: cleanHeaders(headers),
+      headers: cleanHeaders(headers)
     };
     return this.request<QueryResult>(requestConfig).then(
-      result => new QueryIterator(this, result)
+      (result) => new QueryIterator(this, result)
     );
   }
 
@@ -327,7 +324,7 @@ export default class Trino {
    * page.
    */
   async heartbeat(nextUri: string): Promise<void> {
-    await this.request<void>({ url: nextUri, method: 'HEAD' });
+    await this.request<void>({ url: nextUri, method: "HEAD" });
   }
 
   /**
@@ -336,8 +333,8 @@ export default class Trino {
    * @returns The result of the query.
    */
   async cancel(queryId: string): Promise<QueryResult> {
-    return this.request({ url: `/v1/query/${queryId}`, method: 'DELETE' }).then(
-      _ => <QueryResult>{ id: queryId }
+    return this.request({ url: `/v1/query/${queryId}`, method: "DELETE" }).then(
+      (_) => <QueryResult>{ id: queryId }
     );
   }
 }
@@ -374,7 +371,7 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
   async next(): Promise<IteratorResult<QueryResult>> {
     if (this.hasNext()) {
       this.queryResult = await this.client.request<QueryResult>({
-        url: this.queryResult.nextUri,
+        url: this.queryResult.nextUri
       });
       return { value: this.queryResult, done: false };
     }

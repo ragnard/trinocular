@@ -342,19 +342,19 @@
     const r = rows;
     const vc = valueConverter;
     selection = {
-      minRow, maxRow, minCol, maxCol,
+      minRow,
+      maxRow,
+      minCol,
+      maxCol,
       getData() {
         const fields = s.fields.slice(minCol, maxCol + 1);
         const selectedRows = r
           .slice(minRow, maxRow + 1)
-          .map((row) =>
-            fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
-          );
+          .map((row) => fields.map((field, i) => vc(row[minCol + i], field, minCol + i)));
         return { fields, rows: selectedRows };
       }
     };
   });
-
 </script>
 
 <svelte:document oncopy={handleCopy} />

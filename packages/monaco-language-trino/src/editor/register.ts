@@ -1,13 +1,13 @@
-import type * as monacoApi from 'monaco-editor';
-import { TrinoCompletionProvider } from './trinoCompletionProvider';
-import { TrinoSemanticTokensProvider } from './trinoSemanticTokensProvider';
-import { trinoLanguageConfig } from './trinoLanguageConfig';
-import { setupDiagnostics } from './trinoDiagnosticsProvider';
-import { TrinoFoldingProvider } from './trinoFoldingProvider';
-import { DocumentParseService } from './documentParseService';
-import type { MetadataProvider } from './metadataProvider';
+import type * as monacoApi from "monaco-editor";
+import { TrinoCompletionProvider } from "./trinoCompletionProvider";
+import { TrinoSemanticTokensProvider } from "./trinoSemanticTokensProvider";
+import { trinoLanguageConfig } from "./trinoLanguageConfig";
+import { setupDiagnostics } from "./trinoDiagnosticsProvider";
+import { TrinoFoldingProvider } from "./trinoFoldingProvider";
+import { DocumentParseService } from "./documentParseService";
+import type { MetadataProvider } from "./metadataProvider";
 
-const DEFAULT_LANGUAGE_ID = 'trino-sql';
+const DEFAULT_LANGUAGE_ID = "trino-sql";
 
 export interface TrinoLanguageOptions {
   languageId?: string;
@@ -25,8 +25,8 @@ export interface TrinoLanguageRegistration extends monacoApi.IDisposable {
 }
 
 export function register(
-  monaco: Pick<typeof monacoApi, 'languages' | 'editor'>,
-  options?: TrinoLanguageOptions,
+  monaco: Pick<typeof monacoApi, "languages" | "editor">,
+  options?: TrinoLanguageOptions
 ): TrinoLanguageRegistration {
   const languageId = options?.languageId ?? DEFAULT_LANGUAGE_ID;
   const disposables: monacoApi.IDisposable[] = [];
@@ -36,17 +36,15 @@ export function register(
   monaco.languages.register({ id: languageId });
 
   // Language configuration
-  disposables.push(
-    monaco.languages.setLanguageConfiguration(languageId, trinoLanguageConfig),
-  );
+  disposables.push(monaco.languages.setLanguageConfiguration(languageId, trinoLanguageConfig));
 
   // Completion provider
   if (options?.metadataProvider) {
     disposables.push(
       monaco.languages.registerCompletionItemProvider(
         languageId,
-        new TrinoCompletionProvider(options.metadataProvider, parseService),
-      ),
+        new TrinoCompletionProvider(options.metadataProvider, parseService)
+      )
     );
   }
 
@@ -54,16 +52,16 @@ export function register(
   disposables.push(
     monaco.languages.registerDocumentSemanticTokensProvider(
       languageId,
-      new TrinoSemanticTokensProvider(parseService),
-    ),
+      new TrinoSemanticTokensProvider(parseService)
+    )
   );
 
   // Folding provider (fold each SQL statement)
   disposables.push(
     monaco.languages.registerFoldingRangeProvider(
       languageId,
-      new TrinoFoldingProvider(parseService),
-    ),
+      new TrinoFoldingProvider(parseService)
+    )
   );
 
   // Auto-attach diagnostics to models with matching language
@@ -89,9 +87,7 @@ export function register(
   }
 
   // Attach to future models
-  disposables.push(
-    monaco.editor.onDidCreateModel(attachDiagnostics),
-  );
+  disposables.push(monaco.editor.onDidCreateModel(attachDiagnostics));
 
   return {
     parseService,
@@ -104,6 +100,6 @@ export function register(
         d.dispose();
       }
       parseService.dispose();
-    },
+    }
   };
 }

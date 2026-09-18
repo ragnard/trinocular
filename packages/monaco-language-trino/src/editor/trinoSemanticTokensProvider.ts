@@ -1,7 +1,7 @@
-import * as monaco from 'monaco-editor';
-import { ParseTreeWalker, TerminalNode, Token } from 'antlr4ng';
-import type { ParserRuleContext, ParseTree } from 'antlr4ng';
-import { SqlBaseListener } from '../parser/SqlBaseListener';
+import * as monaco from "monaco-editor";
+import { ParseTreeWalker, TerminalNode, Token } from "antlr4ng";
+import type { ParserRuleContext, ParseTree } from "antlr4ng";
+import { SqlBaseListener } from "../parser/SqlBaseListener";
 import type {
   GenericTypeContext,
   DateTimeTypeContext,
@@ -10,20 +10,25 @@ import type {
   RowTypeContext,
   LegacyArrayTypeContext,
   LegacyMapTypeContext,
-  ArrayTypeContext,
-} from '../parser/SqlBaseParser';
-import { SqlBaseLexer } from '../parser/SqlBaseLexer';
-import { trinoSemanticIndex, TYPE_INDEX, SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS } from './trinoTokenMap';
-import type { DocumentParseService } from './documentParseService';
+  ArrayTypeContext
+} from "../parser/SqlBaseParser";
+import { SqlBaseLexer } from "../parser/SqlBaseLexer";
+import {
+  trinoSemanticIndex,
+  TYPE_INDEX,
+  SEMANTIC_TOKEN_TYPES,
+  SEMANTIC_TOKEN_MODIFIERS
+} from "./trinoTokenMap";
+import type { DocumentParseService } from "./documentParseService";
 
 export const semanticTokensLegend: monaco.languages.SemanticTokensLegend = {
   tokenTypes: [...SEMANTIC_TOKEN_TYPES],
-  tokenModifiers: [...SEMANTIC_TOKEN_MODIFIERS],
+  tokenModifiers: [...SEMANTIC_TOKEN_MODIFIERS]
 };
 
 interface SemanticToken {
-  line: number;   // 0-based document line
-  start: number;  // 0-based character offset
+  line: number; // 0-based document line
+  start: number; // 0-based character offset
   length: number;
   tokenType: number;
 }
@@ -90,8 +95,9 @@ class TypeHighlightListener extends SqlBaseListener {
   };
 }
 
-export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSemanticTokensProvider {
-
+export class TrinoSemanticTokensProvider
+  implements monaco.languages.DocumentSemanticTokensProvider
+{
   onDidChange?: monaco.IEvent<void>;
 
   constructor(private readonly parseService: DocumentParseService) {}
@@ -103,7 +109,7 @@ export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSem
   provideDocumentSemanticTokens(
     model: monaco.editor.ITextModel,
     _lastResultId: string | null,
-    token: monaco.CancellationToken,
+    token: monaco.CancellationToken
   ): monaco.languages.SemanticTokens {
     const results = this.parseService.getParseResults(model, token);
     const allTokens: SemanticToken[] = [];
@@ -123,7 +129,7 @@ export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSem
           continue;
         }
 
-        const tokenText = lexerToken.text ?? '';
+        const tokenText = lexerToken.text ?? "";
         if (tokenText.length === 0) continue;
 
         // Check if this token is in a type context
@@ -141,9 +147,7 @@ export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSem
         // Convert statement-relative position to document position
         const stmtLine0 = lexerToken.line - 1; // 0-based line within statement
         const docLine = stmtLine0 + stmt.startLine; // 0-based document line
-        const docCol = stmtLine0 === 0
-          ? lexerToken.column + stmt.startCol
-          : lexerToken.column;
+        const docCol = stmtLine0 === 0 ? lexerToken.column + stmt.startCol : lexerToken.column;
 
         // A semantic token may not cross a line break, nor end past the end of
         // its own line; monaco checks both and logs "Invalid Semantic Tokens
@@ -157,27 +161,27 @@ export class TrinoSemanticTokensProvider implements monaco.languages.DocumentSem
         // keystroke. Emitting one token per line the text actually covers is
         // the whole fix: the run after a line comment's break is empty, which
         // is how its newline stops being highlighted.
-        if (tokenText.indexOf('\n') === -1 && tokenText.indexOf('\r') === -1) {
+        if (tokenText.indexOf("\n") === -1 && tokenText.indexOf("\r") === -1) {
           allTokens.push({
             line: docLine,
             start: docCol,
             length: tokenText.length,
-            tokenType: semanticIndex,
+            tokenType: semanticIndex
           });
           continue;
         }
 
         let pieceLine = docLine;
         let pieceStart = docCol;
-        for (const piece of tokenText.split('\n')) {
+        for (const piece of tokenText.split("\n")) {
           // A '\r' at the end belongs to the line break, not to the line.
-          const length = piece.endsWith('\r') ? piece.length - 1 : piece.length;
+          const length = piece.endsWith("\r") ? piece.length - 1 : piece.length;
           if (length > 0) {
             allTokens.push({
               line: pieceLine,
               start: pieceStart,
               length,
-              tokenType: semanticIndex,
+              tokenType: semanticIndex
             });
           }
           pieceLine++;

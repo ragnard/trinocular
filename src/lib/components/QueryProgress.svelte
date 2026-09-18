@@ -339,30 +339,29 @@
          seeing during that beat. -->
     {#if stages.length > 0}
       <section class="stages">
-          <div class="stage-row head">
-            <span>Stage</span>
-            <span class="bar-col"></span>
-            <span class="num">Splits</span>
-            <span class="num">Rows</span>
+        <div class="stage-row head">
+          <span>Stage</span>
+          <span class="bar-col"></span>
+          <span class="num">Splits</span>
+          <span class="num">Rows</span>
+        </div>
+        {#each stages as { stage, depth } (stage.stageId)}
+          {@const s = splitsOf(stage)}
+          <div class="stage-row">
+            <span class="name" style:padding-left="{depth * 0.9}em">
+              <span class="dot" class:done={stage.done} class:failed={stage.failedTasks > 0}></span>
+              {stageNumber(stage.stageId)}
+              <span class="stage-state">{stage.state.toLowerCase()}</span>
+            </span>
+            <span class="bar-col">
+              <span class="bar stage" style:width="{(s.total / stageScale) * 100}%">
+                {@render segments(s, false)}
+              </span>
+            </span>
+            <span class="num">{formatCount(s.completed)} / {formatCount(s.total)}</span>
+            <span class="num">{formatCount(stage.processedRows)}</span>
           </div>
-          {#each stages as { stage, depth } (stage.stageId)}
-            {@const s = splitsOf(stage)}
-            <div class="stage-row">
-              <span class="name" style:padding-left="{depth * 0.9}em">
-                <span class="dot" class:done={stage.done} class:failed={stage.failedTasks > 0}
-                ></span>
-                {stageNumber(stage.stageId)}
-                <span class="stage-state">{stage.state.toLowerCase()}</span>
-              </span>
-              <span class="bar-col">
-                <span class="bar stage" style:width="{(s.total / stageScale) * 100}%">
-                  {@render segments(s, false)}
-                </span>
-              </span>
-              <span class="num">{formatCount(s.completed)} / {formatCount(s.total)}</span>
-              <span class="num">{formatCount(stage.processedRows)}</span>
-            </div>
-          {/each}
+        {/each}
       </section>
     {/if}
 

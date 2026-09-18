@@ -61,7 +61,10 @@ export const LoggingHandler = (): Handle => {
       // exception thrown by a route or a load *inside* `resolve`, hands it to
       // `handleError`, and returns a 500 response — so from here a crashed
       // endpoint is indistinguishable from a served page except by its status.
-      const log = (res?.status ?? 0) >= 500 ? requestIdLogger.error.bind(requestIdLogger) : requestIdLogger.info.bind(requestIdLogger);
+      const log =
+        (res?.status ?? 0) >= 500
+          ? requestIdLogger.error.bind(requestIdLogger)
+          : requestIdLogger.info.bind(requestIdLogger);
       log(
         {
           method: event.request.method,

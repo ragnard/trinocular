@@ -8,22 +8,40 @@ export interface MetadataProvider {
 
 export class StaticMetadataProvider implements MetadataProvider {
   private readonly schemas: Record<string, string[]> = {
-    tpch: ['sf1', 'tiny', 'information_schema'],
-    memory: ['default'],
-    system: ['metadata', 'runtime', 'jdbc'],
+    tpch: ["sf1", "tiny", "information_schema"],
+    memory: ["default"],
+    system: ["metadata", "runtime", "jdbc"]
   };
 
   private readonly tables: Record<string, string[]> = {
-    'tpch.sf1': ['customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp', 'region', 'supplier'],
-    'tpch.tiny': ['customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp', 'region', 'supplier'],
+    "tpch.sf1": [
+      "customer",
+      "lineitem",
+      "nation",
+      "orders",
+      "part",
+      "partsupp",
+      "region",
+      "supplier"
+    ],
+    "tpch.tiny": [
+      "customer",
+      "lineitem",
+      "nation",
+      "orders",
+      "part",
+      "partsupp",
+      "region",
+      "supplier"
+    ]
   };
 
   async getDefaultCatalog(): Promise<string | undefined> {
-    return 'tpch';
+    return "tpch";
   }
 
   async getDefaultSchema(): Promise<string | undefined> {
-    return 'sf1';
+    return "sf1";
   }
 
   async getCatalogs(): Promise<string[]> {

@@ -1,4 +1,4 @@
-import { SqlBaseParser } from '../parser/SqlBaseParser';
+import { SqlBaseParser } from "../parser/SqlBaseParser";
 
 const NON_KEYWORD_TOKENS = new Set([
   SqlBaseParser.EQ,
@@ -30,7 +30,7 @@ const NON_KEYWORD_TOKENS = new Set([
   SqlBaseParser.BRACKETED_COMMENT,
   SqlBaseParser.WS,
   SqlBaseParser.UNRECOGNIZED,
-  SqlBaseParser.DELIMITER,
+  SqlBaseParser.DELIMITER
 ]);
 
 const keywordMap = new Map<number, string>();

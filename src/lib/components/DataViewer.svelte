@@ -77,13 +77,7 @@
       entries read like a row's fields, and a view format picked for one is
       kept by key: the key is data rather than schema, but the same key in
       another row is far more likely the same kind of value than not. */
-  function flatten(
-    value: any,
-    field: Field,
-    id: string,
-    key: string,
-    path: string
-  ): FlatEntry[] {
+  function flatten(value: any, field: Field, id: string, key: string, path: string): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
       return [{ id, key, path, value: null, field }];

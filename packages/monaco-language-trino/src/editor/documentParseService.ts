@@ -1,13 +1,20 @@
-import * as monaco from 'monaco-editor';
-import { CharStream, CommonTokenStream } from 'antlr4ng';
-import type { ANTLRErrorListener, ATNSimulator, ParserRuleContext, RecognitionException, Recognizer, Token } from 'antlr4ng';
-import { SqlBaseLexer } from '../parser/SqlBaseLexer';
-import { SqlBaseParser } from '../parser/SqlBaseParser';
-import { splitStatements, type StatementSlice } from './splitStatements';
+import * as monaco from "monaco-editor";
+import { CharStream, CommonTokenStream } from "antlr4ng";
+import type {
+  ANTLRErrorListener,
+  ATNSimulator,
+  ParserRuleContext,
+  RecognitionException,
+  Recognizer,
+  Token
+} from "antlr4ng";
+import { SqlBaseLexer } from "../parser/SqlBaseLexer";
+import { SqlBaseParser } from "../parser/SqlBaseParser";
+import { splitStatements, type StatementSlice } from "./splitStatements";
 
 export interface CollectedError {
-  line: number;          // 1-based (from ANTLR)
-  column: number;        // 0-based (from ANTLR)
+  line: number; // 1-based (from ANTLR)
+  column: number; // 0-based (from ANTLR)
   message: string;
   offendingSymbol: Token | null;
 }
@@ -21,25 +28,31 @@ export class ErrorCollector implements ANTLRErrorListener {
     line: number,
     charPositionInLine: number,
     msg: string,
-    _e: RecognitionException | null,
+    _e: RecognitionException | null
   ): void {
     this.errors.push({
       line,
       column: charPositionInLine,
       message: msg,
-      offendingSymbol: offendingSymbol as Token | null,
+      offendingSymbol: offendingSymbol as Token | null
     });
   }
 
-  reportAmbiguity(): void { /* not relevant for diagnostics */ }
-  reportAttemptingFullContext(): void { /* not relevant for diagnostics */ }
-  reportContextSensitivity(): void { /* not relevant for diagnostics */ }
+  reportAmbiguity(): void {
+    /* not relevant for diagnostics */
+  }
+  reportAttemptingFullContext(): void {
+    /* not relevant for diagnostics */
+  }
+  reportContextSensitivity(): void {
+    /* not relevant for diagnostics */
+  }
 }
 
 export interface StatementParseResult {
   slice: StatementSlice;
   tree: ParserRuleContext;
-  tokens: Token[];          // all lexer tokens for the statement
+  tokens: Token[]; // all lexer tokens for the statement
   errors: CollectedError[];
 }
 
@@ -125,7 +138,7 @@ export class DocumentParseService {
    */
   getParseResults(
     model: monaco.editor.ITextModel,
-    cancel?: monaco.CancellationToken,
+    cancel?: monaco.CancellationToken
   ): StatementParseResult[] {
     const uri = model.uri.toString();
     const versionId = model.getVersionId();
@@ -150,7 +163,7 @@ export class DocumentParseService {
           slice: stmt,
           tree: stmtCached.tree,
           tokens: stmtCached.tokens,
-          errors: stmtCached.errors,
+          errors: stmtCached.errors
         });
         continue;
       }
@@ -175,7 +188,7 @@ export class DocumentParseService {
       const stmtResult: StatementCache = {
         tree,
         tokens,
-        errors: errorCollector.errors,
+        errors: errorCollector.errors
       };
 
       // Cache by statement text
@@ -183,7 +196,7 @@ export class DocumentParseService {
 
       results.push({
         slice: stmt,
-        ...stmtResult,
+        ...stmtResult
       });
     }
 

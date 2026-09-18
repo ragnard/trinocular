@@ -30,7 +30,7 @@ export function fieldFromTypeSignature(sig: TypeSignature, name: string, typeNam
     name,
     dataType: toDataType(sig),
     dataTypeName: typeName,
-    nullable: true,
+    nullable: true
   };
 }
 
@@ -39,7 +39,7 @@ function toField(sig: TypeSignature, name: string): Field {
     name,
     dataType: toDataType(sig),
     dataTypeName: formatTypeName(sig),
-    nullable: true,
+    nullable: true
   };
 }
 
@@ -86,7 +86,7 @@ function toDataType(sig: TypeSignature): DataType {
           }
           const fieldName = arg.value.fieldName?.name ?? `_${i}`;
           return toField(arg.value.typeSignature, fieldName);
-        }),
+        })
       };
       return struct;
     }

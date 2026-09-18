@@ -1,6 +1,6 @@
-import { CharStream } from 'antlr4ng';
-import { SqlBaseLexer } from '../parser/SqlBaseLexer';
-import { SqlBaseParser } from '../parser/SqlBaseParser';
+import { CharStream } from "antlr4ng";
+import { SqlBaseLexer } from "../parser/SqlBaseLexer";
+import { SqlBaseParser } from "../parser/SqlBaseParser";
 
 /**
  * The words that can stand as a bare identifier despite being keywords, read
@@ -45,5 +45,5 @@ export function quoteIdentifier(name: string): string {
 }
 
 export function qualifiedName(...parts: string[]): string {
-  return parts.map(quoteIdentifier).join('.');
+  return parts.map(quoteIdentifier).join(".");
 }

@@ -1,5 +1,5 @@
-import type * as monacoApi from 'monaco-editor';
-import type { DocumentParseService } from './documentParseService';
+import type * as monacoApi from "monaco-editor";
+import type { DocumentParseService } from "./documentParseService";
 
 export class TrinoFoldingProvider implements monacoApi.languages.FoldingRangeProvider {
   constructor(private parseService: DocumentParseService) {}
@@ -7,7 +7,7 @@ export class TrinoFoldingProvider implements monacoApi.languages.FoldingRangePro
   provideFoldingRanges(
     model: monacoApi.editor.ITextModel,
     _context: monacoApi.languages.FoldingContext,
-    _token: monacoApi.CancellationToken,
+    _token: monacoApi.CancellationToken
   ): monacoApi.languages.FoldingRange[] {
     const statements = this.parseService.getStatements(model);
     const ranges: monacoApi.languages.FoldingRange[] = [];

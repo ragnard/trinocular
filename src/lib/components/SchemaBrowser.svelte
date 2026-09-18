@@ -268,7 +268,11 @@
     }
     const under = `${node.id}${SEP}`;
     for (const id of open) {
-      if (id.startsWith(under)) meta.get(id)?.load?.().catch(() => {});
+      if (id.startsWith(under))
+        meta
+          .get(id)
+          ?.load?.()
+          .catch(() => {});
     }
   }
 

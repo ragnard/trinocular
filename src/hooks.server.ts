@@ -35,7 +35,7 @@ const authnHandler = async (config: Config) => {
         scope: authn.scope,
         userIdClaim: authn.userIdClaim,
         claimsFrom: authn.claimsFrom,
-        paths: authn.paths,
+        paths: authn.paths
       });
   }
 };
@@ -43,7 +43,9 @@ const authnHandler = async (config: Config) => {
 const createHandle = async () => {
   const sessionStore = await createSessionStore(config.session.store);
   process.once("sveltekit:shutdown", () => {
-    sessionStore.dispose?.().catch((err) => logger.warn({ err }, "session store did not close cleanly"));
+    sessionStore
+      .dispose?.()
+      .catch((err) => logger.warn({ err }, "session store did not close cleanly"));
   });
   const authz = createAuthorizer(config.authz, {
     defaultClient: config.authn.kind === "oidc" ? config.authn.clientId : undefined,
@@ -69,10 +71,10 @@ const createHandle = async () => {
       cookieOptions: {
         path: config.session.cookie.path ?? "/",
         httpOnly: config.session.cookie.httpOnly ?? true,
-        secure: config.session.cookie.secure ?? (env.ORIGIN?.startsWith("https") ?? true),
+        secure: config.session.cookie.secure ?? env.ORIGIN?.startsWith("https") ?? true,
         sameSite: config.session.cookie.sameSite ?? "lax",
         ...(config.session.cookie.domain && { domain: config.session.cookie.domain }),
-        ...(config.session.cookie.maxAge && { maxAge: config.session.cookie.maxAge }),
+        ...(config.session.cookie.maxAge && { maxAge: config.session.cookie.maxAge })
       }
     }),
     await authnHandler(config),
