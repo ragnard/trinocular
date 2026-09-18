@@ -11,8 +11,10 @@
   } from "./types";
   import { defaultCell } from "./snippets.svelte";
 
+  /** `--h-row` and `--h-rail` in style.css: the virtual scroll needs the
+   *  numbers, so they are repeated here rather than read off the stylesheet.
+   *  The header is a rail, like every other pane header in the app. */
   const DEFAULT_ROW_HEIGHT = 30;
-  /** The header is a rail, like every other pane header in the app. */
   const HEADER_HEIGHT = 36;
   const DEFAULT_BUFFER_ROWS = 5;
   const DEFAULT_COLUMN_WIDTH = 150;
@@ -424,7 +426,7 @@
           {#each visibleRows as row, i (startIndex + i)}
             {@const absRow = startIndex + i}
             <tr style:height="{rowHeight}px" data-row-index={absRow}>
-              <td class="row-num" class:selected={isRowNumSelected(absRow)}>{absRow + 1}</td>
+              <td class="row-num meta" class:selected={isRowNumSelected(absRow)}>{absRow + 1}</td>
               {#each row as cell, colIdx}
                 {@const flags = cellFlags(absRow, colIdx)}
                 {@const renderCell = resolvedRenderers[colIdx]}
@@ -523,8 +525,6 @@
     z-index: 2;
     background: var(--s1);
     border-right: 1px solid var(--line);
-    color: var(--fg-3);
-    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
     text-align: right;
   }

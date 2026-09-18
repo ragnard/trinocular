@@ -112,7 +112,7 @@
         >
           <FileText size={14} />
           <span class="name">{file.name}</span>
-          <span class="connection"
+          <span class="connection meta"
             ><HardDrive size={12} />{workspace.connectionName(file.connectionId)}</span
           >
         </button>
@@ -130,7 +130,7 @@
       </button>
     </div>
 
-    <div class="hints">
+    <div class="hints meta">
       <span><kbd>&#8593;</kbd><kbd>&#8595;</kbd> navigate</span>
       <span><kbd>&#8629;</kbd> open</span>
       <span><kbd>esc</kbd> dismiss</span>
@@ -238,8 +238,6 @@
     align-items: center;
     gap: 4px;
     flex: none;
-    color: var(--fg-3);
-    font-size: var(--text-sm);
   }
 
   .hints {
@@ -250,8 +248,6 @@
     align-items: center;
     padding: 0 12px;
     border-top: 1px solid var(--line);
-    color: var(--fg-3);
-    font-size: var(--text-sm);
   }
 
   .hints span {

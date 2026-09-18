@@ -234,9 +234,9 @@
       {#if stats?.queuedTimeMillis}
         <span class="muted">queued {formatDuration(stats.queuedTimeMillis)}</span>
       {/if}
-      <span class="spacer"></span>
+      <span class="fill"></span>
       {#if result.queryId}
-        <span class="query-id" title="Trino query id">{result.queryId}</span>
+        <span class="query-id meta mono" title="Trino query id">{result.queryId}</span>
       {/if}
     </header>
 
@@ -258,7 +258,7 @@
           <span class="key"
             ><i class="swatch queued"></i>Queued <b>{formatCount(splits.queued)}</b></span
           >
-          <span class="spacer"></span>
+          <span class="fill"></span>
           <!-- "known" is the honest word: this total is what Trino has
                scheduled so far, not the work the query will end up doing. -->
           <span class="muted">of {formatCount(splits.total)} splits known so far</span>
@@ -273,9 +273,9 @@
           role="group"
           aria-label="Query progress over time"
         >
-          <div class="axis">
+          <div class="axis small">
             <span class="muted">Splits</span>
-            <span class="spacer"></span>
+            <span class="fill"></span>
             <span class="muted tick">{formatCount(chart.splitsMax)}</span>
           </div>
           <div class="plot" role="img" aria-label={summary}>
@@ -291,9 +291,9 @@
             </svg>
           </div>
 
-          <div class="axis">
+          <div class="axis small">
             <span class="muted">Rows processed</span>
-            <span class="spacer"></span>
+            <span class="fill"></span>
             <span class="muted tick">{formatCount(chart.rowsMax)}</span>
           </div>
           <div
@@ -311,9 +311,9 @@
             </svg>
           </div>
 
-          <div class="axis">
+          <div class="axis small">
             <span class="muted tick">0s</span>
-            <span class="spacer"></span>
+            <span class="fill"></span>
             <span class="muted tick">{formatDuration(chart.tMax)}</span>
           </div>
 
@@ -321,7 +321,7 @@
             <!-- One crosshair across both plots: the two measures are only
                  worth stacking if they can be read at the same instant. -->
             <div class="crosshair" style:left={hoverX}></div>
-            <div class="readout" class:right={hovered.t > chart.tMax / 2} style:left={hoverX}>
+            <div class="readout small" class:right={hovered.t > chart.tMax / 2} style:left={hoverX}>
               <div class="when">{formatDuration(hovered.t)}</div>
               <div><i class="swatch completed"></i>{formatCount(hovered.completed)} completed</div>
               <div><i class="swatch running"></i>{formatCount(hovered.running)} running</div>
@@ -339,7 +339,7 @@
          seeing during that beat. -->
     {#if stages.length > 0}
       <section class="stages">
-        <div class="stage-row head">
+        <div class="stage-row head small">
           <span>Stage</span>
           <span class="bar-col"></span>
           <span class="num">Splits</span>
@@ -347,7 +347,7 @@
         </div>
         {#each stages as { stage, depth } (stage.stageId)}
           {@const s = splitsOf(stage)}
-          <div class="stage-row">
+          <div class="stage-row small">
             <span class="name" style:padding-left="{depth * 0.9}em">
               <span class="dot" class:done={stage.done} class:failed={stage.failedTasks > 0}></span>
               {stageNumber(stage.stageId)}
@@ -365,7 +365,7 @@
       </section>
     {/if}
 
-    <footer>
+    <footer class="meta">
       <!-- While the query runs this counts rows at every stage they pass
            through, so a join reports each input row more than once; on the
            settling chunk Trino restates it as raw input rows and the figure
@@ -412,14 +412,6 @@
     --area-queued: color-mix(in oklab, var(--accent) 11%, var(--s0));
     --area-rows: color-mix(in oklab, var(--fg) 10%, var(--s0));
     --line-rows: color-mix(in oklab, var(--fg) 55%, var(--s0));
-  }
-
-  .spacer {
-    flex: 1;
-  }
-
-  .muted {
-    color: var(--fg-3);
   }
 
   /* --- Bars --- */
@@ -544,8 +536,6 @@
   }
 
   .query-id {
-    font: var(--text-sm) / var(--leading-sm) var(--font-mono);
-    color: var(--fg-3);
     user-select: text;
   }
 
@@ -586,7 +576,6 @@
   .axis {
     display: flex;
     align-items: baseline;
-    font: var(--text-sm) / var(--leading-sm) var(--font);
   }
 
   .tick {
@@ -649,7 +638,6 @@
     box-shadow: var(--shadow);
     pointer-events: none;
     white-space: nowrap;
-    font: var(--text-sm) / var(--leading-sm) var(--font);
     font-variant-numeric: tabular-nums;
     z-index: 1;
   }
@@ -677,7 +665,6 @@
     grid-template-columns: minmax(7em, 10em) minmax(3em, 1fr) 6em 4.5em;
     align-items: center;
     gap: 12px;
-    font: var(--text-sm) / var(--leading-sm) var(--font);
   }
 
   .stage-row.head {
@@ -701,10 +688,6 @@
   }
 
   .dot {
-    flex: none;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
     background: var(--split-running);
   }
 
@@ -737,8 +720,6 @@
     gap: 6px 16px;
     padding-top: 12px;
     border-top: 1px solid var(--line);
-    color: var(--fg-3);
-    font: var(--text-sm) / var(--leading-sm) var(--font);
   }
 
   footer b {

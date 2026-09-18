@@ -807,7 +807,8 @@
   }
 
   /* Lucide renders `stroke="currentColor"`, so the icons inherit the hover and
-     failed colours below without any extra rules. */
+     failed colours below without any extra rules. A running one is spun by the
+     global `.spin` on its slot, the same animation the tree's loader uses. */
   :global(.monaco-editor .trinette-statement-toolbar .icon) {
     display: inline-flex;
     align-items: center;
@@ -824,22 +825,6 @@
   :global(.monaco-editor .trinette-statement-toolbar .icon svg) {
     max-width: none;
     flex: none;
-  }
-
-  :global(.monaco-editor .trinette-statement-toolbar .icon.spin svg) {
-    animation: trinette-spin 1s linear infinite;
-  }
-
-  @keyframes trinette-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.monaco-editor .trinette-statement-toolbar .icon.spin svg) {
-      animation: none;
-    }
   }
 
   :global(.monaco-editor .trinette-statement-toolbar .action + .action) {

@@ -216,7 +216,7 @@
 <div class="inspector">
   <div class="rail">
     <Search size={14} />
-    <span class="ell title">
+    <span class="ell fill">
       {#if selection}
         {documents.length} rows &times; {fieldCount} fields
       {:else}
@@ -241,7 +241,7 @@
     {/if}
     {#each documents as doc (doc.row)}
       <div class="doc-head">
-        <span class="caps">Row {doc.row}</span>
+        <span class="caps small">Row {doc.row}</span>
         <span class="fill"></span>
         <button
           class="chip square"
@@ -328,14 +328,6 @@
     padding-right: 6px;
   }
 
-  .title {
-    flex: 1;
-  }
-
-  .rail :global(svg) {
-    color: var(--fg-3);
-  }
-
   .stack {
     flex: 1;
     min-height: 0;
@@ -364,14 +356,9 @@
 
   .caps {
     color: var(--fg-2);
-    font-size: var(--text-sm);
     font-weight: 600;
     letter-spacing: 0.055em;
     text-transform: uppercase;
-  }
-
-  .fill {
-    flex: 1;
   }
 
   .field {
@@ -440,12 +427,6 @@
 
   .pick.set {
     visibility: visible;
-    color: var(--accent);
-  }
-
-  /* The menu around these rows belongs to `Menu`, so what the rows say about
-     themselves is all this component can style. */
-  .selected {
     color: var(--accent);
   }
 

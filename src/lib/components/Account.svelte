@@ -71,8 +71,4 @@
     margin: 0;
     padding: 2px 12px 6px;
   }
-
-  button.selected {
-    color: var(--accent);
-  }
 </style>
