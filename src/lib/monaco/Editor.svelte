@@ -136,7 +136,7 @@
     const value = `${before ? gap : ""}${text}${after ? gap : ""}`;
     const start = model.getOffsetAt(selection.getStartPosition());
     editor.pushUndoStop();
-    editor.executeEdits("trinette", [{ range: selection, text: value, forceMoveMarkers: true }]);
+    editor.executeEdits("trinocular", [{ range: selection, text: value, forceMoveMarkers: true }]);
     editor.pushUndoStop();
     const end = model.getPositionAt(start + value.length);
     editor.setPosition(end);
@@ -435,7 +435,7 @@
     accessor: monaco.editor.IViewZoneChangeAccessor
   ): StatementToolbar {
     const node = document.createElement("div");
-    node.className = "trinette-statement-toolbar";
+    node.className = "trinocular-statement-toolbar";
 
     const button = (className: string, icon: IconComponent | null, text?: string) => {
       const el = document.createElement("a");
@@ -506,7 +506,7 @@
     toolbar.widget = {
       // Monaco keys its widget map by this id, so it has to be unique —
       // reusing one for another strip would silently replace the first.
-      getId: () => `trinette.statement-toolbar.${index}`,
+      getId: () => `trinocular.statement-toolbar.${index}`,
       getDomNode: () => node,
       // Keeps the caret put when a button is pressed. Only mousedown is
       // suppressed, so the click still lands on the button.
@@ -781,18 +781,18 @@
      sets `display` inline on a content widget's own node, which would beat a
      stylesheet rule short of !important. Its own code lens spaces its links
      the same way. */
-  :global(.monaco-editor .trinette-statement-toolbar) {
+  :global(.monaco-editor .trinocular-statement-toolbar) {
     white-space: nowrap;
     color: var(--fg-3);
   }
 
   /* `!important` because the `.action` rule below sets `display` at the same
      specificity and comes later, which would otherwise un-hide the button. */
-  :global(.monaco-editor .trinette-statement-toolbar [hidden]) {
+  :global(.monaco-editor .trinocular-statement-toolbar [hidden]) {
     display: none !important;
   }
 
-  :global(.monaco-editor .trinette-statement-toolbar .action) {
+  :global(.monaco-editor .trinocular-statement-toolbar .action) {
     cursor: pointer;
     user-select: none;
     /* "Details" is a real `<a href>`, so it would otherwise arrive wearing the
@@ -809,7 +809,7 @@
   /* Lucide renders `stroke="currentColor"`, so the icons inherit the hover and
      failed colours below without any extra rules. A running one is spun by the
      global `.spin` on its slot, the same animation the tree's loader uses. */
-  :global(.monaco-editor .trinette-statement-toolbar .icon) {
+  :global(.monaco-editor .trinocular-statement-toolbar .icon) {
     display: inline-flex;
     align-items: center;
   }
@@ -822,22 +822,22 @@
      editor has been laid out, that is 0. The label survives a `max-width: 0`
      ancestor because nowrap text overflows it; the icon, a replaced element
      sizing itself against its container, collapsed to nothing. */
-  :global(.monaco-editor .trinette-statement-toolbar .icon svg) {
+  :global(.monaco-editor .trinocular-statement-toolbar .icon svg) {
     max-width: none;
     flex: none;
   }
 
-  :global(.monaco-editor .trinette-statement-toolbar .action + .action) {
+  :global(.monaco-editor .trinocular-statement-toolbar .action + .action) {
     margin-left: 1em;
   }
 
-  :global(.monaco-editor .trinette-statement-toolbar .action:hover) {
+  :global(.monaco-editor .trinocular-statement-toolbar .action:hover) {
     color: var(--accent);
     text-decoration: underline;
   }
 
   /* Failed and cancelled results — Trino reports a cancel as a failure. */
-  :global(.monaco-editor .trinette-statement-toolbar .status.failed) {
+  :global(.monaco-editor .trinocular-statement-toolbar .status.failed) {
     color: var(--error);
   }
 </style>

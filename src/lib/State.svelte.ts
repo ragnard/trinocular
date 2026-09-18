@@ -54,7 +54,7 @@ const COMPLETED_STATES: Set<State> = new Set(["FINISHED", "FAILED"]);
 /** What a run and the schema browser both say when the server offered no clusters. */
 export const NO_CONNECTIONS =
   "No connections are configured. Name a cluster under `connections` in the config file, " +
-  "or start Trinette with TRINO_URL.";
+  "or start Trinocular with TRINO_URL.";
 
 /**
  * One reading of the query's split counts. Kept as a series, not just a latest
@@ -562,7 +562,7 @@ export class Workspace {
       onTrouble: (failing) => {
         if (this.saveFailed !== failing) this.saveFailed = failing;
       },
-      report: (message) => console.error(`trinette: ${message}`)
+      report: (message) => console.error(`trinocular: ${message}`)
     });
     this.#connectionIds = new Set(connections.map((c) => c.id));
     this.hasConnections = connections.length > 0;

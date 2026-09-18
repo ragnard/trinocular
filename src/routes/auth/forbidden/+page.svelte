@@ -5,9 +5,9 @@
 <h1>Not authorized</h1>
 <p>
   {#if page.data.userId}
-    <code>{page.data.userId}</code> is signed in, but does not have access to Trinette.
+    <code>{page.data.userId}</code> is signed in, but does not have access to Trinocular.
   {:else}
-    This account does not have access to Trinette.
+    This account does not have access to Trinocular.
   {/if}
 </p>
 <p class="meta">Ask an administrator to grant your account the required role.</p>

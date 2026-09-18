@@ -9,7 +9,7 @@ import { SqliteFileStore } from "./sqlite/fileStore";
 import { silent, testValkey } from "./testValkey";
 import { ValkeyFileStore } from "./valkey/fileStore";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinette-files-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinocular-files-"));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const file = (id: string, content = "select 1") => ({

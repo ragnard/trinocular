@@ -6,7 +6,7 @@ import { logger } from "./logging";
 import { env } from "$env/dynamic/private";
 
 const CookieSchema = z.object({
-  name: z.string().default("trinette-session"),
+  name: z.string().default("trinocular-session"),
   secret: z.string().min(32, "cookie secret must be at least 32 characters for adequate security"),
   path: z.string().optional(),
   httpOnly: z.boolean().optional(),
@@ -90,7 +90,7 @@ const valkeyStore = <T extends z.ZodRawShape>(own: T) =>
 const ValkeySessionStoreSchema = valkeyStore({
   kind: z.literal("valkey"),
   secret: SecretSchema,
-  keyPrefix: z.string().default("trinette:session:")
+  keyPrefix: z.string().default("trinocular:session:")
 });
 
 // A database file on a volume of this one replica. Sealed like Valkey, and for
@@ -133,7 +133,7 @@ const FileStoreSchema = z
     z.object({ kind: z.literal("browser") }),
     z.object({ kind: z.literal("memory") }),
     z.object({ kind: z.literal("sqlite"), path: z.string().min(1) }),
-    valkeyStore({ kind: z.literal("valkey"), keyPrefix: z.string().default("trinette:files:") })
+    valkeyStore({ kind: z.literal("valkey"), keyPrefix: z.string().default("trinocular:files:") })
   ])
   .default({ kind: "browser" });
 
@@ -200,7 +200,7 @@ const RequireRoleAuthzSchema = z.object({
   kind: z.literal("require-role"),
   role: z.string(),
   // The OIDC client whose roles are consulted. Defaults to this application's
-  // own clientId, which is what "the role I granted Trinette in Keycloak"
+  // own clientId, which is what "the role I granted Trinocular in Keycloak"
   // means; name another client to reuse its roles.
   client: z.string().optional(),
   // Escape hatch for a provider that does not lay roles out the way Keycloak
@@ -226,7 +226,7 @@ const ConnectionSchema = z.object({
 });
 
 const BrandingSchema = z.object({
-  name: z.string().min(1).default("trinette"),
+  name: z.string().min(1).default("trinocular"),
   // HTML, shown in the middle of the top bar. It is the operator's, from the
   // same file as the security policy, and is rendered as written.
   message: z.string().optional()
@@ -293,7 +293,7 @@ function validate(raw: unknown, source: string): Config {
 function loadConfig(configPath?: string, trinoUrl?: string): Config {
   if (configPath && trinoUrl) {
     logger.error(
-      "TRINETTE_CONFIG and TRINO_URL are both set. TRINO_URL stands in for a config file; " +
+      "TRINOCULAR_CONFIG and TRINO_URL are both set. TRINO_URL stands in for a config file; " +
         "write the connection into the file and unset it."
     );
     process.exit(1);
@@ -327,7 +327,7 @@ function loadConfig(configPath?: string, trinoUrl?: string): Config {
   return validate(raw, resolvedPath);
 }
 
-export const config: Config = loadConfig(env.TRINETTE_CONFIG, env.TRINO_URL);
+export const config: Config = loadConfig(env.TRINOCULAR_CONFIG, env.TRINO_URL);
 
 /** The auth pages — login, error, forbidden — are SvelteKit routes, so they sit
  *  at a fixed `/auth/*` however `paths.prefix` is configured. Only the paths the

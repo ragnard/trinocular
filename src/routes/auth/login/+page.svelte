@@ -1,3 +1,3 @@
-<h1>Trinette</h1>
+<h1>Trinocular</h1>
 <p>Sign in to continue.</p>
 <a href="/" class="button">Sign in</a>

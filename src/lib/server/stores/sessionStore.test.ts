@@ -9,7 +9,7 @@ import { SqliteSessionStore } from "./sqlite/sessionStore";
 import { silent, testValkey } from "./testValkey";
 import { ValkeySessionStore } from "./valkey/sessionStore";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinette-sessions-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinocular-sessions-"));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const secret = "0123456789abcdef0123456789abcdef";

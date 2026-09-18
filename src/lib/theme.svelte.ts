@@ -16,7 +16,7 @@ import { browser } from "$app/environment";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
-const KEY = "trinette:theme";
+const KEY = "trinocular:theme";
 
 function stored(): ThemeChoice {
   if (!browser) return "system";

@@ -29,7 +29,7 @@ export class HttpError extends Error {
   }
 }
 
-const DEFAULT_SOURCE = "trinette";
+const DEFAULT_SOURCE = "trinocular";
 
 // Trino headers
 const TRINO_HEADER_PREFIX = "X-Trino-";

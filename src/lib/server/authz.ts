@@ -54,8 +54,8 @@ export const RequireRole = (opts: { role: string; claimPath: ClaimPath }): Autho
 
 /**
  * Turns a written policy into an authorizer. The one thing authz borrows from
- * authn is the default client for a role lookup: "the role I granted Trinette"
- * means the roles of the client Trinette signs in as.
+ * authn is the default client for a role lookup: "the role I granted Trinocular"
+ * means the roles of the client Trinocular signs in as.
  *
  * `where` names what the policy governs, for the startup log and for the error
  * a misconfiguration exits on — there is more than one policy now, and "which

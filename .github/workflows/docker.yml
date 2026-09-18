@@ -37,7 +37,7 @@ jobs:
           annotations: true
 
   # `bun test` runs the store contracts against every implementation, and the
-  # Valkey suites are skipped unless TRINETTE_TEST_VALKEY names a server, so
+  # Valkey suites are skipped unless TRINOCULAR_TEST_VALKEY names a server, so
   # without the service here a third of the suite would silently not run. The
   # Dockerfile's builder stage runs `check` and `build`, and neither of these.
   test:
@@ -53,7 +53,7 @@ jobs:
           - 6379:6379
 
     env:
-      TRINETTE_TEST_VALKEY: localhost:6379
+      TRINOCULAR_TEST_VALKEY: localhost:6379
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -145,8 +145,8 @@ jobs:
           target: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
-            TRINETTE_VERSION=${{ steps.version.outputs.version }}
-            TRINETTE_COMMIT=${{ github.sha }}
+            TRINOCULAR_VERSION=${{ steps.version.outputs.version }}
+            TRINOCULAR_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}

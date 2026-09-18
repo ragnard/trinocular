@@ -1,4 +1,4 @@
-# Trinette, with as little to decide as possible. From this directory:
+# Trinocular, with as little to decide as possible. From this directory:
 #
 #   docker compose up                                              # no Trino of your own? one is started
 #   TRINO_URL=http://host.docker.internal:8080 docker compose up    # point it at yours instead
@@ -6,15 +6,15 @@
 # Then open http://localhost:3000. There is no login: everyone is "alice", and
 # nothing is kept when the containers go away.
 
-name: trinette-demo
+name: trinocular-demo
 
 services:
-  trinette:
-    image: ghcr.io/ragnard/trinette:latest
+  trinocular:
+    image: ghcr.io/ragnard/trinocular:latest
     ports:
       - "3000:3000"
     environment:
-      # Without TRINETTE_CONFIG this is the whole configuration: one connection,
+      # Without TRINOCULAR_CONFIG this is the whole configuration: one connection,
       # no login, sessions in memory. The default is where the Trino below sits.
       TRINO_URL: ${TRINO_URL:-http://trino:8080}
       # Not optional, despite there being no login to redirect: unset, the server
@@ -38,9 +38,9 @@ services:
     # profile as none at all — so the service is ordinary when you have no
     # Trino, and under a profile nobody activates when you have one. Should a
     # compose release ever start rejecting the empty name, spell the profile
-    # `bundled` and say `--profile bundled` / `up --no-deps trinette` instead.
+    # `bundled` and say `--profile bundled` / `up --no-deps trinocular` instead.
     profiles: ["${TRINO_URL:+external}"]
-    # Deliberately not published to the host: Trinette reaches it by name over
+    # Deliberately not published to the host: Trinocular reaches it by name over
     # the compose network, and claiming 8080 is how a demo collides with the
     # first thing somebody already has running.
     healthcheck:

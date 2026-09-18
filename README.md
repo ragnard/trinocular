@@ -1,4 +1,4 @@
-# Trinette
+# Trinocular
 
 A web-based SQL query IDE for the [Trino](https://trino.io) distributed query engine.
 
@@ -38,7 +38,7 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 
 ## Trying it
 
-[`demo/compose.yaml`](demo/compose.yaml) runs Trinette with nothing to configure. If you
+[`demo/compose.yaml`](demo/compose.yaml) runs Trinocular with nothing to configure. If you
 have no Trino, it starts one:
 
 ```bash
@@ -52,7 +52,7 @@ If you have one, name it and no second Trino is started:
 TRINO_URL=http://host.docker.internal:8080 docker compose up
 ```
 
-Either way, Trinette is on [http://localhost:3000](http://localhost:3000). There is no
+Either way, Trinocular is on [http://localhost:3000](http://localhost:3000). There is no
 login — everyone is `alice` — and nothing survives the containers. The bundled Trino is a
 large image that wants a couple of gigabytes of memory, and it comes with the `tpch`,
 `tpcds`, `memory` and `jmx` catalogs, so there is something to run straight away:
@@ -68,7 +68,7 @@ docker run --rm -p 3000:3000 \
   --add-host host.docker.internal:host-gateway \
   -e TRINO_URL=http://host.docker.internal:8080 \
   -e ORIGIN=http://localhost:3000 \
-  ghcr.io/ragnard/trinette:latest
+  ghcr.io/ragnard/trinocular:latest
 ```
 
 `ORIGIN` is not optional here even though there is no login: without it the server assumes
@@ -92,12 +92,12 @@ For a look around, one variable is enough and there is no file to write:
 TRINO_URL=http://localhost:8080 bun run dev
 ```
 
-Otherwise Trinette needs a config file and its own address. Point `TRINETTE_CONFIG` at the
+Otherwise Trinocular needs a config file and its own address. Point `TRINOCULAR_CONFIG` at the
 file and set `ORIGIN` to the URL the app is served from — both can go in `.env`:
 
 ```
 ORIGIN=http://localhost:5173
-TRINETTE_CONFIG=config.dev.yaml
+TRINOCULAR_CONFIG=config.dev.yaml
 ```
 
 A minimal `config.dev.yaml` — no login, one cluster:
@@ -124,7 +124,7 @@ Other commands: `bun run build` (production build), `bun run preview`, `bun run 
 
 ## Configuration
 
-The config file is JSON or YAML, named by the `TRINETTE_CONFIG` environment variable. It
+The config file is JSON or YAML, named by the `TRINOCULAR_CONFIG` environment variable. It
 is validated at startup; anything invalid stops the server rather than letting it come up
 with half a policy.
 
@@ -132,9 +132,9 @@ with half a policy.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `TRINETTE_CONFIG` | no | Path to the config file. Without it, and without `TRINO_URL`, the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
-| `TRINO_URL` | no | One Trino cluster's base URL, standing in for a config file — no login, sessions in memory, a cookie secret generated afresh on every start, and the cluster named after the URL's host. It is read **only** when `TRINETTE_CONFIG` is unset: setting both stops the server, since a config file is where a connection belongs once there is one. |
-| `ORIGIN` | for OIDC, and for the container | The URL the app is served from, e.g. `https://trinette.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
+| `TRINOCULAR_CONFIG` | no | Path to the config file. Without it, and without `TRINO_URL`, the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
+| `TRINO_URL` | no | One Trino cluster's base URL, standing in for a config file — no login, sessions in memory, a cookie secret generated afresh on every start, and the cluster named after the URL's host. It is read **only** when `TRINOCULAR_CONFIG` is unset: setting both stops the server, since a config file is where a connection belongs once there is one. |
+| `ORIGIN` | for OIDC, and for the container | The URL the app is served from, e.g. `https://trinocular.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
 | `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
 | `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
 | `BODY_SIZE_LIMIT` | no | The most a request body may be, `512K` by default. Raise it together with `files.maxBytes` if documents are allowed to be bigger than that. |
@@ -149,7 +149,7 @@ branding:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `name` | `trinette` | The name shown at the top left of the window. |
+| `name` | `trinocular` | The name shown at the top left of the window. |
 | `message` | — | HTML shown in the middle of the top bar: a notice, a link to where help is. It is rendered as written, so it is only ever yours; a `<script>` in it does not run, because the app's content security policy allows none. |
 
 ### `session`
@@ -158,13 +158,13 @@ branding:
 session:
   maxLifetimeSeconds: 86400
   cookie:
-    name: trinette-session
+    name: trinocular-session
     secret: <at least 32 characters>
     path: /
     httpOnly: true
     secure: true
     sameSite: lax
-    domain: trinette.example.com
+    domain: trinocular.example.com
     maxAge: 86400
 ```
 
@@ -172,19 +172,19 @@ session:
 | --- | --- | --- |
 | `maxLifetimeSeconds` | `86400` | How long a session lives, in seconds. |
 | `cookie.secret` | **required** | Key the session cookie is encrypted with. At least 32 characters. |
-| `cookie.name` | `trinette-session` | Cookie name. |
+| `cookie.name` | `trinocular-session` | Cookie name. |
 | `cookie.path` | `/` | Cookie path. |
 | `cookie.httpOnly` | `true` | Hide the cookie from scripts. |
 | `cookie.secure` | from `ORIGIN` | Send the cookie over HTTPS only. Defaults to true unless `ORIGIN` is `http://` (with no config file, an absent `ORIGIN` defaults it to false instead). |
 | `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
 | `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
 | `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |
-| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinette. |
+| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinocular. |
 
 #### `store.kind: valkey`
 
 Sessions in [Valkey](https://valkey.io) or Redis, so they survive a restart and any
-number of copies of Trinette can serve them. Each session is one key, encrypted with
+number of copies of Trinocular can serve them. Each session is one key, encrypted with
 the store's own `secret` — a copy of the store gives away nothing without it, and
 changing it signs everyone out. It is deliberately not `cookie.secret`: the cookie
 secret guards what the browser holds and this one guards what the store holds, and
@@ -207,7 +207,7 @@ session:
 | --- | --- | --- |
 | `mode` | **required** | `single`, `cluster` or `sentinel`. |
 | `secret` | **required** | Key sessions in the store are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
-| `keyPrefix` | `trinette:session:` | Prefix on every key, if the store is shared with something else. |
+| `keyPrefix` | `trinocular:session:` | Prefix on every key, if the store is shared with something else. |
 | `username` | — | ACL user (Valkey 6 or later). |
 | `password` | — | Password for the nodes. |
 | `tls` | `false` | `true` to connect over TLS trusting the system's CAs, or `{ ca: <path> }` for a PEM bundle of your own. In `sentinel` mode this applies to the sentinels too. |
@@ -238,13 +238,13 @@ With `mode: sentinel`:
 | `sentinelPassword` | — | Password for the sentinels. |
 | `db` | `0` | Database number. |
 
-Trinette refuses to start if it cannot reach the store, for the same reason it refuses
+Trinocular refuses to start if it cannot reach the store, for the same reason it refuses
 a config it cannot validate.
 
 #### `store.kind: sqlite`
 
 Sessions in a [SQLite](https://sqlite.org) file, so they survive a restart with nothing
-else to run. It is for a single copy of Trinette: the file is opened for this process
+else to run. It is for a single copy of Trinocular: the file is opened for this process
 alone, and a second copy pointed at the same file refuses to start rather than share it.
 Sessions are encrypted with the store's own `secret`, as in Valkey, since the file is
 what a volume snapshot or a backup copies.
@@ -291,7 +291,7 @@ the store is for.
 
 #### `store.kind: sqlite`
 
-Files in a SQLite file, for a single copy of Trinette: as for sessions, the file is this
+Files in a SQLite file, for a single copy of Trinocular: as for sessions, the file is this
 process's alone, and a second copy pointed at it refuses to start.
 
 | Option | Default | Description |
@@ -308,7 +308,7 @@ it until it is gone.
 
 #### `store.kind: valkey`
 
-Files in Valkey or Redis, so any number of copies of Trinette can serve them. A user's
+Files in Valkey or Redis, so any number of copies of Trinocular can serve them. A user's
 documents are one hash under their user id; make sure the server persists to disk (AOF
 or RDB), since unlike a session a lost file is not something a user can sign in again to
 get back.
@@ -325,7 +325,7 @@ files:
 
 It takes the same options as the session store's `valkey` — `mode` and what each mode
 needs, `username`, `password`, `tls`, `connectTimeoutMs`, `commandTimeoutMs` — except
-that there is no `secret`, and `keyPrefix` defaults to `trinette:files:`. The two blocks
+that there is no `secret`, and `keyPrefix` defaults to `trinocular:files:`. The two blocks
 are independent: they can name the same server, where the prefixes keep them apart, or
 different ones.
 
@@ -350,7 +350,7 @@ authn:
 authn:
   kind: oidc
   issuer: https://keycloak.example/realms/prod
-  clientId: trinette
+  clientId: trinocular
   clientSecret: ...
   scope: openid profile email
   userIdClaim: preferred_username
@@ -366,7 +366,7 @@ authn:
 | Option | Default | Description |
 | --- | --- | --- |
 | `issuer` | **required** | Issuer URL; the provider's metadata is discovered from it. |
-| `clientId` | **required** | Client Trinette signs in as. |
+| `clientId` | **required** | Client Trinocular signs in as. |
 | `clientSecret` | **required** | Its secret. |
 | `scope` | **required** | Scopes to request, e.g. `openid profile email`. |
 | `userIdClaim` | `preferred_username` | Which claim names the user. |
@@ -375,7 +375,7 @@ authn:
 | `paths.login` / `logout` / `callback` / `error` | as named | The segments under that prefix. |
 
 The redirect URI to register with the provider is `ORIGIN` + prefix + callback, e.g.
-`https://trinette.example.com/auth/callback`. Signing out also ends the session at the
+`https://trinocular.example.com/auth/callback`. Signing out also ends the session at the
 provider, so register `ORIGIN` + `/` as a valid post-logout redirect URI too.
 
 ### `authz` — who is allowed in
@@ -389,7 +389,7 @@ authz:
 authz:
   kind: require-role
   role: user
-  client: trinette     # optional
+  client: trinocular     # optional
   claim: realm_access.roles   # optional, overrides `client`
 ```
 
@@ -422,10 +422,10 @@ connections:
 | Option | Default | Description |
 | --- | --- | --- |
 | `name` | **required** | Label shown in the UI. |
-| `uri` | **required** | The cluster's base URL. Only the server talks to it; browsers reach it through Trinette. |
+| `uri` | **required** | The cluster's base URL. Only the server talks to it; browsers reach it through Trinocular. |
 | `authz` | — | An extra rule for this cluster, in the same vocabulary as the top-level one. It can only narrow: the application-wide rule has already been applied, so a connection rule can keep people out of one cluster but never let anyone past the front door. A cluster a user may not use is not offered to them. |
 
-Signed-in users reach a cluster as themselves — Trinette passes their user id, and their
+Signed-in users reach a cluster as themselves — Trinocular passes their user id, and their
 access token if they logged in with OIDC — so the cluster's own access control still
 applies.
 
@@ -436,9 +436,9 @@ Images are published to GitHub Packages, as Debian slim (default) and distroless
 ```bash
 docker run --rm -p 3000:3000 \
   -e ORIGIN=http://localhost:3000 \
-  -e TRINETTE_CONFIG=/etc/trinette/config.yaml \
-  -v "$PWD/config.yaml:/etc/trinette/config.yaml:ro" \
-  ghcr.io/ragnard/trinette:latest
+  -e TRINOCULAR_CONFIG=/etc/trinocular/config.yaml \
+  -v "$PWD/config.yaml:/etc/trinocular/config.yaml:ro" \
+  ghcr.io/ragnard/trinocular:latest
 ```
 
 `ORIGIN` must be set: the session cookie's `Secure` flag is derived from it, and it is
@@ -461,8 +461,8 @@ name at the top left, and at the foot of the account menu, where the commit is a
 To build it yourself:
 
 ```bash
-docker build -t trinette .                          # debian slim
-docker build -t trinette --target distroless .      # distroless
+docker build -t trinocular .                          # debian slim
+docker build -t trinocular --target distroless .      # distroless
 ```
 
 A build is told its version rather than working one out — the image's build context has no
@@ -470,13 +470,13 @@ git history in it — so one built by hand is `0.0.0` from an unknown commit unl
 otherwise:
 
 ```bash
-docker build -t trinette \
-  --build-arg TRINETTE_VERSION=0.1.42 \
-  --build-arg TRINETTE_COMMIT=$(git rev-parse HEAD) .
+docker build -t trinocular \
+  --build-arg TRINOCULAR_VERSION=0.1.42 \
+  --build-arg TRINOCULAR_COMMIT=$(git rev-parse HEAD) .
 ```
 
 The same two variables name a `bun run build` outside Docker, where the commit is read from
-git when `TRINETTE_COMMIT` is not set.
+git when `TRINOCULAR_COMMIT` is not set.
 
 ### Health probes
 

@@ -5,8 +5,8 @@
  *
  * One key per file:
  *
- *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, viewFormats}
- *     trinette:workspace:<workspaceId>:ui              {activeFileId, order, connectionId}
+ *     trinocular:workspace:<workspaceId>:file:<fileId>   {id, name, content, viewFormats}
+ *     trinocular:workspace:<workspaceId>:ui              {activeFileId, order, connectionId}
  *
  * It used to be a single `:files` key holding every document, which made three
  * separate failures share one fate. A parse error lost the whole workspace
@@ -40,7 +40,7 @@ import type {
   WorkspaceWatcher
 } from "./workspaceStore";
 
-const prefix = (workspaceId: string) => `trinette:workspace:${workspaceId}:`;
+const prefix = (workspaceId: string) => `trinocular:workspace:${workspaceId}:`;
 const filePrefix = (workspaceId: string) => `${prefix(workspaceId)}file:`;
 const fileKey = (workspaceId: string, fileId: string) => filePrefix(workspaceId) + fileId;
 const uiKey = (workspaceId: string) => `${prefix(workspaceId)}ui`;

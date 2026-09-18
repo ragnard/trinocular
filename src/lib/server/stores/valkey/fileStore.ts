@@ -31,7 +31,7 @@ return {'saved', tostring(next)}
 type PutReply = ["saved", string] | ["conflict", string | null];
 
 interface Commands {
-  trinetteFilePut(
+  trinocularFilePut(
     files: string,
     seq: string,
     id: string,
@@ -53,7 +53,7 @@ export class ValkeyFileStore implements FileStore {
   #log: Log;
 
   private constructor(client: Client, prefix: string, log: Log) {
-    client.defineCommand("trinetteFilePut", { numberOfKeys: 2, lua: PUT });
+    client.defineCommand("trinocularFilePut", { numberOfKeys: 2, lua: PUT });
     this.#client = client as Client & Commands;
     this.#prefix = prefix;
     this.#log = log;
@@ -101,7 +101,7 @@ export class ValkeyFileStore implements FileStore {
 
   async put(userId: string, file: StoredFile, expected: string | null): Promise<PutResult> {
     const keys = this.#keys(userId);
-    const reply = await this.#client.trinetteFilePut(
+    const reply = await this.#client.trinocularFilePut(
       keys.files,
       keys.seq,
       file.id,

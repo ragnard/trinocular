@@ -33,7 +33,7 @@ import type {
 } from "./workspaceStore";
 
 const API = "/api/workspace";
-const CHANNEL = "trinette:workspace";
+const CHANNEL = "trinocular:workspace";
 /** How often a visible tab re-reads the listing to catch up with other
  *  browsers. Refreshing on becoming visible is what usually does the work;
  *  this is for the tab left open beside another one. */
