@@ -302,6 +302,12 @@
     move(delta, 0, extend);
   }
 
+  /** Focuses the grid, with the selection in view. */
+  export function focus() {
+    scrollContainer?.focus();
+    scrollActiveIntoView();
+  }
+
   /** Collapses the selection to the active cell's whole row. */
   export function selectRow() {
     if (!active) return;

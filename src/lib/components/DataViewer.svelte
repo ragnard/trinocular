@@ -68,7 +68,7 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (!onstep || !selection || event.altKey || event.ctrlKey || event.metaKey) return;
-    const typing = event.target instanceof HTMLInputElement;
+    const typing = event.target instanceof HTMLInputElement && event.target.value !== "";
     let delta: number;
     switch (event.key) {
       case "ArrowUp":
@@ -155,10 +155,17 @@
 
   let data: SelectionData | null = $state.raw(null);
 
+  // A block is debounced because a drag changes it on every mousemove and it
+  // can be hundreds of rows; one row is drawn as it is selected, or stepping
+  // faster than the debounce would skip rows without ever showing them.
   $effect(() => {
     const sel = selection;
     if (!sel) {
       data = null;
+      return;
+    }
+    if (sel.minRow === sel.maxRow) {
+      data = sel.getData();
       return;
     }
     const timeout = setTimeout(() => {
@@ -325,16 +332,6 @@
   function copyDocument(entries: FlatEntry[]) {
     copy(JSON.stringify(Object.fromEntries(entries.map((e) => [e.key, e.value])), null, 2));
   }
-
-  function copyAll() {
-    copy(
-      JSON.stringify(
-        documents.map((d) => Object.fromEntries(d.entries.map((e) => [e.key, e.value]))),
-        null,
-        2
-      )
-    );
-  }
 </script>
 
 <!-- Full-window there is nothing else to step, so the keys are the window's;
@@ -382,14 +379,6 @@
         <ChevronDown size={14} />
       </button>
     {/if}
-    <button
-      class="chip square"
-      onclick={copyAll}
-      disabled={!documents.length}
-      title="Copy selection as JSON"
-    >
-      <Copy size={14} />
-    </button>
     {#if onexpand}
       <button
         class="chip square"

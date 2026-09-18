@@ -41,6 +41,11 @@
     table?.selectRow();
   }
 
+  /** Focuses the table with its selection in view. */
+  export function focus() {
+    table?.focus();
+  }
+
   function setLimit(input: HTMLInputElement) {
     const n = Math.floor(Number(input.value));
     if (Number.isFinite(n) && n >= 1) rowLimit = n;

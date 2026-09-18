@@ -218,7 +218,15 @@
   {/if}
 
   {#if recordOpen}
-    <Dialog bind:this={recordDialog} onclose={() => (recordOpen = false)}>
+    <!-- The dialog hands focus back to whatever opened it, which for the
+         chip is the chip; the row you stepped to is where it belongs. -->
+    <Dialog
+      bind:this={recordDialog}
+      onclose={() => {
+        recordOpen = false;
+        resultRef?.focus();
+      }}
+    >
       {@render viewer(true)}
     </Dialog>
   {/if}
