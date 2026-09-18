@@ -409,22 +409,16 @@ export class SqlFile {
   name: string = $state("");
   content: string = $state("");
   /**
-   * The Trino cluster this document's statements run against. A property of
-   * the document, not of the app: switching connection re-points one file,
-   * and every other open file keeps meaning what it meant.
-   */
-  connectionId: string = $state("");
-  /**
    * How the inspector draws a field, keyed by the path the inspector shows
    * (`items[3].meta`, indices and all). Held across rows, since that much is a
    * property of the column, but not across elements: a varchar array can carry
    * a JSON document in one element and a sentence in the next, so collapsing
    * the index would make one click re-type the whole array.
    *
-   * A property of the document for the same reason the connection is: a
-   * workspace-wide map would let a column called `payload` in one document
-   * silently re-type `payload` in another, and a per-result one would be
-   * thrown away by the thing you do most, which is run the query again. It is
+   * A property of the document: a workspace-wide map would let a column
+   * called `payload` in one document silently re-type `payload` in another,
+   * and a per-result one would be thrown away by the thing you do most, which
+   * is run the query again. It is
    * only ever consulted with `viewFormats.ts`, which reads an id it does not
    * know as the default — so a stored choice can outlive the format that
    * served it, and a column can come back as a different type.
@@ -437,13 +431,11 @@ export class SqlFile {
     id: string,
     name: string,
     content: string = "",
-    connectionId: string = "",
     viewFormats: Record<string, string> = {}
   ) {
     this.id = id;
     this.name = name;
     this.content = content;
-    this.connectionId = connectionId;
     this.viewFormats = viewFormats;
   }
 
@@ -490,9 +482,19 @@ export class Workspace {
   id: string;
   /** The clusters this user may use, as the server listed them. */
   readonly connections: readonly ClientConnection[];
-  /** Connection for new files, and for any whose stored one no longer exists. */
+  /** What a workspace runs against until it has chosen, and what a stored
+   *  choice the config no longer declares is healed to. */
   defaultConnectionId: string;
   #connectionIds: Set<string>;
+  /**
+   * The Trino cluster every document's statements run against, and what the
+   * schema browser shows. One for the workspace, not one per document: the
+   * cluster is the place you are working in, and the files are what you are
+   * working on there. It was per file once, and the connection chip then sat
+   * in the document header, where switching files could silently switch
+   * clusters under a browser tree that still showed the old one.
+   */
+  connectionId: string = $state("");
   /**
    * False when the server offered no clusters at all. Every id then heals to
    * `""`, which is a proxy path that can only 404, so the places that would
@@ -508,8 +510,8 @@ export class Workspace {
 
   /**
    * One catalog cache per connection, kept for the session. Browsing a Trino
-   * cluster is slow enough that dropping the tree when the active file changes
-   * -- which the old global connection did on every switch -- is felt.
+   * cluster is slow enough that dropping the tree on every switch is felt, so
+   * coming back to a cluster finds its tree as you left it.
    *
    * Built up front, one per configured connection, and **never lazily**. A
    * `CatalogCache` is made of runes, and svelte does not register a dependency
@@ -540,10 +542,9 @@ export class Workspace {
   saveFailed = $state(false);
 
   /**
-   * `connections` is the configured set, newest config wins: a file restored
-   * from storage that names a connection the config no longer declares is
-   * pointed back at the default, since its own id can only ever 404 at the
-   * proxy.
+   * `connections` is the configured set, newest config wins: a stored choice
+   * naming a connection the config no longer declares is pointed back at the
+   * default, since its own id can only ever 404 at the proxy.
    */
   constructor(
     connections: readonly ClientConnection[],
@@ -573,6 +574,7 @@ export class Workspace {
     for (const id of [...this.#connectionIds, this.defaultConnectionId]) {
       this.#catalogs.set(id, new CatalogCache(this.#createClient(id)));
     }
+    this.connectionId = this.#knownConnection(loaded.connectionId);
     this.#restoreFiles(loaded);
   }
 
@@ -596,11 +598,6 @@ export class Workspace {
     return this.#catalogs.get(this.#knownConnection(connectionId))!;
   }
 
-  /** The connection the active document runs against. */
-  get connectionId(): string {
-    return this.#knownConnection(this.activeFile?.connectionId);
-  }
-
   /** What to call a connection on screen: its name, or its id when the list
    *  does not know it, or nothing at all when there are none to know. */
   connectionName(connectionId: string): string {
@@ -609,15 +606,15 @@ export class Workspace {
     );
   }
 
-  /** The schema of the active document's connection. */
+  /** The schema of the current connection. */
   get catalog(): CatalogCache {
     return this.catalogFor(this.connectionId);
   }
 
-  setFileConnection(file: SqlFile, connectionId: string) {
+  setConnection(connectionId: string) {
     const next = this.#knownConnection(connectionId);
-    if (file.connectionId === next) return;
-    file.connectionId = next;
+    if (this.connectionId === next) return;
+    this.connectionId = next;
     this.persist();
   }
 
@@ -648,16 +645,13 @@ export class Workspace {
   #restoreFiles(stored: LoadedWorkspace) {
     this.#saver.seed(stored.files);
 
-    this.files = stored.files.map(
-      (f) =>
-        new SqlFile(f.id, f.name, f.content, this.#knownConnection(f.connectionId), f.viewFormats)
-    );
+    this.files = stored.files.map((f) => new SqlFile(f.id, f.name, f.content, f.viewFormats));
     if (this.files.length === 0) this.files = [this.#scratchFile()];
     this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
   }
 
   #scratchFile(): SqlFile {
-    return new SqlFile(crypto.randomUUID(), "scratch.sql", "", this.defaultConnectionId);
+    return new SqlFile(crypto.randomUUID(), "scratch.sql");
   }
 
   #record(file: SqlFile): StoredFile {
@@ -665,7 +659,6 @@ export class Workspace {
       id: file.id,
       name: file.name,
       content: file.content,
-      connectionId: file.connectionId,
       viewFormats: { ...file.viewFormats }
     };
   }
@@ -680,7 +673,11 @@ export class Workspace {
   persist() {
     this.#saver.update(
       this.files.map((file) => this.#record(file)),
-      { activeFileId: this.activeFile?.id, order: this.files.map((f) => f.id) }
+      {
+        activeFileId: this.activeFile?.id,
+        order: this.files.map((f) => f.id),
+        connectionId: this.connectionId
+      }
     );
   }
 
@@ -700,7 +697,7 @@ export class Workspace {
     const names = new Set(this.files.map((f) => f.name));
     let n = 1;
     while (names.has(`query-${n}.sql`)) n++;
-    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`, "", this.connectionId);
+    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`);
     this.files.unshift(file);
     this.activeFile = file;
     this.persist();
@@ -734,7 +731,7 @@ export class Workspace {
     // One client per run: the Trino client keeps mutable session header state
     // (prepared statements), which is not safe to share across concurrent runs.
     const result = new Result(
-      this.#createClient(this.#knownConnection(file.connectionId)),
+      this.#createClient(this.connectionId),
       sql,
       startLine,
       anchorId,
@@ -799,8 +796,8 @@ export class Workspace {
    *    stale model is dropped and a fresh one is built from the new text next
    *    time the document is opened. Its results go with it: they belong to
    *    statements that no longer exist.
-   *  - A name or connection change is applied in place, since neither is
-   *    something monaco holds.
+   *  - A name change is applied in place, since a name is nothing monaco
+   *    holds.
    */
   watchStore(): () => void {
     return this.#store.watch({
@@ -813,31 +810,21 @@ export class Workspace {
   #applyRemoteFile(record: FileRecord) {
     // Record it as seen, so this tab does not write the value straight back.
     this.#saver.noteRemote(record);
-    const connectionId = this.#knownConnection(record.connectionId);
     const existing = this.files.find((f) => f.id === record.id);
 
     if (!existing) {
-      this.files.push(
-        new SqlFile(record.id, record.name, record.content, connectionId, record.viewFormats)
-      );
+      this.files.push(new SqlFile(record.id, record.name, record.content, record.viewFormats));
       return;
     }
 
     if (existing === this.activeFile || existing.content === record.content) {
       existing.name = record.name;
-      existing.connectionId = connectionId;
       // In place, like the name: how a value is drawn is nothing monaco holds.
       existing.viewFormats = record.viewFormats;
       return;
     }
 
-    const replacement = new SqlFile(
-      record.id,
-      record.name,
-      record.content,
-      connectionId,
-      record.viewFormats
-    );
+    const replacement = new SqlFile(record.id, record.name, record.content, record.viewFormats);
     this.files[this.files.indexOf(existing)] = replacement;
     for (const result of existing.results) result.discard();
   }

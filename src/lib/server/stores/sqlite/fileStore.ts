@@ -13,7 +13,6 @@ const SCHEMA: string[][] = [
        id TEXT NOT NULL,
        name TEXT NOT NULL,
        content TEXT NOT NULL,
-       connection_id TEXT NOT NULL,
        view_formats TEXT NOT NULL,
        version INTEGER NOT NULL,
        updated_at INTEGER NOT NULL,
@@ -23,6 +22,7 @@ const SCHEMA: string[][] = [
        user_id TEXT PRIMARY KEY,
        active_file_id TEXT,
        "order" TEXT NOT NULL,
+       connection_id TEXT,
        updated_at INTEGER NOT NULL
      )`
   ]
@@ -32,7 +32,6 @@ interface FileRow {
   id: string;
   name: string;
   content: string;
-  connection_id: string;
   view_formats: string;
   version: number;
 }
@@ -40,13 +39,13 @@ interface FileRow {
 interface UiRow {
   active_file_id: string | null;
   order: string;
+  connection_id: string | null;
 }
 
 const toRecord = (row: FileRow): FileRecord => ({
   id: row.id,
   name: row.name,
   content: row.content,
-  connectionId: row.connection_id,
   viewFormats: JSON.parse(row.view_formats),
   version: String(row.version)
 });
@@ -74,16 +73,20 @@ export class SqliteFileStore implements FileStore {
   async list(userId: string) {
     const rows = this.#db
       .query(
-        `SELECT id, name, content, connection_id, view_formats, version
+        `SELECT id, name, content, view_formats, version
          FROM files WHERE user_id = ?`
       )
       .all(userId) as FileRow[];
     const ui = this.#db
-      .query(`SELECT active_file_id, "order" FROM workspace_ui WHERE user_id = ?`)
+      .query(`SELECT active_file_id, "order", connection_id FROM workspace_ui WHERE user_id = ?`)
       .get(userId) as UiRow | null;
     return {
       files: rows.map(toRecord),
-      ui: ui && { activeFileId: ui.active_file_id ?? undefined, order: JSON.parse(ui.order) }
+      ui: ui && {
+        activeFileId: ui.active_file_id ?? undefined,
+        order: JSON.parse(ui.order),
+        connectionId: ui.connection_id ?? undefined
+      }
     };
   }
 
@@ -91,7 +94,7 @@ export class SqliteFileStore implements FileStore {
     return this.#db.transaction((): PutResult => {
       const current = this.#db
         .query(
-          `SELECT id, name, content, connection_id, view_formats, version
+          `SELECT id, name, content, view_formats, version
            FROM files WHERE user_id = ? AND id = ?`
         )
         .get(userId, file.id) as FileRow | null;
@@ -101,11 +104,11 @@ export class SqliteFileStore implements FileStore {
       const version = (current?.version ?? 0) + 1;
       this.#db
         .query(
-          `INSERT INTO files (user_id, id, name, content, connection_id, view_formats, version, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO files (user_id, id, name, content, view_formats, version, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (user_id, id) DO UPDATE SET
              name = excluded.name, content = excluded.content,
-             connection_id = excluded.connection_id, view_formats = excluded.view_formats,
+             view_formats = excluded.view_formats,
              version = excluded.version, updated_at = excluded.updated_at`
         )
         .run(
@@ -113,7 +116,6 @@ export class SqliteFileStore implements FileStore {
           file.id,
           file.name,
           file.content,
-          file.connectionId,
           JSON.stringify(file.viewFormats),
           version,
           Date.now()
@@ -129,13 +131,19 @@ export class SqliteFileStore implements FileStore {
   async putUi(userId: string, ui: StoredUi): Promise<void> {
     this.#db
       .query(
-        `INSERT INTO workspace_ui (user_id, active_file_id, "order", updated_at)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO workspace_ui (user_id, active_file_id, "order", connection_id, updated_at)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (user_id) DO UPDATE SET
            active_file_id = excluded.active_file_id, "order" = excluded."order",
-           updated_at = excluded.updated_at`
+           connection_id = excluded.connection_id, updated_at = excluded.updated_at`
       )
-      .run(userId, ui.activeFileId ?? null, JSON.stringify(ui.order), Date.now());
+      .run(
+        userId,
+        ui.activeFileId ?? null,
+        JSON.stringify(ui.order),
+        ui.connectionId ?? null,
+        Date.now()
+      );
   }
 
   async ping(): Promise<void> {

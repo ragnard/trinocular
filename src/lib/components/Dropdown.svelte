@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * A chip that opens a menu. Three of them exist — the document's file, its
-   * connection, and the results pane's Save — and until this component they
+   * A chip that opens a menu. Three of them exist — the document's file, the
+   * data browser's connection, and the results pane's Save — and until this component they
    * were three implementations of the same thing that had already drifted
    * apart twice: once in what the trigger looked like, once in how the menu
    * was dismissed.
@@ -23,7 +23,7 @@
     icon?: Component<any>;
     title?: string;
     disabled?: boolean;
-    /** For the one chip that names the thing rather than describing it. */
+    /** For a chip that names the thing its rail is about rather than describing it. */
     strong?: boolean;
     /** A wider menu, where the contents need it. */
     menuWidth?: string;

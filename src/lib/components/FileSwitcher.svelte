@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SqlFile, Workspace } from "$lib/State.svelte";
-  import { FileText, HardDrive, Plus } from "@lucide/svelte";
+  import { FileText, Plus } from "@lucide/svelte";
 
   interface Props {
     workspace: Workspace;
@@ -112,9 +112,6 @@
         >
           <FileText size={14} />
           <span class="name">{file.name}</span>
-          <span class="connection meta"
-            ><HardDrive size={12} />{workspace.connectionName(file.connectionId)}</span
-          >
         </button>
       {/each}
 
@@ -231,13 +228,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .connection {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    flex: none;
   }
 
   .hints {

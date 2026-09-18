@@ -88,7 +88,11 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
     }
 
     this.#remember(files, ui);
-    return { files: orderFiles(files, ui), activeFileId: ui?.activeFileId };
+    return {
+      files: orderFiles(files, ui),
+      activeFileId: ui?.activeFileId,
+      connectionId: ui?.connectionId
+    };
   }
 
   /**
@@ -266,5 +270,9 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
 
 function loadWorkspaceUi(workspaceId: string): StoredUi | null {
   const loaded = loadWorkspace(workspaceId);
-  return { activeFileId: loaded.activeFileId, order: loaded.files.map((f) => f.id) };
+  return {
+    activeFileId: loaded.activeFileId,
+    order: loaded.files.map((f) => f.id),
+    connectionId: loaded.connectionId
+  };
 }

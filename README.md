@@ -23,8 +23,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   when it will not list one.
 - Take a ready-made SELECT of every column, or the CREATE statement the cluster itself
   writes, for any table in the browser — copied, or dropped straight into your file.
-- Support for querying multiple Trino instances — each file picks its own, so
-  re-pointing one query leaves the rest alone.
+- Query more than one Trino cluster: pick the one to work in from the data browser, and
+  every file runs against it.
 - Read results in columns sized to what is in them, filling the width you give the
   table; drag a column's edge to size it yourself, or double-click it to fit its contents.
 - Copy a cell as it is, or a block of cells as CSV, with the usual shortcut — nested
@@ -403,8 +403,8 @@ A missing claim, or one that is not a list of strings, counts as no roles and is
 
 ### `connections` — the Trino clusters
 
-Each key is the connection's id, used internally and in stored files; the `name` is what
-users see.
+Each key is the connection's id, used internally and in what the app stores; the `name`
+is what users see.
 
 ```yaml
 connections:

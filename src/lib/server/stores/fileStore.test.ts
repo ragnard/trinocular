@@ -16,7 +16,6 @@ const file = (id: string, content = "select 1") => ({
   id,
   name: `${id}.sql`,
   content,
-  connectionId: "warehouse",
   viewFormats: { payload: "json" }
 });
 
@@ -91,9 +90,18 @@ const contract = (name: string, open: () => FileStore | Promise<FileStore>) => {
     });
 
     test("the ui record is last writer wins", async () => {
-      await store.putUi(user, { activeFileId: "a", order: ["a", "b"] });
+      await store.putUi(user, { activeFileId: "a", order: ["a", "b"], connectionId: "warehouse" });
       await store.putUi(user, { order: ["b"] });
-      expect((await store.list(user)).ui).toEqual({ activeFileId: undefined, order: ["b"] });
+      expect((await store.list(user)).ui).toEqual({
+        activeFileId: undefined,
+        order: ["b"],
+        connectionId: undefined
+      });
+    });
+
+    test("the ui record carries the connection", async () => {
+      await store.putUi(user, { order: [], connectionId: "finance" });
+      expect((await store.list(user)).ui?.connectionId).toBe("finance");
     });
   });
 };

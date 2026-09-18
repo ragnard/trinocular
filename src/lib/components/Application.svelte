@@ -59,9 +59,9 @@
     document.documentElement.dataset.theme = palette;
   });
 
-  // One delegate per connection, swapped when the active document points
+  // One delegate per connection, swapped when the workspace is pointed
   // somewhere else, so completions describe the cluster it actually runs on.
-  // Seeded once, untracked; the effect below is what follows the document.
+  // Seeded once, untracked; the effect below is what follows the connection.
   const metadataProvider = new DelegatingMetadataProvider(
     new TrinoMetadataProvider(untrack(() => workspace.catalog))
   );

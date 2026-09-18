@@ -33,13 +33,13 @@ export const FileSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(255),
   content: z.string(),
-  connectionId: z.string().max(255),
   viewFormats: z.record(z.string().max(1024), z.string().max(64))
 });
 
 export const UiSchema = z.object({
   activeFileId: z.uuid().optional(),
-  order: z.array(z.uuid()).max(10_000)
+  order: z.array(z.uuid()).max(10_000),
+  connectionId: z.string().max(255).optional()
 });
 
 /** The body, parsed against a schema, or the refusal: 413 over the cap and
