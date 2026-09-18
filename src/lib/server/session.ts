@@ -1,7 +1,7 @@
 import type { Handle } from "@sveltejs/kit";
 import { EncryptedCookie } from "./EncryptedCookie";
 
-import { type CookieSerializeOptions } from "cookie";
+import type { CookieSerializeOptions } from "cookie";
 
 import { logger } from "./logging";
 

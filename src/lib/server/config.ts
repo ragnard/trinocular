@@ -294,3 +294,9 @@ export const loginPath =
 
 /** Where the gate sends a refused user: a page, so a fixed route. */
 export const forbiddenPath = `${AUTH_PAGES}/forbidden`;
+
+/** Where `Sign out` posts. Undefined with no provider to sign out of, which is
+ *  what makes the button disappear rather than offer a way out of a session
+ *  `authn: none` never opened. */
+export const logoutPath =
+  config.authn.kind === "oidc" ? `${authPrefix}/${config.authn.paths.logout}` : undefined;

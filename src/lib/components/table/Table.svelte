@@ -58,7 +58,7 @@
     clipboardText
   }: Props = $props();
 
-  let scrollContainer: HTMLDivElement = $state() as HTMLDivElement;
+  let scrollContainer: HTMLDivElement | undefined = $state();
   let scrollTop = $state(0);
   let containerHeight = $state(0);
   let columnWidths: number[] = $state([]);
@@ -149,7 +149,7 @@
       dragging = true;
       document.addEventListener("mousemove", handleDragMove);
       document.addEventListener("mouseup", handleDragEnd);
-      scrollContainer.focus();
+      scrollContainer?.focus();
       return;
     }
 
@@ -170,7 +170,7 @@
     document.addEventListener("mousemove", handleDragMove);
     document.addEventListener("mouseup", handleDragEnd);
 
-    scrollContainer.focus();
+    scrollContainer?.focus();
   }
 
   function resolveCell(x: number, y: number): CellCoord | null {
@@ -355,27 +355,6 @@
     };
   });
 
-  $effect(() => {
-    if (!scrollContainer) return;
-
-    const onScroll = () => {
-      scrollTop = scrollContainer.scrollTop;
-    };
-
-    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        containerHeight = entry.contentRect.height;
-      }
-    });
-    resizeObserver.observe(scrollContainer);
-
-    return () => {
-      scrollContainer.removeEventListener("scroll", onScroll);
-      resizeObserver.disconnect();
-    };
-  });
 </script>
 
 <svelte:document oncopy={handleCopy} />
@@ -385,10 +364,12 @@
     class="table-container"
     class:dragging
     bind:this={scrollContainer}
+    bind:clientHeight={containerHeight}
     role="grid"
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
+    onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}
   >
     <table style:width="100%" style:min-width="{columnsWidth + spacerMinWidth}px">
       <colgroup>

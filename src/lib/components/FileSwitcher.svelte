@@ -2,18 +2,12 @@
   import type { SqlFile, Workspace } from "$lib/State.svelte";
   import { FileText, HardDrive, Plus } from "@lucide/svelte";
 
-  interface Connection {
-    id: string;
-    name: string;
-  }
-
   interface Props {
     workspace: Workspace;
-    connections: Connection[];
     onclose: () => void;
   }
 
-  let { workspace, connections, onclose }: Props = $props();
+  let { workspace, onclose }: Props = $props();
 
   /**
    * The file list used to live in the drawer, where it competed for height
@@ -52,10 +46,6 @@
       block: "nearest"
     });
   });
-
-  function connectionName(file: SqlFile): string {
-    return connections.find((c) => c.id === file.connectionId)?.name || file.connectionId;
-  }
 
   /** The "New file" row sits one past the matches and is always reachable. */
   function choose(at: number) {
@@ -122,7 +112,7 @@
         >
           <FileText size={14} />
           <span class="name">{file.name}</span>
-          <span class="connection"><HardDrive size={12} />{connectionName(file)}</span>
+          <span class="connection"><HardDrive size={12} />{workspace.connectionName(file.connectionId)}</span>
         </button>
       {/each}
 

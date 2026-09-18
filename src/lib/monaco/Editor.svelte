@@ -1,15 +1,59 @@
+<script lang="ts" module>
+  // Once per module, not per instance: the worker factory and the two themes
+  // are monaco-global, and an instance script would re-register them on every
+  // mount.
+  import * as monaco from "monaco-editor";
+  import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+
+  self.MonacoEnvironment = {
+    getWorker: () => new editorWorker()
+  };
+
+  monaco.editor.defineTheme("trino-light", {
+    base: "vs",
+    inherit: true,
+    rules: [
+      { token: "keyword", foreground: "0000FF" },
+      { token: "string", foreground: "A31515" },
+      { token: "number", foreground: "098658" },
+      { token: "comment", foreground: "008000" },
+      { token: "operator", foreground: "000000" },
+      { token: "type", foreground: "267f99" },
+      { token: "identifier", foreground: "001080" },
+      { token: "delimiter", foreground: "000000" }
+    ],
+    colors: {}
+  });
+
+  monaco.editor.defineTheme("trino-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "keyword", foreground: "569CD6" },
+      { token: "string", foreground: "CE9178" },
+      { token: "number", foreground: "B5CEA8" },
+      { token: "comment", foreground: "6A9955" },
+      { token: "operator", foreground: "D4D4D4" },
+      { token: "type", foreground: "4EC9B0" },
+      { token: "identifier", foreground: "9CDCFE" },
+      { token: "delimiter", foreground: "D4D4D4" }
+    ],
+    colors: {}
+  });
+</script>
+
 <script lang="ts">
   import { mount, onMount, unmount, untrack, type Component } from "svelte";
-  import * as monaco from "monaco-editor";
-  import CircleAlert from "@lucide/svelte/icons/circle-alert";
-  import ExternalLink from "@lucide/svelte/icons/external-link";
-  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
-  import Pause from "@lucide/svelte/icons/pause";
-  import Play from "@lucide/svelte/icons/play";
-  import Table from "@lucide/svelte/icons/table";
-  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
-  import X from "@lucide/svelte/icons/x";
-  import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+  import {
+    CircleAlert,
+    ExternalLink,
+    LoaderCircle,
+    Pause,
+    Play,
+    Table,
+    TriangleAlert,
+    X
+  } from "@lucide/svelte";
   import {
     register,
     type DocumentParseService,
@@ -190,42 +234,6 @@
       if (owner) models.delete(owner);
       model.dispose();
     }
-  });
-
-  self.MonacoEnvironment = {
-    getWorker: () => new editorWorker()
-  };
-
-  monaco.editor.defineTheme("trino-light", {
-    base: "vs",
-    inherit: true,
-    rules: [
-      { token: "keyword", foreground: "0000FF" },
-      { token: "string", foreground: "A31515" },
-      { token: "number", foreground: "098658" },
-      { token: "comment", foreground: "008000" },
-      { token: "operator", foreground: "000000" },
-      { token: "type", foreground: "267f99" },
-      { token: "identifier", foreground: "001080" },
-      { token: "delimiter", foreground: "000000" }
-    ],
-    colors: {}
-  });
-
-  monaco.editor.defineTheme("trino-dark", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "keyword", foreground: "569CD6" },
-      { token: "string", foreground: "CE9178" },
-      { token: "number", foreground: "B5CEA8" },
-      { token: "comment", foreground: "6A9955" },
-      { token: "operator", foreground: "D4D4D4" },
-      { token: "type", foreground: "4EC9B0" },
-      { token: "identifier", foreground: "9CDCFE" },
-      { token: "delimiter", foreground: "D4D4D4" }
-    ],
-    colors: {}
   });
 
   function rangesOverlap(a: monaco.IRange, b: monaco.IRange): boolean {

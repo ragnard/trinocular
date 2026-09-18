@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { Result as ResultModel, Workspace } from "$lib/State.svelte";
-  import type { Branding } from "$lib/server/config";
   import Editor from "$lib/monaco/Editor.svelte";
   import * as monaco from "monaco-editor";
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
   import { TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
   import { theme } from "$lib/theme.svelte";
+  import { untrack } from "svelte";
 
   import { SplitPane } from "./split-pane";
   import TopBar from "./TopBar.svelte";
@@ -17,7 +17,7 @@
   import SchemaBrowser from "./SchemaBrowser.svelte";
   import { page } from "$app/state";
 
-  let { workspace = $bindable() }: { workspace: Workspace } = $props();
+  let { workspace }: { workspace: Workspace } = $props();
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
@@ -28,11 +28,10 @@
   // value unsubscribes.
   $effect(() => workspace.watchOtherTabs());
 
-  let connections: { id: string; name: string }[] = $derived(page.data.connections ?? []);
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);
   let logoutPath = $derived(page.data.logoutPath);
-  let branding: Branding = $derived(page.data.branding);
+  let branding = $derived(page.data.branding);
 
   // What is chosen lives in `theme`; what is drawn is this. The OS preference
   // is only followed while the effect is mounted, and painting `<html>` is the
@@ -47,8 +46,9 @@
 
   // One delegate per connection, swapped when the active document points
   // somewhere else, so completions describe the cluster it actually runs on.
+  // Seeded once, untracked; the effect below is what follows the document.
   const metadataProvider = new DelegatingMetadataProvider(
-    new TrinoMetadataProvider(workspace.catalog)
+    new TrinoMetadataProvider(untrack(() => workspace.catalog))
   );
 
   $effect(() => {
@@ -135,7 +135,7 @@
 
 {#snippet doc()}
   <div class="document">
-    <DocumentHeader {workspace} {connections} onquickopen={() => (switcherOpen = true)} />
+    <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
     <div class="document-body">
       <SplitPane
         type="vertical"
@@ -176,7 +176,7 @@
   </div>
 
   {#if switcherOpen}
-    <FileSwitcher {workspace} {connections} onclose={() => (switcherOpen = false)} />
+    <FileSwitcher {workspace} onclose={() => (switcherOpen = false)} />
   {/if}
 </main>
 

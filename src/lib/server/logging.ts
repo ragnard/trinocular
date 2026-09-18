@@ -41,7 +41,7 @@ export const logger = pino({
 // as whatever the configured level happens to be.
 logger.info({ logLevel: level }, "initialized");
 
-export const LoggingHandler: () => Promise<Handle> = async () => {
+export const LoggingHandler = (): Handle => {
   return async ({ event, resolve }) => {
     const requestId = crypto.randomUUID();
     const requestIdLogger: Logger = logger.child({ request_id: requestId });
@@ -96,9 +96,9 @@ export const LoggingHandler: () => Promise<Handle> = async () => {
         // `error`, unlike the two branches above. This is the one that was not
         // thrown deliberately: an HttpError has already been logged, at the
         // level its status earns, by the `error()` helper that threw it, and a
-        // redirect is not a failure at all. Reached only by something thrown by a handler in the
-        // sequence itself — a route's own exception is caught by SvelteKit
-        // before it gets here, which is what `handleError` is for.
+        // redirect is not a failure at all. Reached only by something thrown by
+        // a handler in the sequence itself — a route's own exception is caught
+        // by SvelteKit before it gets here, which is what `handleError` is for.
         requestIdLogger.error(
           {
             method: event.request.method,

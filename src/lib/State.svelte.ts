@@ -2,6 +2,7 @@ import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
+import type { ClientConnection } from "$lib/server/connectionAuthz";
 import { underPath } from "$lib/viewFormats";
 import {
   loadWorkspace,
@@ -23,6 +24,14 @@ const HEARTBEAT_MS = 30_000;
 export const MAX_HOLD_MS = 10 * 60_000;
 
 type Resume = "more" | "all" | "stop";
+
+/** A 401 from the proxy means the session is gone; every request a result
+ *  makes answers it the same way. True when it was one, so a caller can stop. */
+function signedOut(e: unknown): boolean {
+  if (!(e instanceof HttpError && e.status === 401)) return false;
+  window.location.href = "/auth/login";
+  return true;
+}
 
 export type State =
   | "QUEUED"
@@ -186,10 +195,7 @@ export class Result {
         }
       }
     } catch (e) {
-      if (e instanceof HttpError && e.status === 401) {
-        window.location.href = "/auth/login";
-        return;
-      }
+      if (signedOut(e)) return;
       const message = e instanceof Error ? e.message : String(e);
       this.error = {
         message,
@@ -253,9 +259,7 @@ export class Result {
     try {
       await this.client.heartbeat(nextUri);
     } catch (e) {
-      if (e instanceof HttpError && e.status === 401) {
-        window.location.href = "/auth/login";
-      }
+      signedOut(e);
       // Anything else surfaces on the resumed poll, with a message.
     }
   }
@@ -363,10 +367,7 @@ export class Result {
     try {
       await this.client.cancel(this.queryId);
     } catch (e) {
-      if (e instanceof HttpError && e.status === 401) {
-        window.location.href = "/auth/login";
-        return;
-      }
+      if (signedOut(e)) return;
       // The query may have finished between the click and the request; the
       // polling loop reports whatever state it actually settled in.
     }
@@ -457,6 +458,8 @@ export class SqlFile {
 
 export class Workspace {
   id: string;
+  /** The clusters this user may use, as the server listed them. */
+  readonly connections: readonly ClientConnection[];
   /** Connection for new files, and for any whose stored one no longer exists. */
   defaultConnectionId: string;
   #connectionIds: Set<string>;
@@ -508,8 +511,9 @@ export class Workspace {
    * pointed back at the default, since its own id can only ever 404 at the
    * proxy.
    */
-  constructor(connections: { id: string }[], id: string = "default") {
+  constructor(connections: readonly ClientConnection[], id: string = "default") {
     this.id = id;
+    this.connections = connections;
     this.#connectionIds = new Set(connections.map((c) => c.id));
     this.defaultConnectionId = connections[0]?.id ?? "";
     // Every id `#knownConnection` can hand back, so `catalogFor` is a lookup
@@ -545,6 +549,16 @@ export class Workspace {
   /** The connection the active document runs against. */
   get connectionId(): string {
     return this.#knownConnection(this.activeFile?.connectionId);
+  }
+
+  /** What to call a connection on screen: its name, or its id when the list
+   *  does not know it, or nothing at all when there are none to know. */
+  connectionName(connectionId: string): string {
+    return (
+      this.connections.find((c) => c.id === connectionId)?.name ||
+      connectionId ||
+      "No connection"
+    );
   }
 
   /** The schema of the active document's connection. */
@@ -667,11 +681,7 @@ export class Workspace {
     this.files.splice(index, 1);
     // The file's results go with it — stop anything still running.
     for (const result of file.results) result.discard();
-    if (this.files.length === 0) {
-      this.files.push(
-        new SqlFile(crypto.randomUUID(), "scratch.sql", "", this.defaultConnectionId)
-      );
-    }
+    if (this.files.length === 0) this.files.push(this.#scratchFile());
     if (this.activeFile === file) {
       this.activeFile = this.files[0];
     }

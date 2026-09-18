@@ -78,6 +78,13 @@ export function connectionDenialReason(identity: Identity, connectionId: string)
   return decision.allowed ? "allowed" : decision.reason;
 }
 
+/** What the browser is told about a connection: enough to list it and to
+ *  address the proxy, and nothing about its policy. */
+export interface ClientConnection {
+  id: string;
+  name: string;
+}
+
 /**
  * The connections this identity may actually use, in config order.
  *
@@ -88,7 +95,7 @@ export function connectionDenialReason(identity: Identity, connectionId: string)
  * become that default, and every document would come up aimed at a cluster
  * that refuses it.
  */
-export function visibleConnections(identity: Identity | undefined): { id: string; name: string }[] {
+export function visibleConnections(identity: Identity | undefined): ClientConnection[] {
   if (!identity) return [];
   return Object.entries(config.connections ?? {})
     .filter(([id]) => mayUseConnection(identity, id))
