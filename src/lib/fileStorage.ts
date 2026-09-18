@@ -5,9 +5,8 @@
  *
  * One key per file:
  *
- *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, connectionId,
- *                                                       viewFormats}
- *     trinette:workspace:<workspaceId>:ui              {activeFileId, order}
+ *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, viewFormats}
+ *     trinette:workspace:<workspaceId>:ui              {activeFileId, order, connectionId}
  *
  * It used to be a single `:files` key holding every document, which made three
  * separate failures share one fate. A parse error lost the whole workspace
@@ -91,7 +90,11 @@ export function loadWorkspace(workspaceId: string): LoadedWorkspace {
   }
 
   const ui = readUi(workspaceId);
-  return { files: orderFiles(files, ui), activeFileId: ui?.activeFileId };
+  return {
+    files: orderFiles(files, ui),
+    activeFileId: ui?.activeFileId,
+    connectionId: ui?.connectionId
+  };
 }
 
 /** Drops one document from this browser, once the server holds it. */

@@ -1,15 +1,14 @@
 /**
  * The records a workspace is made of, as every store keeps them: one per
- * document, plus an advisory `ui` record holding the active document and the
- * listing order. Shared by the browser stores and the server ones, which is
- * why nothing in here touches the DOM or the filesystem.
+ * document, plus an advisory `ui` record holding the active document, the
+ * listing order and the connection. Shared by the browser stores and the
+ * server ones, which is why nothing in here touches the DOM or the filesystem.
  */
 
 export interface StoredFile {
   id: string;
   name: string;
   content: string;
-  connectionId: string;
   /** Inspector view formats, by field path. See `SqlFile.viewFormats`. */
   viewFormats: Record<string, string>;
 }
@@ -18,6 +17,9 @@ export interface StoredUi {
   activeFileId?: string;
   /** File ids, in the order the switcher should list them. */
   order: string[];
+  /** The cluster the workspace runs against. An id the config no longer
+   *  declares is healed to the default by the caller, like a missing one. */
+  connectionId?: string;
 }
 
 /** A stored document together with the version the store holds it under. The
@@ -44,8 +46,6 @@ export function toStoredFile(value: unknown): StoredFile | null {
     id: file.id,
     name: file.name,
     content: file.content,
-    // An unknown connection is healed against the config by the caller.
-    connectionId: typeof file.connectionId === "string" ? file.connectionId : "",
     viewFormats: toViewFormats(file.viewFormats)
   };
 }
@@ -71,7 +71,8 @@ export function toStoredUi(value: unknown): StoredUi | null {
   if (!Array.isArray(ui.order)) return null;
   return {
     activeFileId: typeof ui.activeFileId === "string" ? ui.activeFileId : undefined,
-    order: ui.order.filter((id): id is string => typeof id === "string")
+    order: ui.order.filter((id): id is string => typeof id === "string"),
+    connectionId: typeof ui.connectionId === "string" ? ui.connectionId : undefined
   };
 }
 

@@ -26,6 +26,7 @@ export interface LoadedWorkspace {
   /** Already in listing order. */
   files: FileRecord[];
   activeFileId?: string;
+  connectionId?: string;
 }
 
 export interface WorkspaceWatcher {

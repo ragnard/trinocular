@@ -41,6 +41,10 @@ export class InMemoryFileStore implements FileStore {
   }
 
   async putUi(userId: string, ui: StoredUi): Promise<void> {
-    this.#ui.set(userId, { activeFileId: ui.activeFileId, order: [...ui.order] });
+    this.#ui.set(userId, {
+      activeFileId: ui.activeFileId,
+      order: [...ui.order],
+      connectionId: ui.connectionId
+    });
   }
 }

@@ -4,7 +4,8 @@
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
   import { selectStatement, terminated, type TableRef } from "$lib/trino/statements";
-  import { Box, Database, Globe, HardDrive, Menu as MenuIcon, Table, X } from "@lucide/svelte";
+  import { Box, Database, HardDrive, Menu as MenuIcon, Table, X } from "@lucide/svelte";
+  import Dropdown from "./Dropdown.svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import TreeView from "./TreeView.svelte";
@@ -18,25 +19,23 @@
 
   let { workspace, oninsert }: Props = $props();
 
-  let connectionName = $derived(workspace.connectionName(workspace.connectionId));
+  /**
+   * The connection is the workspace's, and this rail is where it is chosen:
+   * the tree below is what the choice shows, so the two belong on one band.
+   */
+  let connectionId = $derived(workspace.connectionId);
+  let connectionName = $derived(workspace.connectionName(connectionId));
 
   let filter = $state("");
   let filtering = $derived(filter.trim().length > 0);
-
-  /**
-   * The active document's connection, as a value. Reading it through
-   * `workspace` touches `activeFile` too, so anything downstream of that would
-   * also fire when you merely switch between two files on the same cluster.
-   */
-  let connectionId = $derived(workspace.connectionId);
 
   const NO_IDS: Set<string> = new Set();
 
   /**
    * What is open, kept per connection: node ids are bare catalog and schema
    * names, which collide across clusters, and each cluster's tree was fetched
-   * separately anyway. Keeping them apart means coming back to a document on
-   * the other cluster finds the tree as you left it — the point of holding a
+   * separately anyway. Keeping them apart means coming back to the other
+   * cluster finds the tree as you left it — the point of holding a
    * `CatalogCache` per connection in the first place.
    */
   let openByConnection: Record<string, Set<string>> = $state({});
@@ -370,20 +369,29 @@
 
 <div class="browser">
   <div class="rail">
-    <Globe size={14} />
-    <span class="ell fill">Data browser</span>
+    <Dropdown
+      icon={HardDrive}
+      label={connectionName}
+      strong
+      title="The Trino cluster every document runs against"
+    >
+      {#snippet menu()}
+        {#each workspace.connections as connection (connection.id)}
+          <button
+            class:selected={connection.id === connectionId}
+            onclick={() => workspace.setConnection(connection.id)}
+          >
+            {connection.name}
+          </button>
+        {:else}
+          <button disabled>No connections configured</button>
+        {/each}
+      {/snippet}
+    </Dropdown>
   </div>
 
   <div class="filter">
     <FilterBox bind:value={filter} label="Filter schema" />
-  </div>
-
-  <!-- Says what the tree is. The connection also appears in the document
-       header, where it says what the file runs on; sitting on one band the
-       two read as the same fact rather than a repetition. -->
-  <div class="scope">
-    <HardDrive size={14} />
-    <span class="ell">{connectionName}</span>
   </div>
 
   <div class="tree">
@@ -478,18 +486,13 @@
     padding: 6px;
   }
 
-  /* Body text, not `.meta`. This names the cluster every row in the tree below
-     belongs to, which is the same weight of fact as the tree itself — at
-     `--text-sm` it read as a caption on the filter above it instead. Muted, so
-     it still sits behind the tree without shrinking. */
-  .scope {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: none;
-    height: var(--h-tree);
-    padding: 0 12px;
+  button:disabled {
     color: var(--fg-3);
+    cursor: default;
+  }
+
+  button:disabled:hover {
+    background: transparent;
   }
 
   .tree {

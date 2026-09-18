@@ -38,7 +38,6 @@ const file = (id: string, content: string): StoredFile => ({
   id,
   name: `${id}.sql`,
   content,
-  connectionId: "c",
   viewFormats: {}
 });
 const ui: StoredUi = { order: [] };
