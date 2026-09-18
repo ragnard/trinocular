@@ -1,3 +1,51 @@
+<script lang="ts" module>
+  const TOKENS = [
+    "--font",
+    "--font-mono",
+    "--text",
+    "--leading",
+    "--fg",
+    "--fg-2",
+    "--accent",
+    "--line",
+    "--s2"
+  ];
+
+  /**
+   * One stylesheet per palette, for every frame on the page: two hundred HTML
+   * cells in a selection are two hundred frames, and each used to read the
+   * root's computed style for itself. Cached only once the root actually
+   * wears the palette asked for, since a sheet read a beat early would carry
+   * the other theme's colours for the rest of the session.
+   */
+  const sheets = new Map<string, string>();
+
+  function stylesheet(palette: string): string {
+    const cached = sheets.get(palette);
+    if (cached) return cached;
+    const sheet = build(palette);
+    if (document.documentElement.dataset.theme === palette) sheets.set(palette, sheet);
+    return sheet;
+  }
+
+  function build(palette: string): string {
+    const style = getComputedStyle(document.documentElement);
+    const v = Object.fromEntries(TOKENS.map((t) => [t, style.getPropertyValue(t).trim()]));
+    return [
+      `:root{color-scheme:${palette}}`,
+      `body{margin:8px 12px;font:${v["--text"]}/${v["--leading"]} ${v["--font"]};color:${v["--fg"]};overflow-wrap:anywhere}`,
+      `a{color:${v["--accent"]}}`,
+      `pre,code{font-family:${v["--font-mono"]};font-size:0.95em}`,
+      `pre{padding:8px 12px;background:${v["--s2"]};border-radius:6px;overflow:auto}`,
+      `img{max-width:100%}`,
+      `table{border-collapse:collapse}`,
+      `th,td{padding:2px 8px;border:1px solid ${v["--line"]};text-align:left}`,
+      `blockquote{margin:0;padding-left:12px;border-left:3px solid ${v["--line"]};color:${v["--fg-2"]}}`,
+      `h1,h2,h3,h4{font-weight:600}`
+    ].join("\n");
+  }
+</script>
+
 <script lang="ts">
   /**
    * A document from a result cell, drawn in a frame with an empty `sandbox`:
@@ -18,35 +66,6 @@
   import { theme } from "$lib/theme.svelte";
 
   let { html, title }: { html: string; title?: string } = $props();
-
-  const TOKENS = [
-    "--font",
-    "--font-mono",
-    "--text",
-    "--leading",
-    "--fg",
-    "--fg-2",
-    "--accent",
-    "--line",
-    "--s2"
-  ];
-
-  function stylesheet(palette: string): string {
-    const style = getComputedStyle(document.documentElement);
-    const v = Object.fromEntries(TOKENS.map((t) => [t, style.getPropertyValue(t).trim()]));
-    return [
-      `:root{color-scheme:${palette}}`,
-      `body{margin:8px 12px;font:${v["--text"]}/${v["--leading"]} ${v["--font"]};color:${v["--fg"]};overflow-wrap:anywhere}`,
-      `a{color:${v["--accent"]}}`,
-      `pre,code{font-family:${v["--font-mono"]};font-size:0.95em}`,
-      `pre{padding:8px 12px;background:${v["--s2"]};border-radius:6px;overflow:auto}`,
-      `img{max-width:100%}`,
-      `table{border-collapse:collapse}`,
-      `th,td{padding:2px 8px;border:1px solid ${v["--line"]};text-align:left}`,
-      `blockquote{margin:0;padding-left:12px;border-left:3px solid ${v["--line"]};color:${v["--fg-2"]}}`,
-      `h1,h2,h3,h4{font-weight:600}`
-    ].join("\n");
-  }
 
   // Read once up front, so the first document already carries it, and again
   // whenever the palette changes. An unchanged string is not a change, so a
