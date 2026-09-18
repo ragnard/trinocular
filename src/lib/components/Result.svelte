@@ -102,19 +102,10 @@
       <span class="soft">No result</span>
     {/if}
     <span class="fill"></span>
-    <!-- What the *next* run does; a run already made carries its own cap. -->
+    <!-- What the *next* run does; a run already made carries its own cap. The
+         number sits on the toggle's open side, so it grows into the filler
+         and the toggle stays put. -->
     <div class="limit">
-      <button
-        class="chip"
-        aria-pressed={limitRows}
-        title={limitRows
-          ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
-          : "New runs fetch every row"}
-        onclick={() => (limitRows = !limitRows)}
-      >
-        <ListEnd size={14} />
-        {limitRows ? "Limit" : "No limit"}
-      </button>
       {#if limitRows}
         <input
           class="textbox"
@@ -129,6 +120,17 @@
           }}
         />
       {/if}
+      <button
+        class="chip"
+        aria-pressed={limitRows}
+        title={limitRows
+          ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
+          : "New runs fetch every row"}
+        onclick={() => (limitRows = !limitRows)}
+      >
+        <ListEnd size={14} />
+        {limitRows ? "Limit" : "No limit"}
+      </button>
     </div>
     <Dropdown icon={Download} label="Save" title="Save these results to a file" disabled={!canSave}>
       {#snippet menu()}

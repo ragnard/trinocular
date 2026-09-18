@@ -137,6 +137,13 @@ html {
   cursor: pointer;
 }
 
+/* A chip that opens a rail overhangs the rail's inset by its own padding, so
+   its icon lands where a bare rail icon does and the file chip, the
+   connection chip and the inspector's title all start on one line. */
+.rail > .chip:first-child {
+  margin-left: -8px;
+}
+
 .chip:hover {
   background: var(--s2);
   color: var(--fg);
