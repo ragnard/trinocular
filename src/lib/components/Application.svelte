@@ -11,6 +11,7 @@
   import TopBar from "./TopBar.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
+  import Dialog from "./Dialog.svelte";
   import type { Selection } from "./table/types";
   import DocumentHeader from "./DocumentHeader.svelte";
   import FileSwitcher from "./FileSwitcher.svelte";
@@ -21,7 +22,10 @@
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
+  let recordOpen = $state(false);
   let editorRef: ReturnType<typeof Editor> | undefined = $state();
+  let resultRef: ReturnType<typeof Result> | undefined = $state();
+  let recordDialog: ReturnType<typeof Dialog> | undefined = $state();
 
   // Other tabs, and with the server store other browsers, share this
   // workspace; the store is how this tab hears about documents they add,
@@ -85,6 +89,12 @@
     ];
   });
 
+  // Full-window is one whole row at a time, whatever cells were selected.
+  function openRecord() {
+    resultRef?.selectRow();
+    recordOpen = true;
+  }
+
   let saveTimer: ReturnType<typeof setTimeout>;
   function handleEditorChange() {
     clearTimeout(saveTimer);
@@ -96,7 +106,7 @@
   <SchemaBrowser {workspace} oninsert={(sql) => editorRef?.insert(sql)} />
 {/snippet}
 
-{#snippet inspector()}
+{#snippet viewer(expanded: boolean)}
   <!--
     The inspector is a pane of the window, not a region of the results: it
     reads whatever is selected, at full height, so a block selection is a stack
@@ -107,17 +117,30 @@
     is reach the edge, because a pane you can drag shut with no button left to
     reopen it is a trap rather than a layout.
 
+    The same component, with the same selection, is what the full-window
+    dialog shows: the table stays mounted behind the dialog and still owns the
+    selection, so stepping there is stepping here.
+
     How a field is drawn is a property of the document, so it travels with the
     file rather than with the result being inspected.
   -->
   <DataViewer
     {selection}
+    rowCount={activeResult?.data?.length}
     formats={workspace.activeFile?.viewFormats ?? {}}
     onpick={(path, formatId) => {
       const file = workspace.activeFile;
       if (file) workspace.setViewFormat(file, path, formatId);
     }}
+    onstep={(delta, extend) => resultRef?.step(delta, extend)}
+    {expanded}
+    onexpand={expanded ? undefined : openRecord}
+    onclose={expanded ? () => recordDialog?.close() : undefined}
   />
+{/snippet}
+
+{#snippet inspector()}
+  {@render viewer(false)}
 {/snippet}
 
 {#snippet editor()}
@@ -139,10 +162,12 @@
 
 {#snippet results()}
   <Result
+    bind:this={resultRef}
     result={activeResult}
     bind:selection
     bind:rowLimit={workspace.rowLimit}
     bind:limitRows={workspace.limitRows}
+    onopen={openRecord}
   />
 {/snippet}
 
@@ -190,6 +215,20 @@
 
   {#if switcherOpen}
     <FileSwitcher {workspace} onclose={() => (switcherOpen = false)} />
+  {/if}
+
+  {#if recordOpen}
+    <!-- The dialog hands focus back to whatever opened it, which for the
+         chip is the chip; the row you stepped to is where it belongs. -->
+    <Dialog
+      bind:this={recordDialog}
+      onclose={() => {
+        recordOpen = false;
+        resultRef?.focus();
+      }}
+    >
+      {@render viewer(true)}
+    </Dialog>
   {/if}
 </main>
 

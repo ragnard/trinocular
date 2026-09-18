@@ -10,6 +10,7 @@
     ValueConverter
   } from "./types";
   import { defaultCell, formatCell } from "./snippets.svelte";
+  import { textMeasurer } from "$lib/textWidth";
 
   /** `--h-row` and `--h-rail` in style.css: the virtual scroll needs the
    *  numbers, so they are repeated here rather than read off the stylesheet.
@@ -50,6 +51,8 @@
      * browser's own copy stands.
      */
     clipboardText?: (fields: Field[], rows: readonly (readonly unknown[])[]) => string;
+    /** Enter on a selection: the caller's chance to open it somewhere bigger. */
+    onopen?: () => void;
   }
 
   let {
@@ -63,7 +66,8 @@
     cellRenderer: cellRendererProp,
     valueConverter = identity,
     selection = $bindable(null),
-    clipboardText
+    clipboardText,
+    onopen
   }: Props = $props();
 
   let scrollContainer: HTMLDivElement | undefined = $state();
@@ -252,35 +256,63 @@
       return;
     }
 
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onopen?.();
+      return;
+    }
+
     if (!ARROW_KEYS.has(event.key)) return;
 
     event.preventDefault();
 
-    let nextRow = active.row;
-    let nextCol = active.col;
-
     switch (event.key) {
       case "ArrowUp":
-        nextRow = Math.max(0, active.row - 1);
+        move(-1, 0, event.shiftKey);
         break;
       case "ArrowDown":
-        nextRow = Math.min(totalRows - 1, active.row + 1);
+        move(1, 0, event.shiftKey);
         break;
       case "ArrowLeft":
-        nextCol = Math.max(0, active.col - 1);
+        move(0, -1, event.shiftKey);
         break;
       case "ArrowRight":
-        nextCol = Math.min(fieldCount - 1, active.col + 1);
+        move(0, 1, event.shiftKey);
         break;
     }
+  }
 
-    const next: CellCoord = { row: nextRow, col: nextCol };
+  const clamp = (n: number, max: number) => Math.min(Math.max(0, n), Math.max(0, max));
+
+  function move(rows: number, cols: number, extend: boolean) {
+    if (!active) return;
+    const next: CellCoord = {
+      row: clamp(active.row + rows, totalRows - 1),
+      col: clamp(active.col + cols, fieldCount - 1)
+    };
     active = next;
+    if (!extend) anchor = next;
+    scrollActiveIntoView();
+  }
 
-    if (!event.shiftKey) {
-      anchor = next;
-    }
+  /** Moves the selection `delta` rows (±Infinity for either end); with
+   *  `extend`, the anchor stays put. What the inspector's navigator drives,
+   *  so the selection keeps one owner. */
+  export function step(delta: number, extend = false) {
+    move(delta, 0, extend);
+  }
 
+  /** Focuses the grid, with the selection in view. */
+  export function focus() {
+    scrollContainer?.focus();
+    scrollActiveIntoView();
+  }
+
+  /** Collapses the selection to the active cell's whole row. */
+  export function selectRow() {
+    if (!active) return;
+    anchor = active;
+    rowSelection = true;
     scrollActiveIntoView();
   }
 
@@ -325,15 +357,11 @@
     }
   }
 
-  let measurer: CanvasRenderingContext2D | null = null;
+  let measure: ((text: string) => number) | null = null;
 
   function textWidth(text: string): number {
-    if (!measurer) {
-      measurer = document.createElement("canvas").getContext("2d")!;
-      const s = getComputedStyle(scrollContainer!);
-      measurer.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
-    }
-    return measurer.measureText(text).width;
+    measure ??= textMeasurer(scrollContainer!);
+    return measure(text);
   }
 
   /** Numeric cells draw tabular figures, which a canvas cannot be asked for;

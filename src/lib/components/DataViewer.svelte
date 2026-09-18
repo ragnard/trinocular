@@ -1,16 +1,27 @@
 <script lang="ts">
   import { isDictionary, isList, isStruct } from "./table/types";
   import type { Selection, SelectionData, Field } from "./table/types";
-  import { Copy, Eye, Search } from "@lucide/svelte";
-  import FilterBox from "./FilterBox.svelte";
+  import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
   import {
     DEFAULT_FORMAT,
     formatsFor,
     render,
     resolveFormat,
+    type Rendered,
     type ViewFormat
   } from "$lib/viewFormats";
+  import { formatCount } from "$lib/format";
+  import { textMeasurer } from "$lib/textWidth";
+  import { tick } from "svelte";
+
+  /** The key column's width, its own padding included: `.key` below. */
+  const DEFAULT_KEY_WIDTH = 150;
+  const MIN_KEY_WIDTH = 60;
+  const KEY_PADDING = 7;
+  /** What the value column is left at least, whatever the key is dragged to. */
+  const MIN_VALUE_WIDTH = 160;
+  const PAD = 12;
 
   interface Props {
     selection?: Selection | null;
@@ -19,6 +30,24 @@
     /** How to draw each field, by its path. See `SqlFile.viewFormats`. */
     formats?: Record<string, string>;
     onpick?: (path: string, formatId: string) => void;
+    /** Rows in the result the selection is of, for "of 3,500". */
+    rowCount?: number;
+    /**
+     * Moves the selection by `delta` rows (±Infinity for either end), keeping
+     * the anchor when `extend`. Given, the rail grows a navigator and the
+     * arrow keys step; the selection itself stays the table's to own.
+     */
+    onstep?: (delta: number, extend: boolean) => void;
+    /**
+     * Full-window: the columns start at half the width each, the arrow keys
+     * step wherever focus is, one row is shown at a time, and the filter takes
+     * focus on open.
+     */
+    expanded?: boolean;
+    /** Draws the chip that opens this pane full-window. */
+    onexpand?: () => void;
+    /** Draws the chip that closes it again. */
+    onclose?: () => void;
   }
 
   let {
@@ -26,15 +55,117 @@
     hideNulls = true,
     hideEmpty = true,
     formats = {},
-    onpick
+    onpick,
+    rowCount,
+    onstep,
+    expanded = false,
+    onexpand,
+    onclose
   }: Props = $props();
+
+  let atFirst = $derived(!selection || selection.minRow === 0);
+  let atLast = $derived(!selection || rowCount == null || selection.maxRow >= rowCount - 1);
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (!onstep || !selection || event.altKey || event.ctrlKey || event.metaKey) return;
+    const typing = event.target instanceof HTMLInputElement && event.target.value !== "";
+    let delta: number;
+    switch (event.key) {
+      case "ArrowUp":
+        delta = -1;
+        break;
+      case "ArrowDown":
+        delta = 1;
+        break;
+      case "Home":
+        if (typing) return;
+        delta = -Infinity;
+        break;
+      case "End":
+        if (typing) return;
+        delta = Infinity;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    onstep(delta, event.shiftKey && !expanded);
+  }
+
+  let fieldInput: HTMLInputElement | undefined = $state();
+
+  $effect(() => {
+    if (expanded) void tick().then(() => fieldInput?.focus());
+  });
+
+  let stack: HTMLDivElement | undefined = $state();
+  let stackWidth = $state(0);
+  let pinnedKey: number | null = $state(null);
+  let resizing = $state(false);
+
+  const clampKey = (w: number) =>
+    Math.max(MIN_KEY_WIDTH, Math.min(w, stackWidth - 2 * PAD - MIN_VALUE_WIDTH));
+
+  /** Half the pane when expanded, until dragged; the pane then keeps it. */
+  let keyWidth = $derived(
+    pinnedKey ?? (expanded && stackWidth ? clampKey(stackWidth / 2) : DEFAULT_KEY_WIDTH)
+  );
+
+  function fitKey() {
+    if (!stack) return;
+    const measure = textMeasurer(stack);
+    let width = 0;
+    for (const doc of documents) {
+      for (const entry of doc.entries) width = Math.max(width, measure(entry.key));
+    }
+    pinnedKey = clampKey(Math.ceil(width) + KEY_PADDING);
+  }
+
+  let lastHandlePress = 0;
+
+  function handlePointerdown(event: PointerEvent) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+
+    if (event.timeStamp - lastHandlePress < 400) {
+      lastHandlePress = 0;
+      fitKey();
+      return;
+    }
+    lastHandlePress = event.timeStamp;
+
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = keyWidth;
+    resizing = true;
+
+    const onPointermove = (e: PointerEvent) => {
+      pinnedKey = clampKey(startWidth + e.clientX - startX);
+    };
+    const onPointerup = () => {
+      resizing = false;
+      handle.releasePointerCapture(event.pointerId);
+      handle.removeEventListener("pointermove", onPointermove);
+      handle.removeEventListener("pointerup", onPointerup);
+    };
+    handle.addEventListener("pointermove", onPointermove);
+    handle.addEventListener("pointerup", onPointerup);
+  }
 
   let data: SelectionData | null = $state.raw(null);
 
+  // A block is debounced because a drag changes it on every mousemove and it
+  // can be hundreds of rows; one row is drawn as it is selected, or stepping
+  // faster than the debounce would skip rows without ever showing them.
   $effect(() => {
     const sel = selection;
     if (!sel) {
       data = null;
+      return;
+    }
+    if (sel.minRow === sel.maxRow) {
+      data = sel.getData();
       return;
     }
     const timeout = setTimeout(() => {
@@ -126,29 +257,53 @@
     return [{ id, key, path, value, field }];
   }
 
-  /**
-   * One filter, matched against field names and values alike. Two boxes
-   * (Field / Value) cost a whole extra row of chrome for a distinction nobody
-   * makes while scanning a document.
-   */
-  let filter = $state("");
+  let fieldFilter = $state("");
+  let valueFilter = $state("");
 
-  let documents: { row: number; entries: FlatEntry[] }[] = $derived.by(() => {
+  function clearOnEscape(event: KeyboardEvent) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (event.key === "Escape" && input.value) {
+      event.preventDefault();
+      if (input === fieldInput) fieldFilter = "";
+      else valueFilter = "";
+    }
+  }
+
+  /** A case-insensitive regex, or null for an empty box or one that will not
+   *  compile — which is shown on the box, and filters nothing meanwhile. */
+  function compile(source: string): RegExp | null {
+    if (!source) return null;
+    try {
+      return new RegExp(source, "i");
+    } catch {
+      return null;
+    }
+  }
+
+  let fieldPattern = $derived(compile(fieldFilter));
+  let valuePattern = $derived(compile(valueFilter));
+  let fieldInvalid = $derived(!!fieldFilter && !fieldPattern);
+  let valueInvalid = $derived(!!valueFilter && !valuePattern);
+
+  /** An entry with what the row will draw for it, which is also what the
+   *  value filter reads: what you see is what you can search for. */
+  type Entry = FlatEntry & { rendered: Rendered };
+
+  let documents: { row: number; entries: Entry[] }[] = $derived.by(() => {
     if (!data || !selection) return [];
-    const needle = filter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
-      let entries = data!.fields.flatMap((field, c) =>
+      let flat = data!.fields.flatMap((field, c) =>
         flatten(row[c], field, String(c), field.name, field.name)
       );
-      if (hideNulls) entries = entries.filter((e) => e.value !== null);
-      if (hideEmpty) entries = entries.filter((e) => !e.empty);
-      if (needle) {
-        entries = entries.filter(
-          (e) =>
-            e.key.toLowerCase().includes(needle) || String(e.value).toLowerCase().includes(needle)
-        );
-      }
+      if (hideNulls) flat = flat.filter((e) => e.value !== null);
+      if (hideEmpty) flat = flat.filter((e) => !e.empty);
+      if (fieldPattern) flat = flat.filter((e) => fieldPattern.test(e.key));
+      let entries = flat.map((e) => ({
+        ...e,
+        rendered: render(e.value, e.field, formatId(e))
+      }));
+      if (valuePattern) entries = entries.filter((e) => valuePattern.test(e.rendered.text));
       return { row: firstRow + i + 1, entries };
     });
   });
@@ -188,8 +343,8 @@
   }
 
   /** What the row shows, in full: the cap is on the screen, not on the value. */
-  function copyValue(entry: FlatEntry) {
-    copy(render(entry.value, entry.field, formatId(entry)).text);
+  function copyValue(entry: Entry) {
+    copy(entry.rendered.text);
   }
 
   /**
@@ -201,41 +356,118 @@
   function copyDocument(entries: FlatEntry[]) {
     copy(JSON.stringify(Object.fromEntries(entries.map((e) => [e.key, e.value])), null, 2));
   }
-
-  function copyAll() {
-    copy(
-      JSON.stringify(
-        documents.map((d) => Object.fromEntries(d.entries.map((e) => [e.key, e.value]))),
-        null,
-        2
-      )
-    );
-  }
 </script>
 
-<div class="inspector">
+<!-- Full-window there is nothing else to step, so the keys are the window's;
+     in the pane they are only taken from inside it. -->
+<svelte:window onkeydown={expanded ? handleKeydown : undefined} />
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="inspector"
+  class:resizing
+  style:--key="{keyWidth}px"
+  onkeydown={expanded ? undefined : handleKeydown}
+>
   <div class="rail">
     <Search size={14} />
     <span class="ell fill">
       {#if selection}
-        {documents.length} rows &times; {fieldCount} fields
+        {#if selection.minRow === selection.maxRow}
+          Row {formatCount(selection.minRow + 1)}
+        {:else}
+          Rows {formatCount(selection.minRow + 1)}–{formatCount(selection.maxRow + 1)}
+        {/if}
+        {#if rowCount != null}of {formatCount(rowCount)}{/if}
+        &middot; {fieldCount}
+        {fieldCount === 1 ? "field" : "fields"}
       {:else}
         Inspector
       {/if}
     </span>
-    <button
-      class="chip square"
-      onclick={copyAll}
-      disabled={!documents.length}
-      title="Copy selection as JSON"
-    >
-      <Copy size={14} />
-    </button>
+    {#if onstep}
+      <button
+        class="chip square"
+        onclick={() => onstep(-1, false)}
+        disabled={atFirst}
+        title="Previous row (↑)"
+      >
+        <ChevronUp size={14} />
+      </button>
+      <button
+        class="chip square"
+        onclick={() => onstep(1, false)}
+        disabled={atLast}
+        title="Next row (↓)"
+      >
+        <ChevronDown size={14} />
+      </button>
+    {/if}
+    {#if onexpand}
+      <button
+        class="chip square"
+        onclick={onexpand}
+        disabled={!selection}
+        title="Open full window (Enter in the table)"
+      >
+        <Maximize2 size={14} />
+      </button>
+    {/if}
+    {#if onclose}
+      <button class="chip square" onclick={onclose} title="Close (Esc)">
+        <X size={14} />
+      </button>
+    {/if}
   </div>
 
-  <FilterBox bind:value={filter} placeholder="Filter fields…" label="Filter fields" />
+  <!-- The table's header, for the same reason: the separator is what says
+       where the columns are, and its edge is the one place they are dragged.
+       A second press within 400ms fits the keys. -->
+  <div class="header">
+    <span class="key">
+      Field
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <span class="resize-handle" onpointerdown={handlePointerdown}></span>
+    </span>
+    <span class="value">Value</span>
+  </div>
 
-  <div class="stack" onscroll={() => picker?.close()}>
+  <div class="filters">
+    <span class="key">
+      <input
+        type="text"
+        class="textbox"
+        bind:this={fieldInput}
+        bind:value={fieldFilter}
+        placeholder="Filter…"
+        spellcheck="false"
+        aria-label="Filter fields"
+        aria-invalid={fieldInvalid}
+        title={fieldInvalid ? "Not a valid regular expression" : "Regular expression"}
+        onkeydown={clearOnEscape}
+      />
+    </span>
+    <span class="value">
+      <input
+        type="text"
+        class="textbox"
+        bind:value={valueFilter}
+        placeholder="Filter…"
+        spellcheck="false"
+        aria-label="Filter values"
+        aria-invalid={valueInvalid}
+        title={valueInvalid ? "Not a valid regular expression" : "Regular expression"}
+        onkeydown={clearOnEscape}
+      />
+    </span>
+  </div>
+
+  <div
+    class="stack"
+    bind:this={stack}
+    bind:clientWidth={stackWidth}
+    onscroll={() => picker?.close()}
+  >
     {#if !documents.length}
       <p class="empty">Select cells in the results to inspect them.</p>
     {/if}
@@ -254,7 +486,7 @@
       {#each doc.entries as entry (entry.id)}
         {@const choices = formatsFor(entry.field)}
         {@const chosen = resolveFormat(entry.field, formatId(entry))}
-        {@const { view } = render(entry.value, entry.field, formatId(entry))}
+        {@const { view } = entry.rendered}
         <div class="field">
           <span class="key ell" title={entry.key}>{entry.key}</span>
           <!-- Whatever the format drew: text with its own cap, a frame, an
@@ -334,6 +566,63 @@
     overflow: auto;
   }
 
+  .header,
+  .filters,
+  .field {
+    display: grid;
+    grid-template-columns: var(--key) minmax(0, 1fr);
+    padding: 0 12px;
+  }
+
+  .header,
+  .filters {
+    flex: none;
+    align-items: center;
+    height: var(--h-rail);
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .header .key,
+  .filters .key {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid var(--line);
+  }
+
+  .header .key {
+    color: var(--fg);
+  }
+
+  .filters .value {
+    display: flex;
+  }
+
+  .filters input {
+    flex: 1;
+  }
+
+  .resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .resize-handle:hover,
+  .resizing .resize-handle {
+    background: var(--accent-line);
+  }
+
+  .resizing {
+    user-select: none;
+    cursor: col-resize;
+  }
+
   .empty {
     padding: 16px 12px;
     color: var(--fg-3);
@@ -363,11 +652,9 @@
 
   .field {
     position: relative;
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 0 10px;
     align-items: start;
-    padding: 6px 12px 6px 12px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -377,10 +664,12 @@
   }
 
   .key {
+    padding-right: 6px;
     color: var(--fg-2);
   }
 
   .value {
+    padding-left: 6px;
     overflow-wrap: anywhere;
   }
 

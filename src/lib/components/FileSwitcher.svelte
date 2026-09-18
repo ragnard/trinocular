@@ -145,7 +145,7 @@
     z-index: 20;
     display: flex;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--scrim);
   }
 
   .palette {
