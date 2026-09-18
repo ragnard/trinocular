@@ -1,0 +1,46 @@
+{
+  "name": "trinocular",
+  "private": true,
+  "version": "0.1.0",
+  "homepage": "https://github.com/ragnard/trinocular",
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "bun test src",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "monaco-editor": "^0.56.0"
+  },
+  "devDependencies": {
+    "@lucide/svelte": "^1.47.0",
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/adapter-node": "^5.5.7",
+    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@types/bun": "^1.4.2",
+    "@types/node": "^26.6.1",
+    "iovalkey": "^0.4.0",
+    "marked": "^18.0.13",
+    "monaco-language-trino": "workspace:*",
+    "openid-client": "^6.8.8",
+    "pino": "^10.3.1",
+    "prettier": "^3.9.8",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0",
+    "zod": "^4.6.5"
+  }
+}

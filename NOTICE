@@ -1,0 +1,24 @@
+Trinocular
+Copyright 2026 Ragnar Dahlén
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product includes material from third parties:
+
+Trino SQL grammar
+  packages/monaco-language-trino/grammar/SqlBase.g4, and the parser
+  generated from it under packages/monaco-language-trino/src/parser/.
+  From the Trino project, https://github.com/trinodb/trino.
+  Licensed under the Apache License, Version 2.0.
+
+trino-js-client
+  src/lib/trino/index.ts is derived from
+  https://github.com/trinodb/trino-js-client and has been modified for
+  this project; the file's header says how.
+  Licensed under the Apache License, Version 2.0.
+
+Iosevka Aile
+  src/lib/assets/fonts/iosevka-aile-*.woff2 are subsets of Iosevka Aile,
+  https://github.com/be5invis/Iosevka, Copyright 2015-2026 Renzhi Li.
+  Licensed under the SIL Open Font License, Version 1.1. See
+  src/lib/assets/fonts/LICENSE-Iosevka.md.

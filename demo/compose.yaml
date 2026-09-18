@@ -1,0 +1,54 @@
+# Trinocular, with as little to decide as possible. From this directory:
+#
+#   docker compose up                                              # no Trino of your own? one is started
+#   TRINO_URL=http://host.docker.internal:8080 docker compose up    # point it at yours instead
+#
+# Then open http://localhost:3000. There is no login: everyone is "alice", and
+# nothing is kept when the containers go away.
+
+name: trinocular-demo
+
+services:
+  trinocular:
+    image: ghcr.io/ragnard/trinocular:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # Without TRINOCULAR_CONFIG this is the whole configuration: one connection,
+      # no login, sessions in memory. The default is where the Trino below sits.
+      TRINO_URL: ${TRINO_URL:-http://trino:8080}
+      # Not optional, despite there being no login to redirect: unset, the server
+      # assumes https, and the proxy hands the browser a `nextUri` on a scheme
+      # nothing is listening on. Override it along with the published port.
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+    # A name for "the host" that Linux docker does not otherwise know, so the
+    # same TRINO_URL reaches a Trino on your laptop on all three platforms.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      trino:
+        condition: service_healthy
+        # Nothing to wait for when TRINO_URL has profiled the service away.
+        required: false
+
+  trino:
+    image: trinodb/trino:483
+    # This is the conditional: `${TRINO_URL:+external}` is "external" when
+    # TRINO_URL is set and empty when it is not, and compose reads an empty
+    # profile as none at all — so the service is ordinary when you have no
+    # Trino, and under a profile nobody activates when you have one. Should a
+    # compose release ever start rejecting the empty name, spell the profile
+    # `bundled` and say `--profile bundled` / `up --no-deps trinocular` instead.
+    profiles: ["${TRINO_URL:+external}"]
+    # Deliberately not published to the host: Trinocular reaches it by name over
+    # the compose network, and claiming 8080 is how a demo collides with the
+    # first thing somebody already has running.
+    healthcheck:
+      # The image's own check, given a grace period that a cold start fits in:
+      # its 10s start period lets three failed checks mark a still-starting
+      # Trino unhealthy, which compose reports as a dependency that failed.
+      test: ["CMD-SHELL", "/usr/lib/trino/bin/health-check"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 120s

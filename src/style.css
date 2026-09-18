@@ -1,0 +1,329 @@
+/*
+ * The whole visual system: two text sizes, four heights, three radii, one
+ * icon size, one accent. If something here needs a fifth height or a third
+ * text size, that is a sign the thing being built is doing two jobs.
+ *
+ * Surfaces are one monotonic ramp — s0 is the page, and every step is one
+ * level nearer the viewer. The ramp means the SAME thing in both themes,
+ * which the old --bg-1/--bg-2 and --border/--border-dark pairs did not: each
+ * of those swapped which one was stronger when the theme flipped, so a
+ * component tuned in one theme was guessing in the other.
+ */
+@import "./lib/assets/fonts/iosevka-aile.css";
+
+:root {
+  color-scheme: light;
+
+  --s0: #ffffff; /* page, editor, table body */
+  --s1: #f7f7f8; /* panes, rails, table header */
+  --s2: #eeeef1; /* hover, menus, popovers */
+  --s3: #e3e3e8; /* pressed, active */
+
+  --line: #e8e8ec; /* hairline inside a surface */
+  --line-strong: #d6d6dc; /* divider between surfaces */
+
+  --fg: #1f2024; /* body text */
+  --fg-2: #6b6c74; /* secondary text, field names */
+  --fg-3: #8f9099; /* icons at rest, types, row numbers, hints */
+
+  --accent: #0e65eb;
+  --accent-bg: rgba(14, 101, 235, 0.1);
+  --accent-line: rgba(14, 101, 235, 0.45);
+
+  --ok: #1a7f5a;
+  --error: #cf222e;
+
+  --shadow: 0 10px 28px rgba(15, 18, 25, 0.14), 0 2px 6px rgba(15, 18, 25, 0.07);
+  --scrim: rgba(0, 0, 0, 0.45); /* behind a palette or a dialog */
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --s0: #1e1e1e;
+  --s1: #252527;
+  --s2: #2e2e31;
+  --s3: #3a3a3e;
+
+  --line: #303033;
+  --line-strong: #3f3f44;
+
+  --fg: #cfcfd2;
+  --fg-2: #96969c;
+  --fg-3: #6e6e75;
+
+  --accent: #4da6ff;
+  --accent-bg: rgba(77, 166, 255, 0.16);
+  --accent-line: rgba(77, 166, 255, 0.55);
+
+  --ok: #5ec9a8;
+  --error: #f47067;
+
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --scrim: rgba(0, 0, 0, 0.45);
+}
+
+:root {
+  /* --font-mono: 'Iosevka SS08'; */
+  --font: "Iosevka Aile", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Two text sizes. There is no third. */
+  --text: 13px;
+  --leading: 20px;
+  --text-sm: 11px;
+  --leading-sm: 16px;
+
+  /* Four heights, and they stack. */
+  --h-rail: 36px; /* every pane header, and the table header row */
+  --h-row: 30px; /* table row */
+  --h-tree: 26px; /* tree row, menu item */
+  --h-ctl: 24px; /* chips, buttons, inputs inside a rail */
+
+  /* Three radii, nested largest outside. */
+  --r-panel: 8px;
+  --r: 6px;
+  --r-kbd: 4px;
+
+  /* One spacing scale: 6 icon-to-label, 8 inside a control, 12 rail and cell
+     padding, 16 pane padding. Used literally; no token indirection earns its
+     keep for four numbers. */
+}
+
+html {
+  font: var(--text) / var(--leading) var(--font);
+  background-color: var(--s0);
+  color: var(--fg);
+}
+
+/* --- The handful of primitives every pane repeats ------------------------ */
+
+/* The 36px band across the top of every pane. Its own icons are furniture. */
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: var(--h-rail);
+  padding: 0 12px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.rail > svg {
+  flex: none;
+  color: var(--fg-3);
+}
+
+/* Takes whatever room a flex row has left: what pushes a rail's controls to
+   its far edge, or a document header's copy button off its title. */
+.fill {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Anything clickable that lives in a rail: chips, toggles, icon buttons. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-ctl);
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A chip that opens a rail overhangs the rail's inset by its own padding, so
+   its icon lands where a bare rail icon does and the file chip, the
+   connection chip and the inspector's title all start on one line. */
+.rail > .chip:first-child {
+  margin-left: -8px;
+}
+
+.chip:hover {
+  background: var(--s2);
+  color: var(--fg);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.chip:disabled {
+  background: transparent;
+  color: var(--fg-3);
+  cursor: default;
+}
+
+.chip.square {
+  width: var(--h-ctl);
+  padding: 0;
+  justify-content: center;
+  color: var(--fg-3);
+}
+
+.chip svg {
+  flex: none;
+}
+
+/* What drops out of a chip that opens a menu. Only the surface and the rows
+   are here: where a menu is put is the caller's business, and the two we have
+   answer that differently — the document header hangs one off its own rail,
+   while the results pane has to escape an overflow it cannot afford to be
+   clipped by. What a menu looks like is not allowed to differ with that. */
+.menu {
+  min-width: 12em;
+  padding: 4px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--s2);
+  box-shadow: var(--shadow);
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: var(--h-tree);
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--s3);
+}
+
+.menu .separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line-strong);
+}
+
+/* The row that is the current choice, in a menu of choices. */
+.menu .selected {
+  color: var(--accent);
+}
+
+/* The small text size on its own, for what is small but not muted: an error
+   under a tree row, a chart's axis, a stage table. */
+.small {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* Small and muted: captions, hints, types, row numbers. */
+.meta {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--fg-3);
+}
+
+.muted {
+  color: var(--fg-3);
+}
+
+.warn {
+  color: var(--error);
+}
+
+/* A button that reads as a link, inline in a sentence: "Show more". */
+.link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A 7px status dot; the caller colours it. */
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.ell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+kbd {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-kbd);
+  background: var(--s0);
+  padding: 1px 5px;
+  font: var(--text-sm) / 1 var(--font);
+}
+
+/* A bare text input is unstyled: most of them sit inside a box that draws
+   the border and shows the focus (the filter box, the file switcher), and
+   an input that arrived bordered had to be undressed by each of those. The
+   one that stands alone wears `.textbox`. In `:where()`, so the reset has no
+   specificity and a class on the input — `.textbox` — beats it. */
+:where(input[type="text"]) {
+  appearance: none;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+:where(input[type="text"]:focus-visible) {
+  outline: none;
+}
+
+.textbox {
+  height: var(--h-ctl);
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--s0);
+}
+
+.textbox:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.textbox[aria-invalid="true"] {
+  border-color: var(--error);
+  outline-color: var(--error);
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

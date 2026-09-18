@@ -1,0 +1,37 @@
+{
+  "name": "monaco-language-trino",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc && vite build",
+    "build:lib": "rm -rf dist && vite build && tsc -p tsconfig.lib.json",
+    "build:grammar": "antlr-ng -Dlanguage=TypeScript -l -v -o src/parser grammar/SqlBase.g4 && bun run fix:generated",
+    "fix:generated": "sed -i 's|^import { ErrorNode, ParseTreeListener, ParserRuleContext, TerminalNode } from \"antlr4ng\";|import { ErrorNode, ParserRuleContext, TerminalNode } from \"antlr4ng\";\\nimport type { ParseTreeListener } from \"antlr4ng\";|' src/parser/SqlBaseListener.ts"
+  },
+  "peerDependencies": {
+    "monaco-editor": ">=0.30.0"
+  },
+  "devDependencies": {
+    "antlr-ng": "^1.0.10",
+    "monaco-editor": "^0.56.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "antlr4-c3": "^3.4.4",
+    "antlr4ng": "^3.0.16"
+  }
+}
