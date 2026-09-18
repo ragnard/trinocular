@@ -70,10 +70,18 @@ FONTS := $(FONT_DIR)/iosevka-aile-400.woff2 $(FONT_DIR)/iosevka-aile-600.woff2
 # could see: macOS ignores TrueType instructions and DirectWrite mostly
 # substitutes its own, but at the 11-13px this UI runs at on Windows at
 # standard DPI, stem alignment is exactly where they still tell.
+#
+# --notdef-outline keeps the box that .notdef draws; pyftsubset empties it by
+# default to save a few bytes. Iosevka's U+F880 is a composite glyph made of
+# .notdef and nothing else, so the default leaves it referencing an empty
+# glyph 0, which Firefox's OpenType sanitizer reports on every page load
+# ("empty gid 0 used as component in glyph 6654") even though it then draws
+# the font as normal.
 SUBSET_FLAGS := \
 	--flavor=woff2 \
 	--unicodes='*' \
-	--layout-features='ccmp,locl,calt,mark,mkmk,zero'
+	--layout-features='ccmp,locl,calt,mark,mkmk,zero' \
+	--notdef-outline
 
 .DEFAULT_GOAL := fonts
 .PHONY: fonts fonts-info fonts-clean fonts-distclean
