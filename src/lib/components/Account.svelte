@@ -13,6 +13,7 @@
   import { Monitor, Moon, Sun, UserRound } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
   import { theme, type ThemeChoice } from "$lib/theme.svelte";
+  import { BUILD, commitUrl, shortCommit } from "$lib/build";
 
   interface Props {
     userId?: string;
@@ -28,6 +29,8 @@
    * is on hover and at the head of the menu.
    */
   let short = $derived(userId ? userId.split("@")[0] : "Not signed in");
+
+  const commit = shortCommit(BUILD);
 
   const choices: { id: ThemeChoice; label: string; icon: typeof Monitor }[] = [
     { id: "system", label: "System", icon: Monitor },
@@ -62,6 +65,14 @@
         <button type="submit">Sign out</button>
       </form>
     {/if}
+
+    <div class="separator"></div>
+    <p class="build meta">
+      {BUILD.version}
+      {#if commit}
+        · <a class="mono" href={commitUrl(BUILD)} target="_blank" rel="noopener">{commit}</a>
+      {/if}
+    </p>
   {/snippet}
 </Dropdown>
 
@@ -70,5 +81,18 @@
     max-width: 22em;
     margin: 0;
     padding: 2px 12px 6px;
+  }
+
+  .build {
+    margin: 0;
+    padding: 6px 12px 2px;
+  }
+
+  .build a {
+    color: inherit;
+  }
+
+  .build a:hover {
+    color: var(--accent);
   }
 </style>

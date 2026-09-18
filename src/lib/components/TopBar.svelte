@@ -1,6 +1,7 @@
 <script lang="ts">
   // The wordmark stands where the logo will go.
   import Account from "./Account.svelte";
+  import { BUILD, describeBuild } from "$lib/build";
   import type { Branding } from "$lib/server/config";
 
   interface Props {
@@ -14,7 +15,7 @@
 </script>
 
 <header class="rail topbar">
-  <span class="wordmark">{branding.name}</span>
+  <span class="wordmark" title={describeBuild(BUILD)}>{branding.name}</span>
   <!-- The operator's HTML, from the config file. The CSP keeps a script in
        it from running; nothing else about it is checked. -->
   <div class="message ell">

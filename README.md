@@ -444,12 +444,39 @@ docker run --rm -p 3000:3000 \
 `ORIGIN` must be set: the session cookie's `Secure` flag is derived from it, and it is
 where the OIDC provider redirects back to.
 
+Every build of `main` is published under a version and under its commit, and the
+distroless image under the same tags with `-distroless` on the end:
+
+| Tag | Is |
+| --- | --- |
+| `0.1.212` | one build: `MAJOR.MINOR` from `package.json` and the number of the CI run that built it, so the number only ever goes up |
+| `0.1` | the latest build of that series |
+| `871beae…` | the same build, by the full commit hash |
+| `latest` | the latest build |
+
+The image is labelled and annotated with `org.opencontainers.image.version` and
+`.revision`. A running instance says what it is on its first log line, on hover over the
+name at the top left, and at the foot of the account menu, where the commit is a link.
+
 To build it yourself:
 
 ```bash
 docker build -t trinette .                          # debian slim
 docker build -t trinette --target distroless .      # distroless
 ```
+
+A build is told its version rather than working one out — the image's build context has no
+git history in it — so one built by hand is `0.0.0` from an unknown commit unless you say
+otherwise:
+
+```bash
+docker build -t trinette \
+  --build-arg TRINETTE_VERSION=0.1.42 \
+  --build-arg TRINETTE_COMMIT=$(git rev-parse HEAD) .
+```
+
+The same two variables name a `bun run build` outside Docker, where the commit is read from
+git when `TRINETTE_COMMIT` is not set.
 
 ### Health probes
 
