@@ -3,19 +3,13 @@
   import { FileText, HardDrive } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
 
-  interface Connection {
-    id: string;
-    name: string;
-  }
-
   interface Props {
     workspace: Workspace;
-    connections: Connection[];
     /** Opens the file switcher; the header only advertises the shortcut. */
     onquickopen: () => void;
   }
 
-  let { workspace, connections, onquickopen }: Props = $props();
+  let { workspace, onquickopen }: Props = $props();
 
   /**
    * The bar names the document you are editing and the one thing that decides
@@ -24,11 +18,7 @@
    * by a rule rather than sitting side by side as equals.
    */
   let file: SqlFile | null = $derived(workspace.activeFile);
-  let connectionName = $derived(
-    connections.find((c) => c.id === workspace.connectionId)?.name ||
-      workspace.connectionId ||
-      "No connection"
-  );
+  let connectionName = $derived(workspace.connectionName(workspace.connectionId));
 
   function rename() {
     if (!file) return;
@@ -64,7 +54,7 @@
     title="The Trino cluster this document runs against"
   >
     {#snippet menu()}
-      {#each connections as connection (connection.id)}
+      {#each workspace.connections as connection (connection.id)}
         <button
           class:selected={connection.id === workspace.connectionId}
           onclick={() => pick(connection.id)}

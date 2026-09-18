@@ -14,7 +14,7 @@ import { logConnectionAuthz } from "$lib/server/connectionAuthz";
 import { logger } from "$lib/server/logging";
 import { type Claims } from "$lib/server/identity";
 
-const NoAuthnHandler = async (opts: { user: string; claims: Claims }): Promise<Handle> => {
+const NoAuthnHandler = (opts: { user: string; claims: Claims }): Handle => {
   return async ({ event, resolve }) => {
     event.locals.identity = { userId: opts.user, claims: opts.claims };
     return resolve(event);
@@ -26,7 +26,7 @@ const authnHandler = async (config: Config) => {
 
   switch (authn.kind) {
     case "none":
-      return await NoAuthnHandler({ user: authn.user, claims: authn.claims });
+      return NoAuthnHandler({ user: authn.user, claims: authn.claims });
     case "oidc":
       return await OIDCHandler({
         issuer: new URL(authn.issuer),
@@ -61,7 +61,7 @@ const createHandle = async () => {
     // Before logging and before the session: a probe is not traffic, and must
     // not be issued a cookie or have the store read on its behalf.
     ProbeHandler(sessionStore),
-    await LoggingHandler(),
+    LoggingHandler(),
     await SessionHandler(sessionStore, {
       cookieName: config.session.cookie.name,
       cookieSecret: config.session.cookie.secret,

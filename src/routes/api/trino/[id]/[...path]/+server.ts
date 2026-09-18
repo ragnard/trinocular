@@ -5,6 +5,7 @@ import { error } from "$lib/server/errors";
 import type { Identity } from "$lib/server/identity";
 import { isTrinoHeader } from "$lib/trino";
 import { mayUseConnection, connectionDenialReason } from "$lib/server/connectionAuthz";
+import { refuse } from "$lib/server/authz";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 
@@ -145,12 +146,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   // Kept anyway: this route sends a user's name to a cluster, and it should not
   // be reachable without one just because a hook was reordered.
   const identity = event.locals.identity;
-  if (!identity) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
+  if (!identity) return refuse(401, "unauthorized");
 
   // The application-wide policy passed at the gate; this cluster may still
   // have one of its own. Checked here rather than in the hook because the hook
@@ -163,10 +159,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
       { userId: identity.userId, connection: id, reason: connectionDenialReason(identity, id) },
       "connection authz denied"
     );
-    return new Response(JSON.stringify({ error: "forbidden" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" }
-    });
+    return refuse(403, "forbidden");
   }
 
   // The id, not the whole connection: `target` carries the cluster's `authz`
@@ -190,29 +183,20 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     error(event.locals.logger, 502, "Failed to connect to upstream Trino server", "upstream request failed", { id, url, err });
   }
 
-  // A HEAD's answer carries a JSON content-type and no body.
-  if (event.request.method === "HEAD") {
-    return new Response(null, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: downstreamHeaders(response),
-    });
-  }
-
-  if (response.status !== 200) {
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: downstreamHeaders(response),
-    });
-  }
-
+  // Only a 200 JSON answer has URIs to rewrite. Everything else — a HEAD's
+  // answer (a JSON content-type and no body, which `json()` would choke on),
+  // an upstream error, a body of some other type — is passed through unread,
+  // under the same header allowlist.
   const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
+  const passThrough =
+    event.request.method === "HEAD" ||
+    response.status !== 200 ||
+    !contentType.includes("application/json");
+  if (passThrough) {
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: downstreamHeaders(response),
+      headers: downstreamHeaders(response)
     });
   }
 
@@ -226,7 +210,7 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   return new Response(JSON.stringify(responseBody), {
     status: response.status,
     statusText: response.statusText,
-    headers: responseHeaders,
+    headers: responseHeaders
   });
 }
 
@@ -239,18 +223,9 @@ function getServer(event: RequestEvent): [Connection, string] {
   return [server, id];
 }
 
-export function GET(event: RequestEvent) {
-  return proxy(event, ...getServer(event));
-}
+const handle = (event: RequestEvent) => proxy(event, ...getServer(event));
 
-export function HEAD(event: RequestEvent) {
-  return proxy(event, ...getServer(event));
-}
-
-export async function POST(event: RequestEvent) {
-  return proxy(event, ...getServer(event));
-}
-
-export async function DELETE(event: RequestEvent) {
-  return proxy(event, ...getServer(event));
-}
+export const GET = handle;
+export const HEAD = handle;
+export const POST = handle;
+export const DELETE = handle;

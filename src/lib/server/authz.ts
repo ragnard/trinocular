@@ -122,8 +122,8 @@ const returnTo = (event: RequestEvent): string => {
 
 /** A refusal a program can read. Thrown SvelteKit errors render the fallback
  *  HTML error page even for a JSON caller, which the Trino client would meet as
- *  a parse failure rather than a status. */
-const refuse = (status: number, error: string): Response =>
+ *  a parse failure rather than a status. The proxy's own refusals use it too. */
+export const refuse = (status: number, error: string): Response =>
   new Response(JSON.stringify({ error }), {
     status,
     headers: { "content-type": "application/json" }

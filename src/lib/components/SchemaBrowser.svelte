@@ -9,7 +9,6 @@
   import Menu from "./Menu.svelte";
   import TreeView from "./TreeView.svelte";
   import TypeIcon from "./TypeIcon.svelte";
-  import { page } from "$app/state";
 
   interface Props {
     workspace: Workspace;
@@ -19,11 +18,7 @@
 
   let { workspace, oninsert }: Props = $props();
 
-  let connectionName = $derived(
-    page.data.connections?.find((c: { id: string }) => c.id === workspace.connectionId)?.name ||
-      workspace.connectionId ||
-      "No connection"
-  );
+  let connectionName = $derived(workspace.connectionName(workspace.connectionId));
 
   let filter = $state("");
   let filtering = $derived(filter.trim().length > 0);

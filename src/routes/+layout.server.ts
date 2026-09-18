@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from "./$types";
 import { visibleConnections } from "$lib/server/connectionAuthz";
-import { authPrefix, config } from "$lib/server/config";
+import { config, logoutPath } from "$lib/server/config";
 
 // The authn/authz gate used to live here, as a redirect for a missing userId.
 // It is `AccessHandler` in hooks.server.ts now: a layout only guards what
@@ -17,10 +17,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     // same thing again per request — this list is what the switcher draws, not
     // what enforces anything.
     connections: visibleConnections(locals.identity),
-    // Where the account menu's `Sign out` posts. Undefined with no provider to
-    // sign out of, which is what makes the item disappear rather than offer a
-    // way out of a session `authn: none` never opened.
-    logoutPath:
-      config.authn.kind === "oidc" ? `${authPrefix}/${config.authn.paths.logout}` : undefined
+    // Where the account menu's — and the forbidden page's — `Sign out` posts.
+    logoutPath
   };
 };

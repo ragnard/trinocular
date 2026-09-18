@@ -3,7 +3,7 @@ import * as client from "openid-client";
 import type { Session } from "./session";
 
 import { env } from "$env/dynamic/private";
-import { error as error } from "./errors";
+import { error } from "./errors";
 import { logger } from "./logging";
 import type { Claims } from "./identity";
 

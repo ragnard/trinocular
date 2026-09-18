@@ -3,6 +3,8 @@
 import type { Logger } from "pino";
 import type { Session } from "$lib/server/session";
 import type { Identity } from "$lib/server/identity";
+import type { Branding } from "$lib/server/config";
+import type { ClientConnection } from "$lib/server/connectionAuthz";
 
 declare global {
   namespace App {
@@ -19,11 +21,16 @@ declare global {
       identity: Identity | undefined;
       accessToken: string;
     }
-    // interface PageData {}
+    /** What the root layout's load hands every page; see +layout.server.ts. */
+    interface PageData {
+      branding: Branding;
+      connections: ClientConnection[];
+      userId?: string;
+      logoutPath?: string;
+    }
     // interface PageState {}
     // interface Platform {}
   }
-
 }
 
 export {};
