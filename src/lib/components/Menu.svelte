@@ -10,7 +10,12 @@
    * click anywhere else, which is what the hand-rolled version was reaching
    * for with a full-window backdrop div and a window keydown handler. The top
    * layer also means a menu is never clipped by a pane that has to hide its
-   * overflow.
+   * overflow. The one thing added is *when* a click outside counts: the
+   * platform waits for the pointer to come back up, and only if it went down
+   * outside too, so that a drag out of a popover -- selecting its text --
+   * does not lose it. A menu of buttons has nothing to drag, and the wait
+   * reads as lag, so this closes on the pointer going down, the way native
+   * menus do; an item still fires on the click, on the way back up.
    *
    * Opening is the platform's too — a trigger carries `popovertarget={id}` and
    * toggles this without asking. That matters for the inspector, where every
@@ -36,20 +41,44 @@
   let { id, anchor = null, menuWidth, onopenchange, menu }: Props = $props();
 
   let panel: HTMLDivElement | undefined = $state();
+  let open = $state(false);
 
   export function close() {
     panel?.hidePopover();
   }
 
+  // Not the anchor: a press on it is a toggle, and closing here would have
+  // the click that follows open the menu straight back up.
+  $effect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (panel?.contains(target) || anchor?.contains(target)) return;
+      close();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  });
+
   /**
    * The top layer positions against the viewport, so this is measured and
    * placed each time it opens: under the anchor, kept on screen, and flipped
    * above it rather than run off the bottom.
+   *
+   * Placed from `beforetoggle`, which the browser fires synchronously before
+   * it shows the popover, and not from `toggle`, which it queues as a task
+   * after — by which time a frame has painted the menu wherever it was last
+   * put, or at its default fixed position the first time, and the move to the
+   * anchor was a visible jump. A popover that is not open is `display: none`
+   * and measures as nothing, so the panel is displayed for the length of this
+   * handler and put back; nothing paints in between, since it is all one task.
    */
   function place() {
     if (!anchor || !panel) return;
     const trigger = anchor.getBoundingClientRect();
+    panel.style.display = "block";
     const size = panel.getBoundingClientRect();
+    panel.style.display = "";
     const below = trigger.bottom + 6;
     const top =
       below + size.height > window.innerHeight - 8 ? trigger.top - 6 - size.height : below;
@@ -57,13 +86,16 @@
     panel.style.top = `${Math.max(8, top)}px`;
   }
 
+  function onBeforeToggle(event: ToggleEvent) {
+    if (event.newState === "open") place();
+  }
+
   function onToggle(event: ToggleEvent) {
     // Also how a trigger learns it has been dismissed from outside, which is
     // most of the time: it is what keeps a chip drawn as pressed only while
     // its menu is up.
-    const open = event.newState === "open";
+    open = event.newState === "open";
     onopenchange?.(open);
-    if (open) place();
   }
 
   /**
@@ -82,6 +114,7 @@
   popover
   bind:this={panel}
   style:min-width={menuWidth}
+  onbeforetoggle={onBeforeToggle}
   ontoggle={onToggle}
   onclickcapture={onMenuClick}
 >
