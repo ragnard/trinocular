@@ -36,6 +36,11 @@
     table?.step(delta, extend);
   }
 
+  /** Collapses the selection to the active cell's whole row; see `Table.selectRow`. */
+  export function selectRow() {
+    table?.selectRow();
+  }
+
   function setLimit(input: HTMLInputElement) {
     const n = Math.floor(Number(input.value));
     if (Number.isFinite(n) && n >= 1) rowLimit = n;

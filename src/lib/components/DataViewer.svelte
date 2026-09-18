@@ -13,12 +13,14 @@
   } from "$lib/viewFormats";
   import { formatCount } from "$lib/format";
   import { textMeasurer } from "$lib/textWidth";
+  import { tick } from "svelte";
 
+  /** The key column's width, its own padding included: `.key` below. */
   const DEFAULT_KEY_WIDTH = 150;
   const MIN_KEY_WIDTH = 60;
+  const KEY_PADDING = 7;
   /** What the value column is left at least, whatever the key is dragged to. */
   const MIN_VALUE_WIDTH = 160;
-  const KEY_GAP = 10;
   const PAD = 12;
 
   interface Props {
@@ -36,6 +38,12 @@
      * arrow keys step; the selection itself stays the table's to own.
      */
     onstep?: (delta: number, extend: boolean) => void;
+    /**
+     * Full-window: the columns start at half the width each, the arrow keys
+     * step wherever focus is, one row is shown at a time, and the filter takes
+     * focus on open.
+     */
+    expanded?: boolean;
     /** Draws the chip that opens this pane full-window. */
     onexpand?: () => void;
     /** Draws the chip that closes it again. */
@@ -50,6 +58,7 @@
     onpick,
     rowCount,
     onstep,
+    expanded = false,
     onexpand,
     onclose
   }: Props = $props();
@@ -80,16 +89,27 @@
         return;
     }
     event.preventDefault();
-    onstep(delta, event.shiftKey);
+    onstep(delta, event.shiftKey && !expanded);
   }
+
+  let filterBox: ReturnType<typeof FilterBox> | undefined = $state();
+
+  $effect(() => {
+    if (expanded) void tick().then(() => filterBox?.focus());
+  });
 
   let stack: HTMLDivElement | undefined = $state();
   let stackWidth = $state(0);
-  let keyWidth = $state(DEFAULT_KEY_WIDTH);
+  let pinnedKey: number | null = $state(null);
   let resizing = $state(false);
 
   const clampKey = (w: number) =>
-    Math.max(MIN_KEY_WIDTH, Math.min(w, stackWidth - 2 * PAD - KEY_GAP - MIN_VALUE_WIDTH));
+    Math.max(MIN_KEY_WIDTH, Math.min(w, stackWidth - 2 * PAD - MIN_VALUE_WIDTH));
+
+  /** Half the pane when expanded, until dragged; the pane then keeps it. */
+  let keyWidth = $derived(
+    pinnedKey ?? (expanded && stackWidth ? clampKey(stackWidth / 2) : DEFAULT_KEY_WIDTH)
+  );
 
   function fitKey() {
     if (!stack) return;
@@ -98,7 +118,7 @@
     for (const doc of documents) {
       for (const entry of doc.entries) width = Math.max(width, measure(entry.key));
     }
-    keyWidth = clampKey(Math.ceil(width) + 1);
+    pinnedKey = clampKey(Math.ceil(width) + KEY_PADDING);
   }
 
   let lastHandlePress = 0;
@@ -121,7 +141,7 @@
     resizing = true;
 
     const onPointermove = (e: PointerEvent) => {
-      keyWidth = clampKey(startWidth + e.clientX - startX);
+      pinnedKey = clampKey(startWidth + e.clientX - startX);
     };
     const onPointerup = () => {
       resizing = false;
@@ -131,14 +151,6 @@
     };
     handle.addEventListener("pointermove", onPointermove);
     handle.addEventListener("pointerup", onPointerup);
-  }
-
-  function handleKeyResize(event: KeyboardEvent) {
-    const step = event.shiftKey ? 50 : 10;
-    if (event.key === "ArrowLeft") keyWidth = clampKey(keyWidth - step);
-    else if (event.key === "ArrowRight") keyWidth = clampKey(keyWidth + step);
-    else return;
-    event.preventDefault();
   }
 
   let data: SelectionData | null = $state.raw(null);
@@ -325,8 +337,17 @@
   }
 </script>
 
+<!-- Full-window there is nothing else to step, so the keys are the window's;
+     in the pane they are only taken from inside it. -->
+<svelte:window onkeydown={expanded ? handleKeydown : undefined} />
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="inspector" class:resizing onkeydown={handleKeydown}>
+<div
+  class="inspector"
+  class:resizing
+  style:--key="{keyWidth}px"
+  onkeydown={expanded ? undefined : handleKeydown}
+>
   <div class="rail">
     <Search size={14} />
     <span class="ell fill">
@@ -386,78 +407,76 @@
     {/if}
   </div>
 
-  <FilterBox bind:value={filter} placeholder="Filter fields…" label="Filter fields" />
+  <FilterBox
+    bind:this={filterBox}
+    bind:value={filter}
+    placeholder="Filter fields…"
+    label="Filter fields"
+  />
 
-  <div class="body">
-    <div
-      class="stack"
-      style:--key="{keyWidth}px"
-      bind:this={stack}
-      bind:clientWidth={stackWidth}
-      onscroll={() => picker?.close()}
-    >
-      {#if !documents.length}
-        <p class="empty">Select cells in the results to inspect them.</p>
-      {/if}
-      {#each documents as doc (doc.row)}
-        <div class="doc-head">
-          <span class="caps small">Row {doc.row}</span>
-          <span class="fill"></span>
-          <button
-            class="chip square"
-            onclick={() => copyDocument(doc.entries)}
-            title="Copy row as JSON"
-          >
-            <Copy size={12} />
-          </button>
-        </div>
-        {#each doc.entries as entry (entry.id)}
-          {@const choices = formatsFor(entry.field)}
-          {@const chosen = resolveFormat(entry.field, formatId(entry))}
-          {@const { view } = render(entry.value, entry.field, formatId(entry))}
-          <div class="field">
-            <span class="key ell" title={entry.key}>{entry.key}</span>
-            <!-- Whatever the format drew: text with its own cap, a frame, an
-               image. This row does not know which, and does not need to. -->
-            <div class="value" class:null={entry.value === null}>
-              <view.component {...view.props} title={entry.key} />
-            </div>
-            <div class="controls">
-              {#if choices.length > 1}
-                <button
-                  class="chip square pick"
-                  class:set={chosen.id !== DEFAULT_FORMAT}
-                  popovertarget={menuId}
-                  onclick={(e) => startPick(entry, e.currentTarget)}
-                  title={`Show "${entry.key}" as… (${chosen.label})`}
-                >
-                  <Eye size={12} />
-                </button>
-              {/if}
-              <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
-                <Copy size={12} />
-              </button>
-            </div>
-          </div>
-        {/each}
-      {/each}
-    </div>
-    {#if documents.length}
-      <!-- The key/value boundary, draggable like a table header's edge; a
-           second press within 400ms fits the keys. -->
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-      <div
-        class="handle"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Field name column width"
-        aria-valuenow={keyWidth}
-        tabindex="0"
-        style:left="{PAD + keyWidth}px"
-        onpointerdown={handlePointerdown}
-        onkeydown={handleKeyResize}
-      ></div>
+  <!-- The table's header, for the same reason: the separator is what says
+       where the columns are, and its edge is the one place they are dragged.
+       A second press within 400ms fits the keys. -->
+  <div class="header">
+    <span class="key">
+      Field
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <span class="resize-handle" onpointerdown={handlePointerdown}></span>
+    </span>
+    <span class="value">Value</span>
+  </div>
+
+  <div
+    class="stack"
+    bind:this={stack}
+    bind:clientWidth={stackWidth}
+    onscroll={() => picker?.close()}
+  >
+    {#if !documents.length}
+      <p class="empty">Select cells in the results to inspect them.</p>
     {/if}
+    {#each documents as doc (doc.row)}
+      <div class="doc-head">
+        <span class="caps small">Row {doc.row}</span>
+        <span class="fill"></span>
+        <button
+          class="chip square"
+          onclick={() => copyDocument(doc.entries)}
+          title="Copy row as JSON"
+        >
+          <Copy size={12} />
+        </button>
+      </div>
+      {#each doc.entries as entry (entry.id)}
+        {@const choices = formatsFor(entry.field)}
+        {@const chosen = resolveFormat(entry.field, formatId(entry))}
+        {@const { view } = render(entry.value, entry.field, formatId(entry))}
+        <div class="field">
+          <span class="key ell" title={entry.key}>{entry.key}</span>
+          <!-- Whatever the format drew: text with its own cap, a frame, an
+               image. This row does not know which, and does not need to. -->
+          <div class="value" class:null={entry.value === null}>
+            <view.component {...view.props} title={entry.key} />
+          </div>
+          <div class="controls">
+            {#if choices.length > 1}
+              <button
+                class="chip square pick"
+                class:set={chosen.id !== DEFAULT_FORMAT}
+                popovertarget={menuId}
+                onclick={(e) => startPick(entry, e.currentTarget)}
+                title={`Show "${entry.key}" as… (${chosen.label})`}
+              >
+                <Eye size={12} />
+              </button>
+            {/if}
+            <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
+              <Copy size={12} />
+            </button>
+          </div>
+        </div>
+      {/each}
+    {/each}
   </div>
 </div>
 
@@ -505,61 +524,53 @@
     padding-right: 6px;
   }
 
-  .rail .chip:disabled {
-    color: var(--fg-3);
-    background: transparent;
-    cursor: default;
-  }
-
-  .body {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
-
   .stack {
     flex: 1;
     min-height: 0;
     overflow: auto;
   }
 
-  /* Sits in the gap between the key and value columns, over the whole
-     height of the stack; the rule it draws is only there when it is being
-     looked for. */
-  .handle {
+  .header,
+  .field {
+    display: grid;
+    grid-template-columns: var(--key) minmax(0, 1fr);
+    padding: 0 12px;
+  }
+
+  .header {
+    flex: none;
+    align-items: center;
+    height: var(--h-rail);
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .header .key {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    color: var(--fg);
+    border-right: 1px solid var(--line);
+  }
+
+  .resize-handle {
     position: absolute;
     top: 0;
-    bottom: 0;
-    width: 10px;
-    z-index: 2;
+    right: 0;
+    width: 6px;
+    height: 100%;
     cursor: col-resize;
     touch-action: none;
-    outline: none;
   }
 
-  .handle::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 4px;
-    width: 1px;
-  }
-
-  .handle:hover::before,
-  .handle:focus-visible::before,
-  .resizing .handle::before {
+  .resize-handle:hover,
+  .resizing .resize-handle {
     background: var(--accent-line);
   }
 
   .resizing {
     user-select: none;
-  }
-
-  .resizing :global(*) {
-    cursor: col-resize !important;
+    cursor: col-resize;
   }
 
   .empty {
@@ -591,11 +602,9 @@
 
   .field {
     position: relative;
-    display: grid;
-    grid-template-columns: var(--key) minmax(0, 1fr);
-    gap: 0 10px;
     align-items: start;
-    padding: 6px 12px 6px 12px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -605,10 +614,12 @@
   }
 
   .key {
+    padding-right: 6px;
     color: var(--fg-2);
   }
 
   .value {
+    padding-left: 6px;
     overflow-wrap: anywhere;
   }
 

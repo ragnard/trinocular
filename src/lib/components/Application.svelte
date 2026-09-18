@@ -89,6 +89,12 @@
     ];
   });
 
+  // Full-window is one whole row at a time, whatever cells were selected.
+  function openRecord() {
+    resultRef?.selectRow();
+    recordOpen = true;
+  }
+
   let saveTimer: ReturnType<typeof setTimeout>;
   function handleEditorChange() {
     clearTimeout(saveTimer);
@@ -127,7 +133,8 @@
       if (file) workspace.setViewFormat(file, path, formatId);
     }}
     onstep={(delta, extend) => resultRef?.step(delta, extend)}
-    onexpand={expanded ? undefined : () => (recordOpen = true)}
+    {expanded}
+    onexpand={expanded ? undefined : openRecord}
     onclose={expanded ? () => recordDialog?.close() : undefined}
   />
 {/snippet}
@@ -160,7 +167,7 @@
     bind:selection
     bind:rowLimit={workspace.rowLimit}
     bind:limitRows={workspace.limitRows}
-    onopen={() => (recordOpen = true)}
+    onopen={openRecord}
   />
 {/snippet}
 

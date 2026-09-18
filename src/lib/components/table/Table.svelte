@@ -302,6 +302,14 @@
     move(delta, 0, extend);
   }
 
+  /** Collapses the selection to the active cell's whole row. */
+  export function selectRow() {
+    if (!active) return;
+    anchor = active;
+    rowSelection = true;
+    scrollActiveIntoView();
+  }
+
   function handleCopy(event: ClipboardEvent) {
     if (document.activeElement !== scrollContainer) return;
     const rect = selectionRect;

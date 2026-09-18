@@ -29,12 +29,12 @@
 
 <style>
   dialog {
-    width: calc(100vw - 48px);
-    height: calc(100vh - 48px);
+    inset: 24px;
+    width: auto;
+    height: auto;
     max-width: none;
     max-height: none;
-    inset: 0;
-    margin: auto;
+    margin: 0;
     padding: 0;
     overflow: hidden;
     border: 1px solid var(--line-strong);
@@ -45,7 +45,7 @@
   }
 
   dialog::backdrop {
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--scrim);
   }
 
   dialog > :global(*) {

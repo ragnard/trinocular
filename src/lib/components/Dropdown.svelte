@@ -80,10 +80,4 @@
   .chip.strong:not([aria-pressed="true"]) {
     color: var(--fg);
   }
-
-  .chip:disabled {
-    color: var(--fg-3);
-    background: transparent;
-    cursor: default;
-  }
 </style>
