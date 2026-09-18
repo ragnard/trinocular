@@ -99,12 +99,13 @@
   }
 
   /**
-   * Any button in a menu closes it. Captured on the way down, so the menu is
-   * already gone by the time the item's own handler runs — one of them opens a
-   * `prompt()`, and a menu left standing behind a modal dialog looks stuck.
+   * Any button or link in a menu closes it. Captured on the way down, so the
+   * menu is already gone by the time the item's own handler runs — one of them
+   * opens a `prompt()`, and a menu left standing behind a modal dialog looks
+   * stuck.
    */
   function onMenuClick(event: MouseEvent) {
-    if ((event.target as HTMLElement).closest("button")) close();
+    if ((event.target as HTMLElement).closest("button, a")) close();
   }
 </script>
 

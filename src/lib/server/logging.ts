@@ -2,6 +2,7 @@ import { isHttpError, isRedirect, type Handle } from "@sveltejs/kit";
 import { pino, type Logger } from "pino";
 
 import { env } from "$env/dynamic/private";
+import { BUILD } from "$lib/build";
 
 const LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"];
 
@@ -35,11 +36,12 @@ export const logger = pino({
   }
 });
 
-// `logLevel`, not `level`: the formatter above already emits a `level` field,
-// and a second one in the same object makes a duplicate JSON key that a parser
-// resolves to whichever it reads last — the line would report its own severity
-// as whatever the configured level happens to be.
-logger.info({ logLevel: level }, "initialized");
+// The first line of every start says what is running. `logLevel`, not
+// `level`: the formatter above already emits a `level` field, and a second one
+// in the same object makes a duplicate JSON key that a parser resolves to
+// whichever it reads last — the line would report its own severity as
+// whatever the configured level happens to be.
+logger.info({ version: BUILD.version, commit: BUILD.commit, logLevel: level }, "starting");
 
 export const LoggingHandler = (): Handle => {
   return async ({ event, resolve }) => {

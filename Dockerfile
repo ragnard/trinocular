@@ -24,6 +24,13 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 COPY . .
 
+# Inputs, since the context has no .git to ask (see .dockerignore); a build
+# given neither is `0.0.0` from an unknown commit. After the install, so that
+# changing them does not re-run it.
+ARG TRINETTE_VERSION
+ARG TRINETTE_COMMIT
+ENV TRINETTE_VERSION=${TRINETTE_VERSION} TRINETTE_COMMIT=${TRINETTE_COMMIT}
+
 RUN bun run --bun check
 RUN bun run --bun build
 
