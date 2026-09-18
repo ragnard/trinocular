@@ -97,7 +97,7 @@
       </button>
       {#if limitRows}
         <input
-          class="field"
+          class="textbox"
           type="text"
           inputmode="numeric"
           pattern="[0-9]*"
