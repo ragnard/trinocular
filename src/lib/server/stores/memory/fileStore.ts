@@ -1,6 +1,6 @@
 import type { FileRecord, StoredFile, StoredUi } from "$lib/workspaceRecord";
 
-import type { FileStore, PutResult } from "./fileStore";
+import type { FileStore, PutResult } from "../../fileStore";
 
 /** Files in this process, gone with it. For development, and for what the
  *  sqlite store has to agree with. */

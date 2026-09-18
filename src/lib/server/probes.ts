@@ -2,7 +2,7 @@ import type { Handle } from "@sveltejs/kit";
 
 import type { FileStore } from "./fileStore";
 import { logger } from "./logging";
-import type { SessionStore } from "./session";
+import type { SessionStore } from "./sessionStore";
 
 export const LIVEZ_PATH = "/livez";
 export const READYZ_PATH = "/readyz";

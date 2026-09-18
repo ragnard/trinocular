@@ -2,9 +2,9 @@ import type { Database } from "bun:sqlite";
 
 import type { FileRecord, StoredFile, StoredUi } from "$lib/workspaceRecord";
 
-import type { SqliteFileStoreConfig } from "./config";
-import type { FileStore, PutResult } from "./fileStore";
-import { migrate, openDatabase } from "./sqlite";
+import type { SqliteFileStoreConfig } from "../../config";
+import type { FileStore, PutResult } from "../../fileStore";
+import { migrate, openDatabase } from "./database";
 
 const SCHEMA: string[][] = [
   [

@@ -270,7 +270,7 @@ whose files they see — and a browser that had files of its own hands them over
 next time it visits, then forgets its own copies, so the server is the only place they
 are. Switching back to `browser` therefore starts each browser from whatever it made
 since, not from what it had before: a move to the server is not meant to be undone,
-and the files are in the database file if it has to be.
+and the files are in the store if it has to be.
 
 ```yaml
 files:
@@ -283,10 +283,20 @@ files:
 | Option | Default | Description |
 | --- | --- | --- |
 | `maxBytes` | `524288` | The most one document may be, in bytes of its stored record. A save over it is refused, and the editor says so. The default is the server's own request body limit; raise `BODY_SIZE_LIMIT` with it. |
-| `store.kind` | `browser` | `browser`, `memory` or `sqlite`. `memory` is for development: the files are gone when the process is. |
-| `store.path` | **required** for `sqlite` | The database file. As for sessions, it is this process's alone, so a second copy of Trinette pointed at it refuses to start. |
+| `store.kind` | `browser` | `browser`, `memory`, `sqlite` or `valkey`. `memory` is for development: the files are gone when the process is. |
 
-Files are not encrypted in the store — the SQL text is what a backup of the file is for.
+Files are not encrypted in the store, whichever it is — the SQL text is what a copy of
+the store is for.
+
+#### `store.kind: sqlite`
+
+Files in a SQLite file, for a single copy of Trinette: as for sessions, the file is this
+process's alone, and a second copy pointed at it refuses to start.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `path` | **required** | The database file. Created if it does not exist; the directory must. |
+
 Sessions and files can share a directory but should be two files: the session file can
 be deleted to sign everyone out without touching a document.
 
@@ -294,6 +304,29 @@ For Kubernetes, that is one replica, a `ReadWriteOnce` volume mounted at `/data`
 Deployment with `strategy: Recreate` so an update stops the old pod before starting the
 new one — the volume can only be attached to one node at a time, and the old pod holds
 it until it is gone.
+
+#### `store.kind: valkey`
+
+Files in Valkey or Redis, so any number of copies of Trinette can serve them. A user's
+documents are one hash under their user id; make sure the server persists to disk (AOF
+or RDB), since unlike a session a lost file is not something a user can sign in again to
+get back.
+
+```yaml
+files:
+  store:
+    kind: valkey
+    mode: single           # or cluster, or sentinel
+    host: valkey.example
+    port: 6379
+    password: ...
+```
+
+It takes the same options as the session store's `valkey` — `mode` and what each mode
+needs, `username`, `password`, `tls`, `connectTimeoutMs`, `commandTimeoutMs` — except
+that there is no `secret`, and `keyPrefix` defaults to `trinette:files:`. The two blocks
+are independent: they can name the same server, where the prefixes keep them apart, or
+different ones.
 
 ### `authn` — who the user is
 

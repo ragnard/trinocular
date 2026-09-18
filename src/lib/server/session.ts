@@ -4,25 +4,13 @@ import { EncryptedCookie } from "./EncryptedCookie";
 import type { CookieSerializeOptions } from "cookie";
 
 import { logger } from "./logging";
-
-export type SessionID = string;
-export type SessionData = Record<string, unknown>;
+import type { SessionData, SessionID, SessionStore } from "./sessionStore";
 
 export interface SessionOptions {
   cookieName: string;
   cookieSecret: string;
   cookieOptions: CookieSerializeOptions & { path: string };
   maxLifetimeSeconds: number;
-}
-
-export interface SessionStore {
-  load(sessionId: SessionID): Promise<SessionData | null>;
-  save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void>;
-  destroy(sessionId: SessionID): Promise<void>;
-  /** Rejects if the store cannot currently be reached. Absent means the store
-   *  has nothing to reach, and reads as always ready. */
-  ping?(): Promise<void>;
-  dispose?(): Promise<void>;
 }
 
 export class Session {
@@ -109,55 +97,6 @@ export class Session {
     if (this.#previousSessionId) {
       await this.#store.destroy(this.#previousSessionId);
     }
-  }
-}
-
-interface StoreEntry {
-  data: SessionData;
-  expiresAt: number;
-}
-
-export class InMemoryStore implements SessionStore {
-  #sessions = new Map<SessionID, StoreEntry>();
-  #sweepInterval: ReturnType<typeof setInterval>;
-
-  constructor(sweepIntervalMs: number = 60_000) {
-    this.#sweepInterval = setInterval(() => this.#sweep(), sweepIntervalMs);
-    if (this.#sweepInterval.unref) this.#sweepInterval.unref();
-  }
-
-  async load(sessionId: SessionID): Promise<SessionData | null> {
-    const entry = this.#sessions.get(sessionId);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      this.#sessions.delete(sessionId);
-      return null;
-    }
-    return { ...entry.data };
-  }
-
-  async save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void> {
-    this.#sessions.set(sessionId, {
-      data: { ...data },
-      expiresAt: Date.now() + ttlSeconds * 1000
-    });
-  }
-
-  async destroy(sessionId: SessionID): Promise<void> {
-    this.#sessions.delete(sessionId);
-  }
-
-  #sweep(): void {
-    const now = Date.now();
-    for (const [id, entry] of this.#sessions) {
-      if (now > entry.expiresAt) {
-        this.#sessions.delete(id);
-      }
-    }
-  }
-
-  async dispose(): Promise<void> {
-    clearInterval(this.#sweepInterval);
   }
 }
 

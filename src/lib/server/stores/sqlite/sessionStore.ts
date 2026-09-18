@@ -1,9 +1,9 @@
 import type { Database } from "bun:sqlite";
 
-import type { SqliteSessionStoreConfig } from "./config";
-import { Sealer } from "./Sealer";
-import type { SessionData, SessionID, SessionStore } from "./session";
-import { migrate, openDatabase } from "./sqlite";
+import type { SqliteSessionStoreConfig } from "../../config";
+import { Sealer } from "../../Sealer";
+import type { SessionData, SessionID, SessionStore } from "../../sessionStore";
+import { migrate, openDatabase } from "./database";
 
 const SCHEMA: string[][] = [
   [

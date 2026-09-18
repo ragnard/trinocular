@@ -2,7 +2,7 @@ import type { FileRecord, StoredFile, StoredUi } from "$lib/workspaceRecord";
 
 import { config, type FileStoreConfig } from "./config";
 import { logger } from "./logging";
-import { InMemoryFileStore } from "./memoryFileStore";
+import { InMemoryFileStore } from "./stores/memory/fileStore";
 
 export type PutResult =
   | { status: "saved"; version: string }
@@ -30,7 +30,9 @@ export interface FileStore {
 }
 
 /** Null when the files stay in the browser. A store that cannot be opened
- *  exits the process, the same policy as the session store and the config. */
+ *  exits the process, the same policy as the session store and the config.
+ *  The sqlite and Valkey stores are imported lazily so a deployment without
+ *  them never evaluates them. */
 export const createFileStore = async (cfg: FileStoreConfig): Promise<FileStore | null> => {
   switch (cfg.kind) {
     case "browser":
@@ -40,13 +42,29 @@ export const createFileStore = async (cfg: FileStoreConfig): Promise<FileStore |
       logger.info({ store: "memory" }, "file store configured");
       return new InMemoryFileStore();
     case "sqlite": {
-      const { SqliteFileStore } = await import("./sqliteFileStore");
+      const { SqliteFileStore } = await import("./stores/sqlite/fileStore");
       try {
         const store = SqliteFileStore.create(cfg);
         logger.info({ store: "sqlite", path: cfg.path }, "file store configured");
         return store;
       } catch (err) {
         logger.error({ err, path: cfg.path }, "failed to open the file store");
+        process.exit(1);
+      }
+    }
+    case "valkey": {
+      const { ValkeyFileStore } = await import("./stores/valkey/fileStore");
+      const { describe } = await import("./stores/valkey/client");
+      const where = describe(cfg);
+      try {
+        const store = await ValkeyFileStore.create(
+          cfg,
+          logger.child({ component: "valkey-file-store" })
+        );
+        logger.info({ store: "valkey", ...where }, "file store configured");
+        return store;
+      } catch (err) {
+        logger.error({ err, ...where }, "failed to connect to the file store");
         process.exit(1);
       }
     }
