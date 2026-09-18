@@ -150,8 +150,8 @@
     <!-- The rows went to make room; the run itself is still here to read. -->
     <div class="message">
       <p>
-        The {formatCount(result.released)} rows of this result were released to free memory. Run the statement
-        again to see them.
+        The {result.released.toLocaleString()} rows of this result were released to free memory. Run the
+        statement again to see them.
       </p>
     </div>
   {:else if schema}
