@@ -9,7 +9,7 @@
     RowSource,
     ValueConverter
   } from "./types";
-  import { defaultCell } from "./snippets.svelte";
+  import { defaultCell, formatCell } from "./snippets.svelte";
 
   /** `--h-row` and `--h-rail` in style.css: the virtual scroll needs the
    *  numbers, so they are repeated here rather than read off the stylesheet.
@@ -19,6 +19,14 @@
   const DEFAULT_BUFFER_ROWS = 5;
   const DEFAULT_COLUMN_WIDTH = 150;
   const MIN_COLUMN_WIDTH = 50;
+  const MAX_COLUMN_WIDTH = 400;
+  const FIT_MAX_WIDTH = 1200;
+  const SAMPLE_ROWS = 200;
+  const FIT_ROWS = 5000;
+  /** 12px padding a side, the header's 1px rule, and a pixel for rounding. */
+  const CELL_PADDING = 26;
+  /** The caller's header puts a 14px type icon and a 6px gap beside the name. */
+  const HEADER_EXTRA = 20;
   const DEFAULT_SPACER_MIN_WIDTH = 100;
   const ROW_NUMBER_WIDTH = 52;
 
@@ -29,7 +37,6 @@
     rows?: RowSource;
     rowHeight?: number;
     bufferRows?: number;
-    columnWidth?: number;
     spacerMinWidth?: number;
     header?: Snippet<[Field]>;
     empty?: Snippet;
@@ -50,7 +57,6 @@
     rows,
     rowHeight = DEFAULT_ROW_HEIGHT,
     bufferRows = DEFAULT_BUFFER_ROWS,
-    columnWidth = DEFAULT_COLUMN_WIDTH,
     spacerMinWidth = DEFAULT_SPACER_MIN_WIDTH,
     header,
     empty,
@@ -63,13 +69,38 @@
   let scrollContainer: HTMLDivElement | undefined = $state();
   let scrollTop = $state(0);
   let containerHeight = $state(0);
-  let columnWidths: number[] = $state([]);
+  let containerWidth = $state(0);
+  /** Content widths measured from the first rows; `pinned` is where a column
+   *  the user has sized stands instead, and takes no share of the slack. */
+  let measured: number[] = $state([]);
+  let pinned: (number | null)[] = $state([]);
+  let sampled = $state(-1);
   let resizing = $state(false);
   let dragging = $state(false);
 
   let totalRows = $derived(rows?.length ?? 0);
   let fieldCount = $derived(schema?.fields?.length ?? 0);
   let colCount = $derived(fieldCount + 2);
+
+  let layout = $derived.by(() => {
+    const widths = Array.from(
+      { length: fieldCount },
+      (_, i) => pinned[i] ?? measured[i] ?? DEFAULT_COLUMN_WIDTH
+    );
+    const flex = widths.flatMap((_, i) => (pinned[i] == null ? [i] : []));
+    const flexTotal = flex.reduce((sum, i) => sum + widths[i], 0);
+    const slack = containerWidth - ROW_NUMBER_WIDTH - widths.reduce((sum, w) => sum + w, 0);
+    if (slack <= 0 || flexTotal === 0) return { widths, filled: false };
+    let given = 0;
+    for (const i of flex) {
+      const share = Math.floor((slack * widths[i]) / flexTotal);
+      widths[i] += share;
+      given += share;
+    }
+    widths[flex[flex.length - 1]] += slack - given;
+    return { widths, filled: true };
+  });
+  let columnWidths = $derived(layout.widths);
   let columnsWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
 
   const defaultCellRenderer: CellRendererLookup = () => defaultCell;
@@ -294,11 +325,53 @@
     }
   }
 
+  let measurer: CanvasRenderingContext2D | null = null;
+
+  function textWidth(text: string): number {
+    if (!measurer) {
+      measurer = document.createElement("canvas").getContext("2d")!;
+      const s = getComputedStyle(scrollContainer!);
+      measurer.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+    }
+    return measurer.measureText(text).width;
+  }
+
+  /** Numeric cells draw tabular figures, which a canvas cannot be asked for;
+   *  every digit measured as a zero is the same width. */
+  function contentWidth(col: number, sample: readonly (readonly unknown[])[], max: number) {
+    const field = schema!.fields[col];
+    let width = textWidth(field.name) + HEADER_EXTRA;
+    for (const row of sample) {
+      let text = formatCell(valueConverter(row[col], field, col), field.dataType);
+      if (numeric[col]) text = text.replace(/\d/g, "0");
+      width = Math.max(width, textWidth(text));
+      if (width + CELL_PADDING >= max) break;
+    }
+    return Math.min(max, Math.max(MIN_COLUMN_WIDTH, Math.ceil(width) + CELL_PADDING));
+  }
+
+  function fitColumn(col: number) {
+    if (!rows) return;
+    pinned[col] = contentWidth(col, rows.slice(0, FIT_ROWS), FIT_MAX_WIDTH);
+  }
+
+  let lastHandlePress: { col: number; time: number } | null = null;
+
   function handleResizePointerdown(event: PointerEvent, colIndex: number) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
 
     event.stopPropagation();
+    // Also suppresses the compatibility mouse events, `dblclick` among them,
+    // so a double press is recognised here.
     event.preventDefault();
+
+    const press = { col: colIndex, time: event.timeStamp };
+    if (lastHandlePress?.col === colIndex && press.time - lastHandlePress.time < 400) {
+      lastHandlePress = null;
+      fitColumn(colIndex);
+      return;
+    }
+    lastHandlePress = press;
 
     const handle = event.currentTarget as HTMLElement;
     handle.setPointerCapture(event.pointerId);
@@ -309,7 +382,7 @@
 
     const onPointermove = (e: PointerEvent) => {
       const delta = e.clientX - startX;
-      columnWidths[colIndex] = Math.max(MIN_COLUMN_WIDTH, startWidth + delta);
+      pinned[colIndex] = Math.max(MIN_COLUMN_WIDTH, startWidth + delta);
     };
 
     const onPointerup = () => {
@@ -329,7 +402,20 @@
     anchor = null;
     active = null;
     rowSelection = false;
-    columnWidths = Array(schema?.fields?.length ?? 0).fill(columnWidth);
+    measured = [];
+    pinned = Array(schema?.fields?.length ?? 0).fill(null);
+    sampled = -1;
+  });
+
+  // Measure from the header alone until the first rows land, then once from
+  // those. Later pages do not re-measure: widths must not shift under a
+  // reader while a result streams.
+  $effect(() => {
+    if (!schema || !rows || !scrollContainer) return;
+    if (sampled > 0 || (sampled === 0 && rows.length === 0)) return;
+    const sample = rows.slice(0, SAMPLE_ROWS);
+    measured = schema.fields.map((_, i) => contentWidth(i, sample, MAX_COLUMN_WIDTH));
+    sampled = sample.length;
   });
 
   // Sync selection prop from internal selection state
@@ -367,13 +453,17 @@
     class:dragging
     bind:this={scrollContainer}
     bind:clientHeight={containerHeight}
+    bind:clientWidth={containerWidth}
     role="grid"
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
     onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}
   >
-    <table style:width="100%" style:min-width="{columnsWidth + spacerMinWidth}px">
+    <table
+      style:width="100%"
+      style:min-width="{columnsWidth + (layout.filled ? 0 : spacerMinWidth)}px"
+    >
       <colgroup>
         <col style:width="{ROW_NUMBER_WIDTH}px" />
         {#each columnWidths as w}

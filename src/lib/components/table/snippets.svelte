@@ -18,7 +18,7 @@
     return String(value);
   }
 
-  export { defaultCell };
+  export { defaultCell, formatCell };
 </script>
 
 {#snippet defaultCell(field: Field, value: any)}

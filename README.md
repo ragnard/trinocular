@@ -24,6 +24,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   writes, for any table in the browser — copied, or dropped straight into your file.
 - Support for querying multiple Trino instances — each file picks its own, so
   re-pointing one query leaves the rest alone.
+- Read results in columns sized to what is in them, filling the width you give the
+  table; drag a column's edge to size it yourself, or double-click it to fit its contents.
 - Copy a cell as it is, or a block of cells as CSV, with the usual shortcut — nested
   values come out as JSON.
 - Save any result as CSV or NDJSON without running the query again.
