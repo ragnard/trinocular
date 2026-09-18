@@ -36,8 +36,42 @@ jobs:
           advanced-security: false
           annotations: true
 
+  # `bun test` runs the store contracts against every implementation, and the
+  # Valkey suites are skipped unless TRINETTE_TEST_VALKEY names a server, so
+  # without the service here a third of the suite would silently not run. The
+  # Dockerfile's builder stage runs `check` and `build`, and neither of these.
+  test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    services:
+      valkey:
+        image: valkey/valkey:9-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      TRINETTE_TEST_VALKEY: localhost:6379
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run test
+
+      - run: bun run format:check
+
   build:
-    needs: zizmor
+    needs: [zizmor, test]
     runs-on: ubuntu-latest
 
     permissions:
