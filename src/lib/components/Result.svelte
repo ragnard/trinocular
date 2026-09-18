@@ -17,14 +17,24 @@
     /** Rows the next run shows before pausing to ask, while `limitRows` is on. */
     rowLimit?: number;
     limitRows?: boolean;
+    /** Enter on the table's selection. */
+    onopen?: () => void;
   }
 
   let {
     result,
     selection = $bindable(null),
     rowLimit = $bindable(1000),
-    limitRows = $bindable(true)
+    limitRows = $bindable(true),
+    onopen
   }: Props = $props();
+
+  let table: ReturnType<typeof Table> | undefined = $state();
+
+  /** Moves the table's selection by `delta` rows; see `Table.step`. */
+  export function step(delta: number, extend = false) {
+    table?.step(delta, extend);
+  }
 
   function setLimit(input: HTMLInputElement) {
     const n = Math.floor(Number(input.value));
@@ -180,7 +190,15 @@
     {:else if result.running}
       <QueryProgress {result} compact />
     {/if}
-    <Table {schema} rows={result.data} {valueConverter} {clipboardText} bind:selection>
+    <Table
+      bind:this={table}
+      {schema}
+      rows={result.data}
+      {valueConverter}
+      {clipboardText}
+      {onopen}
+      bind:selection
+    >
       {#snippet header(field)}
         <!-- One line: the type is an icon beside the name rather than a second
              row of text under it. Spelled out, a type is mostly noise a column

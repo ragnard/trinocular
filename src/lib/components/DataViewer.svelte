@@ -1,7 +1,7 @@
 <script lang="ts">
   import { isDictionary, isList, isStruct } from "./table/types";
   import type { Selection, SelectionData, Field } from "./table/types";
-  import { Copy, Eye, Search } from "@lucide/svelte";
+  import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import {
@@ -11,6 +11,15 @@
     resolveFormat,
     type ViewFormat
   } from "$lib/viewFormats";
+  import { formatCount } from "$lib/format";
+  import { textMeasurer } from "$lib/textWidth";
+
+  const DEFAULT_KEY_WIDTH = 150;
+  const MIN_KEY_WIDTH = 60;
+  /** What the value column is left at least, whatever the key is dragged to. */
+  const MIN_VALUE_WIDTH = 160;
+  const KEY_GAP = 10;
+  const PAD = 12;
 
   interface Props {
     selection?: Selection | null;
@@ -19,6 +28,18 @@
     /** How to draw each field, by its path. See `SqlFile.viewFormats`. */
     formats?: Record<string, string>;
     onpick?: (path: string, formatId: string) => void;
+    /** Rows in the result the selection is of, for "of 3,500". */
+    rowCount?: number;
+    /**
+     * Moves the selection by `delta` rows (±Infinity for either end), keeping
+     * the anchor when `extend`. Given, the rail grows a navigator and the
+     * arrow keys step; the selection itself stays the table's to own.
+     */
+    onstep?: (delta: number, extend: boolean) => void;
+    /** Draws the chip that opens this pane full-window. */
+    onexpand?: () => void;
+    /** Draws the chip that closes it again. */
+    onclose?: () => void;
   }
 
   let {
@@ -26,8 +47,99 @@
     hideNulls = true,
     hideEmpty = true,
     formats = {},
-    onpick
+    onpick,
+    rowCount,
+    onstep,
+    onexpand,
+    onclose
   }: Props = $props();
+
+  let atFirst = $derived(!selection || selection.minRow === 0);
+  let atLast = $derived(!selection || rowCount == null || selection.maxRow >= rowCount - 1);
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (!onstep || !selection || event.altKey || event.ctrlKey || event.metaKey) return;
+    const typing = event.target instanceof HTMLInputElement;
+    let delta: number;
+    switch (event.key) {
+      case "ArrowUp":
+        delta = -1;
+        break;
+      case "ArrowDown":
+        delta = 1;
+        break;
+      case "Home":
+        if (typing) return;
+        delta = -Infinity;
+        break;
+      case "End":
+        if (typing) return;
+        delta = Infinity;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    onstep(delta, event.shiftKey);
+  }
+
+  let stack: HTMLDivElement | undefined = $state();
+  let stackWidth = $state(0);
+  let keyWidth = $state(DEFAULT_KEY_WIDTH);
+  let resizing = $state(false);
+
+  const clampKey = (w: number) =>
+    Math.max(MIN_KEY_WIDTH, Math.min(w, stackWidth - 2 * PAD - KEY_GAP - MIN_VALUE_WIDTH));
+
+  function fitKey() {
+    if (!stack) return;
+    const measure = textMeasurer(stack);
+    let width = 0;
+    for (const doc of documents) {
+      for (const entry of doc.entries) width = Math.max(width, measure(entry.key));
+    }
+    keyWidth = clampKey(Math.ceil(width) + 1);
+  }
+
+  let lastHandlePress = 0;
+
+  function handlePointerdown(event: PointerEvent) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+
+    if (event.timeStamp - lastHandlePress < 400) {
+      lastHandlePress = 0;
+      fitKey();
+      return;
+    }
+    lastHandlePress = event.timeStamp;
+
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = keyWidth;
+    resizing = true;
+
+    const onPointermove = (e: PointerEvent) => {
+      keyWidth = clampKey(startWidth + e.clientX - startX);
+    };
+    const onPointerup = () => {
+      resizing = false;
+      handle.releasePointerCapture(event.pointerId);
+      handle.removeEventListener("pointermove", onPointermove);
+      handle.removeEventListener("pointerup", onPointerup);
+    };
+    handle.addEventListener("pointermove", onPointermove);
+    handle.addEventListener("pointerup", onPointerup);
+  }
+
+  function handleKeyResize(event: KeyboardEvent) {
+    const step = event.shiftKey ? 50 : 10;
+    if (event.key === "ArrowLeft") keyWidth = clampKey(keyWidth - step);
+    else if (event.key === "ArrowRight") keyWidth = clampKey(keyWidth + step);
+    else return;
+    event.preventDefault();
+  }
 
   let data: SelectionData | null = $state.raw(null);
 
@@ -213,16 +325,42 @@
   }
 </script>
 
-<div class="inspector">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="inspector" class:resizing onkeydown={handleKeydown}>
   <div class="rail">
     <Search size={14} />
     <span class="ell fill">
       {#if selection}
-        {documents.length} rows &times; {fieldCount} fields
+        {#if selection.minRow === selection.maxRow}
+          Row {formatCount(selection.minRow + 1)}
+        {:else}
+          Rows {formatCount(selection.minRow + 1)}–{formatCount(selection.maxRow + 1)}
+        {/if}
+        {#if rowCount != null}of {formatCount(rowCount)}{/if}
+        &middot; {fieldCount}
+        {fieldCount === 1 ? "field" : "fields"}
       {:else}
         Inspector
       {/if}
     </span>
+    {#if onstep}
+      <button
+        class="chip square"
+        onclick={() => onstep(-1, false)}
+        disabled={atFirst}
+        title="Previous row (↑)"
+      >
+        <ChevronUp size={14} />
+      </button>
+      <button
+        class="chip square"
+        onclick={() => onstep(1, false)}
+        disabled={atLast}
+        title="Next row (↓)"
+      >
+        <ChevronDown size={14} />
+      </button>
+    {/if}
     <button
       class="chip square"
       onclick={copyAll}
@@ -231,56 +369,95 @@
     >
       <Copy size={14} />
     </button>
+    {#if onexpand}
+      <button
+        class="chip square"
+        onclick={onexpand}
+        disabled={!selection}
+        title="Open full window (Enter in the table)"
+      >
+        <Maximize2 size={14} />
+      </button>
+    {/if}
+    {#if onclose}
+      <button class="chip square" onclick={onclose} title="Close (Esc)">
+        <X size={14} />
+      </button>
+    {/if}
   </div>
 
   <FilterBox bind:value={filter} placeholder="Filter fields…" label="Filter fields" />
 
-  <div class="stack" onscroll={() => picker?.close()}>
-    {#if !documents.length}
-      <p class="empty">Select cells in the results to inspect them.</p>
-    {/if}
-    {#each documents as doc (doc.row)}
-      <div class="doc-head">
-        <span class="caps small">Row {doc.row}</span>
-        <span class="fill"></span>
-        <button
-          class="chip square"
-          onclick={() => copyDocument(doc.entries)}
-          title="Copy row as JSON"
-        >
-          <Copy size={12} />
-        </button>
-      </div>
-      {#each doc.entries as entry (entry.id)}
-        {@const choices = formatsFor(entry.field)}
-        {@const chosen = resolveFormat(entry.field, formatId(entry))}
-        {@const { view } = render(entry.value, entry.field, formatId(entry))}
-        <div class="field">
-          <span class="key ell" title={entry.key}>{entry.key}</span>
-          <!-- Whatever the format drew: text with its own cap, a frame, an
-               image. This row does not know which, and does not need to. -->
-          <div class="value" class:null={entry.value === null}>
-            <view.component {...view.props} title={entry.key} />
-          </div>
-          <div class="controls">
-            {#if choices.length > 1}
-              <button
-                class="chip square pick"
-                class:set={chosen.id !== DEFAULT_FORMAT}
-                popovertarget={menuId}
-                onclick={(e) => startPick(entry, e.currentTarget)}
-                title={`Show "${entry.key}" as… (${chosen.label})`}
-              >
-                <Eye size={12} />
-              </button>
-            {/if}
-            <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
-              <Copy size={12} />
-            </button>
-          </div>
+  <div class="body">
+    <div
+      class="stack"
+      style:--key="{keyWidth}px"
+      bind:this={stack}
+      bind:clientWidth={stackWidth}
+      onscroll={() => picker?.close()}
+    >
+      {#if !documents.length}
+        <p class="empty">Select cells in the results to inspect them.</p>
+      {/if}
+      {#each documents as doc (doc.row)}
+        <div class="doc-head">
+          <span class="caps small">Row {doc.row}</span>
+          <span class="fill"></span>
+          <button
+            class="chip square"
+            onclick={() => copyDocument(doc.entries)}
+            title="Copy row as JSON"
+          >
+            <Copy size={12} />
+          </button>
         </div>
+        {#each doc.entries as entry (entry.id)}
+          {@const choices = formatsFor(entry.field)}
+          {@const chosen = resolveFormat(entry.field, formatId(entry))}
+          {@const { view } = render(entry.value, entry.field, formatId(entry))}
+          <div class="field">
+            <span class="key ell" title={entry.key}>{entry.key}</span>
+            <!-- Whatever the format drew: text with its own cap, a frame, an
+               image. This row does not know which, and does not need to. -->
+            <div class="value" class:null={entry.value === null}>
+              <view.component {...view.props} title={entry.key} />
+            </div>
+            <div class="controls">
+              {#if choices.length > 1}
+                <button
+                  class="chip square pick"
+                  class:set={chosen.id !== DEFAULT_FORMAT}
+                  popovertarget={menuId}
+                  onclick={(e) => startPick(entry, e.currentTarget)}
+                  title={`Show "${entry.key}" as… (${chosen.label})`}
+                >
+                  <Eye size={12} />
+                </button>
+              {/if}
+              <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
+                <Copy size={12} />
+              </button>
+            </div>
+          </div>
+        {/each}
       {/each}
-    {/each}
+    </div>
+    {#if documents.length}
+      <!-- The key/value boundary, draggable like a table header's edge; a
+           second press within 400ms fits the keys. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Field name column width"
+        aria-valuenow={keyWidth}
+        tabindex="0"
+        style:left="{PAD + keyWidth}px"
+        onpointerdown={handlePointerdown}
+        onkeydown={handleKeyResize}
+      ></div>
+    {/if}
   </div>
 </div>
 
@@ -328,10 +505,61 @@
     padding-right: 6px;
   }
 
+  .rail .chip:disabled {
+    color: var(--fg-3);
+    background: transparent;
+    cursor: default;
+  }
+
+  .body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
   .stack {
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+
+  /* Sits in the gap between the key and value columns, over the whole
+     height of the stack; the rule it draws is only there when it is being
+     looked for. */
+  .handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    z-index: 2;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .handle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+  }
+
+  .handle:hover::before,
+  .handle:focus-visible::before,
+  .resizing .handle::before {
+    background: var(--accent-line);
+  }
+
+  .resizing {
+    user-select: none;
+  }
+
+  .resizing :global(*) {
+    cursor: col-resize !important;
   }
 
   .empty {
@@ -364,7 +592,7 @@
   .field {
     position: relative;
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: var(--key) minmax(0, 1fr);
     gap: 0 10px;
     align-items: start;
     padding: 6px 12px 6px 12px;

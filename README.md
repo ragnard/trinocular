@@ -12,7 +12,7 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   rows, or however many you set, and asks before fetching more, or all of them. Switch
   the cap off for runs that should not stop.
 - Inspect one or more rows of a result set, field by field, with nested values spelled
-  out.
+  out — in a side pane, or opened full-window to step from row to row.
 - Flexible value display — read a field as text, as a hex dump, as JSON, as rendered
   Markdown or HTML, or see the image a binary column holds, and have the choice
   remembered. Rendered
