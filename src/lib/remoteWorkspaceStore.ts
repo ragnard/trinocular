@@ -15,7 +15,7 @@
  * moved is reported as a write, an id that is gone as a removal.
  */
 
-import { loadWorkspace, markImported } from "./fileStorage";
+import { loadWorkspace, removeLocalFile } from "./fileStorage";
 import {
   orderFiles,
   toStoredFile,
@@ -80,14 +80,11 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
   async load(): Promise<LoadedWorkspace> {
     let { files, ui } = await this.#listing();
 
-    if (!markImported(this.#workspaceId, false)) {
-      const imported = await this.#import(new Set(files.map((f) => f.id)));
-      if (imported.length > 0) {
-        files = files.concat(imported);
-        // Their order was this browser's; the server's, if it has one, wins.
-        if (!ui) ui = loadWorkspaceUi(this.#workspaceId);
-      }
-      markImported(this.#workspaceId);
+    const imported = await this.#import(new Set(files.map((f) => f.id)));
+    if (imported.length > 0) {
+      files = files.concat(imported);
+      // Their order was this browser's; the server's, if it has one, wins.
+      if (!ui) ui = loadWorkspaceUi(this.#workspaceId);
     }
 
     this.#remember(files, ui);
@@ -95,19 +92,29 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
   }
 
   /**
-   * The documents this browser kept before the server did, handed over once.
-   * Only ones the server does not have: a second browser of the same person
-   * has its own, and by the time it visits the first one's are already there.
-   * A create that loses a race to another tab importing the same document is
-   * a conflict, which is the right answer and needs no handling.
+   * The documents this browser kept that the server does not have, handed
+   * over and then removed from localStorage, so that what is left there is
+   * only what has never reached the server. That is what makes the check safe
+   * to run on every load rather than once: a document created in the browser
+   * while the deployment was back on browser storage is imported on the next
+   * visit, while one the server has since deleted cannot come back, because
+   * its local copy went when it was first imported. A create that loses a
+   * race to another tab importing the same document is a conflict, which is
+   * the right answer; the copy is dropped either way, since the server has it.
    */
   async #import(present: Set<string>): Promise<FileRecord[]> {
     const imported: FileRecord[] = [];
     for (const file of loadWorkspace(this.#workspaceId).files) {
-      if (present.has(file.id)) continue;
-      const { version, ...record } = file;
-      const outcome = await this.put(record, null);
-      if (outcome.status === "saved") imported.push({ ...record, version: outcome.version });
+      // The scratch file a workspace makes when it finds nothing is not a
+      // document anybody wrote; carrying it over would put a blank beside the
+      // one the server already made for the same reason.
+      if (!present.has(file.id) && file.content !== "") {
+        const { version, ...record } = file;
+        const outcome = await this.put(record, null);
+        if (outcome.status === "saved") imported.push({ ...record, version: outcome.version });
+        else if (outcome.status === "refused") continue;
+      }
+      removeLocalFile(this.#workspaceId, file.id);
     }
     return imported;
   }

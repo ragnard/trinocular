@@ -264,8 +264,11 @@ session:
 By default a user's files live in their browser, and only there: another browser, or the
 same one with its storage cleared, starts empty. With a server store they follow the
 person instead — keyed by their user id, so what `authn` says the user's id is decides
-whose files they see — and a browser that had files of its own brings them along the
-first time it visits.
+whose files they see — and a browser that had files of its own hands them over the
+next time it visits, then forgets its own copies, so the server is the only place they
+are. Switching back to `browser` therefore starts each browser from whatever it made
+since, not from what it had before: a move to the server is not meant to be undone,
+and the files are in the database file if it has to be.
 
 ```yaml
 files:
