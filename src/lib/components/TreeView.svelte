@@ -13,12 +13,12 @@
      */
     hint?: string;
     children?: TreeNode[];
-    loading?: boolean;
-    /** Why the last attempt to fill `children` failed; drawn under the row while it is open. */
-    error?: string;
     /** Offers the reload button. Only nodes whose children come from somewhere are. */
     reloadable?: boolean;
   }
+
+  const NONE: ReadonlySet<string> = new Set();
+  const NO_ERRORS: ReadonlyMap<string, string> = new Map();
 </script>
 
 <script lang="ts">
@@ -35,6 +35,14 @@
      * stops the chevron from lying: whatever it draws, clicking changes.
      */
     expanded: Set<string>;
+    /**
+     * Status, by node id, kept apart from the nodes on purpose: a spinner
+     * starting on one row must not rebuild the tree — with a few thousand
+     * columns loaded, that rebuild re-parses every one of their types.
+     */
+    loading?: ReadonlySet<string>;
+    /** Why the last attempt to fill a node's children failed; drawn under the row while it is open. */
+    errors?: ReadonlyMap<string, string>;
     ontoggle: (node: TreeNode) => void;
     onclick?: (node: TreeNode) => void;
     onreload?: (node: TreeNode) => void;
@@ -47,13 +55,26 @@
     depth?: number;
   }
 
-  let { nodes, expanded, ontoggle, onclick, onreload, icon, actions, depth = 0 }: Props = $props();
+  let {
+    nodes,
+    expanded,
+    loading = NONE,
+    errors = NO_ERRORS,
+    ontoggle,
+    onclick,
+    onreload,
+    icon,
+    actions,
+    depth = 0
+  }: Props = $props();
 </script>
 
 <ul class="tree" class:nested={depth > 0}>
   {#each nodes as node (node.id)}
     {@const isLeaf = node.children === undefined}
     {@const isOpen = expanded.has(node.id)}
+    {@const isLoading = loading.has(node.id)}
+    {@const error = errors.get(node.id)}
     <li class="node" class:leaf={isLeaf}>
       {#if isLeaf}
         <div class="row">
@@ -72,7 +93,7 @@
       {:else}
         <div class="row">
           <button class="label" title={node.hint} onclick={() => ontoggle(node)}>
-            {#if node.loading}
+            {#if isLoading}
               <LoaderCircle size={12} class="spin" />
             {:else}
               <ChevronRight size={12} class={isOpen ? "toggle open" : "toggle"} />
@@ -91,20 +112,22 @@
               class="reload"
               title="Reload"
               aria-label="Reload {node.label}"
-              disabled={node.loading}
+              disabled={isLoading}
               onclick={() => onreload(node)}
             >
               <RefreshCw size={12} />
             </button>
           {/if}
         </div>
-        {#if isOpen && node.error}
-          <div class="node-error small warn">{node.error}</div>
+        {#if isOpen && error}
+          <div class="node-error small warn">{error}</div>
         {/if}
         {#if isOpen && node.children && node.children.length > 0}
           <TreeView
             nodes={node.children}
             {expanded}
+            {loading}
+            {errors}
             {ontoggle}
             {onclick}
             {onreload}
