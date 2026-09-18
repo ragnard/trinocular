@@ -2,7 +2,6 @@
   import { isDictionary, isList, isStruct } from "./table/types";
   import type { Selection, SelectionData, Field } from "./table/types";
   import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
-  import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
   import {
     DEFAULT_FORMAT,
@@ -92,10 +91,10 @@
     onstep(delta, event.shiftKey && !expanded);
   }
 
-  let filterBox: ReturnType<typeof FilterBox> | undefined = $state();
+  let fieldInput: HTMLInputElement | undefined = $state();
 
   $effect(() => {
-    if (expanded) void tick().then(() => filterBox?.focus());
+    if (expanded) void tick().then(() => fieldInput?.focus());
   });
 
   let stack: HTMLDivElement | undefined = $state();
@@ -257,16 +256,22 @@
     return [{ id, key, path, value, field }];
   }
 
-  /**
-   * One filter, matched against field names and values alike. Two boxes
-   * (Field / Value) cost a whole extra row of chrome for a distinction nobody
-   * makes while scanning a document.
-   */
-  let filter = $state("");
+  let fieldFilter = $state("");
+  let valueFilter = $state("");
+
+  function clearOnEscape(event: KeyboardEvent) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (event.key === "Escape" && input.value) {
+      event.preventDefault();
+      if (input === fieldInput) fieldFilter = "";
+      else valueFilter = "";
+    }
+  }
 
   let documents: { row: number; entries: FlatEntry[] }[] = $derived.by(() => {
     if (!data || !selection) return [];
-    const needle = filter.trim().toLowerCase();
+    const fieldNeedle = fieldFilter.trim().toLowerCase();
+    const valueNeedle = valueFilter.trim().toLowerCase();
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
       let entries = data!.fields.flatMap((field, c) =>
@@ -274,11 +279,9 @@
       );
       if (hideNulls) entries = entries.filter((e) => e.value !== null);
       if (hideEmpty) entries = entries.filter((e) => !e.empty);
-      if (needle) {
-        entries = entries.filter(
-          (e) =>
-            e.key.toLowerCase().includes(needle) || String(e.value).toLowerCase().includes(needle)
-        );
+      if (fieldNeedle) entries = entries.filter((e) => e.key.toLowerCase().includes(fieldNeedle));
+      if (valueNeedle) {
+        entries = entries.filter((e) => String(e.value).toLowerCase().includes(valueNeedle));
       }
       return { row: firstRow + i + 1, entries };
     });
@@ -396,13 +399,6 @@
     {/if}
   </div>
 
-  <FilterBox
-    bind:this={filterBox}
-    bind:value={filter}
-    placeholder="Filter fields…"
-    label="Filter fields"
-  />
-
   <!-- The table's header, for the same reason: the separator is what says
        where the columns are, and its edge is the one place they are dragged.
        A second press within 400ms fits the keys. -->
@@ -413,6 +409,32 @@
       <span class="resize-handle" onpointerdown={handlePointerdown}></span>
     </span>
     <span class="value">Value</span>
+  </div>
+
+  <div class="filters">
+    <span class="key">
+      <input
+        type="text"
+        class="textbox"
+        bind:this={fieldInput}
+        bind:value={fieldFilter}
+        placeholder="Filter…"
+        spellcheck="false"
+        aria-label="Filter fields"
+        onkeydown={clearOnEscape}
+      />
+    </span>
+    <span class="value">
+      <input
+        type="text"
+        class="textbox"
+        bind:value={valueFilter}
+        placeholder="Filter…"
+        spellcheck="false"
+        aria-label="Filter values"
+        onkeydown={clearOnEscape}
+      />
+    </span>
   </div>
 
   <div
@@ -520,26 +542,40 @@
   }
 
   .header,
+  .filters,
   .field {
     display: grid;
     grid-template-columns: var(--key) minmax(0, 1fr);
     padding: 0 12px;
   }
 
-  .header {
+  .header,
+  .filters {
     flex: none;
     align-items: center;
     height: var(--h-rail);
     border-bottom: 1px solid var(--line-strong);
   }
 
-  .header .key {
+  .header .key,
+  .filters .key {
     position: relative;
     height: 100%;
     display: flex;
     align-items: center;
-    color: var(--fg);
     border-right: 1px solid var(--line);
+  }
+
+  .header .key {
+    color: var(--fg);
+  }
+
+  .filters .value {
+    display: flex;
+  }
+
+  .filters input {
+    flex: 1;
   }
 
   .resize-handle {

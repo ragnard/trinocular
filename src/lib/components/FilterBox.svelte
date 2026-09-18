@@ -16,10 +16,6 @@
     value = "";
     input?.focus();
   }
-
-  export function focus() {
-    input?.focus();
-  }
 </script>
 
 <div class="filter">
