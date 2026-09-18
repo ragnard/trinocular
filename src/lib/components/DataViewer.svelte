@@ -3,6 +3,7 @@
   import type { Selection, SelectionData, Field } from "./table/types";
   import { Copy, Eye, Search } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
+  import { MARK, mark } from "$lib/perfMarks";
   import Menu from "./Menu.svelte";
   import {
     DEFAULT_FORMAT,
@@ -154,6 +155,10 @@
   });
 
   let fieldCount = $derived(documents[0]?.entries.length ?? 0);
+
+  $effect(() => {
+    mark(MARK.inspectorRendered, { documents: documents.length, fields: fieldCount });
+  });
 
   /**
    * The picker: one menu for the whole pane, pointed at by every row's button.

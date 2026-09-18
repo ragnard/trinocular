@@ -1,4 +1,5 @@
 import Trino, { HttpError } from "$lib/trino";
+import { MARK, mark } from "./perfMarks";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
@@ -206,6 +207,7 @@ export class Result {
           this.#take(pending);
         }
       }
+      mark(MARK.resultSettled, { rows: this.data.length });
     } catch (e) {
       if (signedOut(e)) return;
       this.fail(e instanceof Error ? e.message : String(e));
@@ -214,6 +216,7 @@ export class Result {
 
   /** Settles the result on a failure of ours rather than the cluster's. */
   fail(message: string) {
+    mark(MARK.resultSettled, { rows: this.data.length, failed: true });
     this.error = {
       message,
       errorCode: 0,
@@ -229,6 +232,7 @@ export class Result {
    * sharing the pages already held, which is how $state.raw notices.
    */
   #take(page: readonly QueryData[]) {
+    mark(MARK.resultPage, { rows: page.length });
     const room = this.limit == null ? Infinity : this.limit - this.data.length;
     if (page.length <= room) {
       this.data = this.data.append(page);
@@ -384,11 +388,20 @@ export class Result {
   discard() {
     if (this.#discarded) return;
     this.#discarded = true;
-    if (this.completed) return;
-    if (this.held) return this.stop();
-    // Also makes `execute` fire the DELETE if the query id has not arrived yet.
-    this.cancelRequested = true;
-    void this.#sendCancel();
+    if (!this.completed) {
+      if (this.held) this.stop();
+      else {
+        // Also makes `execute` fire the DELETE if the query id has not arrived yet.
+        this.cancelRequested = true;
+        void this.#sendCancel();
+      }
+    }
+    // Nothing can show these rows again, and a `$derived` that read `data`
+    // keeps the old signal, value and all, until it is next evaluated — which
+    // for a result pane whose result went null is never. Dropping them here
+    // is what actually frees them.
+    this.data = Rows.empty;
+    this.#pending = [];
   }
 
   async #sendCancel() {

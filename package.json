@@ -12,8 +12,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p perf",
     "test": "bun test src",
+    "perf": "bun perf/run.ts",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -36,6 +37,7 @@
     "pino": "^10.3.1",
     "prettier": "^3.9.8",
     "prettier-plugin-svelte": "^4.1.1",
+    "puppeteer-core": "^25.11.0",
     "svelte": "^5.55.1",
     "svelte-check": "^4.4.6",
     "typescript": "^5.9.3",

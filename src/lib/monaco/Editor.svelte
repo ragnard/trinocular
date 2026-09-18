@@ -3,6 +3,7 @@
   // are monaco-global, and an instance script would re-register them on every
   // mount.
   import * as monaco from "monaco-editor";
+  import { MARK, mark } from "$lib/perfMarks";
   import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
   self.MonacoEnvironment = {
@@ -705,6 +706,7 @@
     });
 
     const contentListener = editor.onDidChangeModelContent(() => {
+      mark(MARK.editorChange);
       const model = editor?.getModel();
       if (!model) return;
       const owner = fileOfModel.get(model);

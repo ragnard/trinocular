@@ -16,6 +16,7 @@ bun run check            # Type-check with svelte-check
 bun run preview          # Preview production build
 bun run format           # Prettier over the tree (format:check only reports)
 bun run test             # bun's own runner over src/**/*.test.ts
+bun run perf             # browser performance scenarios against a running app (perf/)
 ```
 
 Tests are `bun test`, with no framework installed: the store contracts (`fileStore.test.ts` runs one suite against the memory and sqlite file stores, `sqliteSessionStore.test.ts`), and the save queue (`workspaceSaver.test.ts`, against a store whose promises the test settles by hand). A module under test must not import `$env/dynamic/private`, which only vite resolves — so the store implementations take plain options and import their interface `type`-only, and `fileStore.ts`/`sessionStore.ts` (which read the config) are the factories nothing tests.
@@ -136,6 +137,12 @@ Monaco Editor → runStatement() → Trino client (fetch, one per run) → serve
         kind: require-role
         role: finance
   ```
+
+### Performance scenarios (`perf/`)
+
+`bun run perf` is not a test: it drives the real app in headless Chromium (`puppeteer-core`, a devDependency) through scripted scenarios and reads the CPU profile and the trace the DevTools Performance panel would show, so a change to `Table`, `Rows`, `Result`, the inspector or the language package can be measured before and after (`--compare`). It needs a running app (`PERF_URL`) with a `tpch` catalog and `bun run check` type-checks it (`tsc -p perf`). A scenario (`perf/scenarios/`) drives a `Session` and hands back a reading of the `Trace`; the runner writes `trace.json`, one `.cpuprofile` per phase and a `summary.json` under `perf/out/<scenario>/`. Each scenario reports in its own unit — ms per page, per key, per selection — and makes *structural* checks (zero requests on a keystroke, no long task, the heap coming back), never absolute-millisecond ones: headless has no GPU, so paint is software raster, and wall time is a puppeteer round-trip per input event. Script, style and layout time are the same engine a user runs and are what the numbers mean.
+
+The app carries `performance.mark`s at the points the scenarios measure between (`src/lib/perfMarks.ts`: a page appended, a result settled, an editor edit, the inspector drawn). They cost microseconds and show as a track in anyone's DevTools. Three things the harness had to learn: **the profile charges each mark ~1ms** — with the timeline trace category on, Blink forces a profiler sample at every mark and the sample takes the whole interval since the last one, so `cpu.ts` drops the native `mark` frame rather than report a cost that is not there; **a puppeteer `ElementHandle` pins its element** on the DevTools side until disposed, and a Run strip's listener closure reaches its result, so `Session` clicks and waits in-page (`evaluate`, `waitForFunction`) and never holds a handle to the DOM, or a dropped result reads as retained; and **the dev server cannot pass the heap checks**, because Svelte's dev runtime (5.55) adds every batched source to a module-level `source_stacks` set that its `flush()` shadows instead of clearing, so under `vite dev` each run retains its predecessor — the `leak` scenario detects vite and skips its checks. Two things the scenarios found on first run and the code now reflects: a discarded `Result` drops its rows itself (`Result.discard`), since a dirty `$derived` in `Result.svelte` kept the old `data` signal, value and all, until it was next read — which for a pane whose result went null was never; and the generated `SqlBaseListener` declared ~1,100 optional handler fields that `useDefineForClassFields` turned into a thousand `undefined` own properties per instance, one instance per statement per parse, a third of every keystroke in a big file — the package's tsconfig now sets it `false`.
 
 ### Monaco language package
 
