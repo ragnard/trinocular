@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The wordmark stands where the logo will go.
   import Account from "./Account.svelte";
+  import logo from "$lib/assets/logo.svg";
   import { BUILD, describeBuild } from "$lib/build";
   import type { Branding } from "$lib/server/config";
 
@@ -15,7 +15,10 @@
 </script>
 
 <header class="rail topbar">
-  <span class="wordmark" title={describeBuild(BUILD)}>{branding.name}</span>
+  <span class="wordmark" title={describeBuild(BUILD)}>
+    <img class="logo" src={logo} alt="" />
+    {branding.name}
+  </span>
   <!-- The operator's HTML, from the config file. The CSP keeps a script in
        it from running; nothing else about it is checked. -->
   <div class="message ell">
@@ -40,10 +43,18 @@
   }
 
   .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
     letter-spacing: 0.01em;
     color: var(--fg);
     user-select: none;
+  }
+
+  .logo {
+    width: 20px;
+    height: 20px;
   }
 
   .message {
