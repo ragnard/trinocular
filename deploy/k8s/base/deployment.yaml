@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trinette
+spec:
+  # More than one replica needs `session.store.kind: valkey` in the config,
+  # or a login on one pod is a stranger to the next. A sqlite store holds an
+  # exclusive lock on its file and so also pins this to 1.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trinette
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trinette
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: trinette
+          image: ghcr.io/ragnard/trinette:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: TRINETTE_CONFIG
+              value: /etc/trinette/config.yaml
+          envFrom:
+            # ORIGIN, and anything else that is not a secret.
+            - configMapRef:
+                name: trinette-env
+            # What `${...}` in config.yaml refers to.
+            - secretRef:
+                name: trinette-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /etc/trinette
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: config
+          configMap:
+            name: trinette-config

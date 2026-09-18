@@ -128,6 +128,26 @@ The config file is JSON or YAML, named by the `TRINETTE_CONFIG` environment vari
 is validated at startup; anything invalid stops the server rather than letting it come up
 with half a policy.
 
+Any string value in it may refer to an environment variable as `${NAME}`, which is how
+a secret stays out of the file:
+
+```yaml
+session:
+  cookie:
+    secret: ${COOKIE_SECRET}
+authn:
+  kind: oidc
+  clientSecret: ${OIDC_CLIENT_SECRET}
+```
+
+The reference is resolved after the file is parsed and before it is validated, so a value
+is only ever a value — one holding a newline or a colon cannot add a key — and the schema
+judges what was substituted, not the placeholder. A variable that is not set stops the
+server, naming the path and the variable (never the value); a variable that is set but empty
+is an empty string, which the schema then accepts or refuses on its own terms. Keys are never
+expanded, and `$${NAME}` is the literal text. The file can name any variable the process
+can see, so it is exactly as trusted as the environment it runs in — which it already was.
+
 ### Environment variables
 
 | Variable | Required | Description |
@@ -450,6 +470,20 @@ To build it yourself:
 docker build -t trinette .                          # debian slim
 docker build -t trinette --target distroless .      # distroless
 ```
+
+### Kubernetes
+
+`deploy/k8s/` is a kustomize layout to start from: a base with the Deployment and Service,
+an Ingress as an opt-in component, and an example overlay holding the three things a
+deployment decides — the config file (as a ConfigMap), what its `${...}` references resolve
+to (as a Secret, from an env file) and the host. Copy the overlay, edit those, and
+
+```bash
+kubectl apply -k deploy/k8s/overlays/mine
+```
+
+[`deploy/k8s/README.md`](deploy/k8s/README.md) has the rest, including what the example
+leaves out (more than one replica, a sqlite volume).
 
 ### Health probes
 

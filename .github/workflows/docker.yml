@@ -70,6 +70,11 @@ jobs:
 
       - run: bun run format:check
 
+      # The example overlay has to keep building, or the one thing it is for —
+      # being copied — hands somebody a patch that no longer applies. kubectl is
+      # on the runner image already.
+      - run: kubectl kustomize deploy/k8s/overlays/example > /dev/null
+
   build:
     needs: [zizmor, test]
     runs-on: ubuntu-latest

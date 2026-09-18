@@ -3,6 +3,7 @@ import path from "path";
 import { z } from "zod";
 
 import { logger } from "./logging";
+import { expandEnv, MissingVariableError } from "./expandEnv";
 import { env } from "$env/dynamic/private";
 
 const CookieSchema = z.object({
@@ -322,6 +323,18 @@ function loadConfig(configPath?: string, trinoUrl?: string): Config {
   } catch (err) {
     logger.error(`Failed to read config from ${resolvedPath}: ${err}`);
     process.exit(1);
+  }
+
+  // On the parsed tree, before validation, so that the schema judges the values
+  // that will actually be used — a `${COOKIE_SECRET}` is not 32 characters.
+  try {
+    raw = expandEnv(raw, env);
+  } catch (err) {
+    if (err instanceof MissingVariableError) {
+      logger.error(`Config ${resolvedPath}: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
   }
 
   return validate(raw, resolvedPath);

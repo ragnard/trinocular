@@ -1,0 +1,48 @@
+# Copy this directory, then edit: config.yaml, secrets.env, and the host
+# below (twice — ORIGIN and the Ingress are the same address).
+#
+#   kubectl apply -k deploy/k8s/overlays/example
+#
+# Every generated name carries a hash of its contents and the Deployment is
+# rewritten to match, so a change to config.yaml or secrets.env rolls the pods
+# on the next apply.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trinette
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+components:
+  - ../../components/ingress
+
+images:
+  - name: ghcr.io/ragnard/trinette
+    newTag: latest
+
+configMapGenerator:
+  - name: trinette-config
+    files:
+      - config.yaml # the key is the file name, which is what TRINETTE_CONFIG names
+  - name: trinette-env
+    literals:
+      - ORIGIN=https://trinette.example.com
+
+secretGenerator:
+  - name: trinette-secrets
+    envs:
+      - secrets.env
+
+patches:
+  - target:
+      kind: Ingress
+      name: trinette
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: trinette.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: trinette.example.com

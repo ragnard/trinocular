@@ -1,0 +1,8 @@
+# An Ingress for the Service, TLS-terminated at the ingress controller. The
+# host is a placeholder the overlay patches — it is the same host as ORIGIN,
+# which is why both are set in the overlay, side by side.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - ingress.yaml

@@ -1,0 +1,32 @@
+# Trinette's config file, as documented in the README's "Configuration"
+# section. `${NAME}` is the environment variable NAME, resolved by the server
+# at startup — here, the keys of secrets.env, which land on the container via
+# `envFrom`. A reference to a variable that is not set stops the server rather
+# than reading as an empty string.
+
+session:
+  cookie:
+    secret: ${COOKIE_SECRET}
+
+authn:
+  kind: oidc
+  issuer: https://keycloak.example.com/realms/prod
+  clientId: trinette
+  clientSecret: ${OIDC_CLIENT_SECRET}
+  scope: openid profile email
+  claimsFrom: access_token # where Keycloak puts client roles by default
+
+authz:
+  kind: require-role
+  role: user # resource_access.trinette.roles must contain "user"
+
+# For a first look with no identity provider, in place of the two above:
+#
+# authn:
+#   kind: none
+#   user: alice
+
+connections:
+  warehouse:
+    name: Warehouse
+    uri: http://trino.data.svc.cluster.local:8080

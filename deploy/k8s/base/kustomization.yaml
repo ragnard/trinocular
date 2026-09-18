@@ -1,0 +1,10 @@
+# Not deployable on its own, on purpose: the Deployment names a ConfigMap
+# holding the config file, a ConfigMap holding ORIGIN and a Secret holding what
+# the config refers to, and none of them is here. An overlay generates all
+# three — see ../overlays/example.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
