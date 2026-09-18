@@ -32,9 +32,15 @@ const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
 function toTargetUrl(event: RequestEvent, target: Connection): string {
   const url = new URL("/" + (event.params.path ?? ""), target.uri);
   if (url.origin !== new URL(target.uri).origin) {
-    error(event.locals.logger, 400, "Invalid Trino API path", "trino API path left the target origin", {
-      origin: url.origin
-    });
+    error(
+      event.locals.logger,
+      400,
+      "Invalid Trino API path",
+      "trino API path left the target origin",
+      {
+        origin: url.origin
+      }
+    );
   }
   if (!ALLOWED_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     error(event.locals.logger, 400, "Invalid Trino API path", "invalid trino API path requested", {
@@ -85,7 +91,7 @@ const FORWARDED_REQUEST_HEADERS = new Set([
 
 function createUpstreamHeaders(event: RequestEvent, identity: Identity) {
   const headers: Record<string, string> = {
-    accept: "application/json",
+    accept: "application/json"
   };
   event.request.headers.forEach((value, name) => {
     if (FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) {
@@ -177,10 +183,16 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
     response = await fetch(url, {
       method: event.request.method,
       headers: headers,
-      body: requestBody,
+      body: requestBody
     });
   } catch (err) {
-    error(event.locals.logger, 502, "Failed to connect to upstream Trino server", "upstream request failed", { id, url, err });
+    error(
+      event.locals.logger,
+      502,
+      "Failed to connect to upstream Trino server",
+      "upstream request failed",
+      { id, url, err }
+    );
   }
 
   // Only a 200 JSON answer has URIs to rewrite. Everything else — a HEAD's

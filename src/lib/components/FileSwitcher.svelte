@@ -112,7 +112,9 @@
         >
           <FileText size={14} />
           <span class="name">{file.name}</span>
-          <span class="connection"><HardDrive size={12} />{workspace.connectionName(file.connectionId)}</span>
+          <span class="connection"
+            ><HardDrive size={12} />{workspace.connectionName(file.connectionId)}</span
+          >
         </button>
       {/each}
 

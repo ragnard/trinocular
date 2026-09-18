@@ -217,7 +217,12 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   const handleCallback = async (session: Session, event: RequestEvent) => {
     const callbackData = await session.get<OIDCCallbackData>("oidc-callback");
     if (!callbackData) {
-      error(event.locals.logger, 500, "Internal server error", "callback data missing from session");
+      error(
+        event.locals.logger,
+        500,
+        "Internal server error",
+        "callback data missing from session"
+      );
     }
 
     let tokens;
@@ -225,13 +230,13 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       tokens = await client.authorizationCodeGrant(config, event.url, {
         pkceCodeVerifier: callbackData.codeVerifier,
         expectedState: callbackData.state,
-        expectedNonce: callbackData.nonce,
+        expectedNonce: callbackData.nonce
       });
     } catch (e) {
       event.locals.logger.error({ error: e }, "OIDC token exchange failed");
       await session.take("oidc-callback");
       await session.set("auth-error", {
-        requestId: event.locals.requestId,
+        requestId: event.locals.requestId
       });
       redirect(303, errorPath);
     }
@@ -242,7 +247,8 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
     if (!hasValidUserId(sessionData.claims, opts.userIdClaim)) {
       error(
-        event.locals.logger, 403,
+        event.locals.logger,
+        403,
         "Authentication failed: ID token missing or invalid required claims",
         "auth failed: missing or invalid userId claim",
         { claims: sessionData.claims }

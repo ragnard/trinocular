@@ -555,9 +555,7 @@ export class Workspace {
    *  does not know it, or nothing at all when there are none to know. */
   connectionName(connectionId: string): string {
     return (
-      this.connections.find((c) => c.id === connectionId)?.name ||
-      connectionId ||
-      "No connection"
+      this.connections.find((c) => c.id === connectionId)?.name || connectionId || "No connection"
     );
   }
 

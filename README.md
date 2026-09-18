@@ -116,7 +116,7 @@ connections:
 See [Configuration](#configuration) for everything else.
 
 Other commands: `bun run build` (production build), `bun run preview`, `bun run check`
-(type-check).
+(type-check), `bun run format` (prettier).
 
 ## Configuration
 

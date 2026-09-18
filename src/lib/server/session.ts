@@ -139,7 +139,7 @@ export class InMemoryStore implements SessionStore {
   async save(sessionId: SessionID, data: SessionData, ttlSeconds: number): Promise<void> {
     this.#sessions.set(sessionId, {
       data: { ...data },
-      expiresAt: Date.now() + ttlSeconds * 1000,
+      expiresAt: Date.now() + ttlSeconds * 1000
     });
   }
 

@@ -1,12 +1,12 @@
-import * as monaco from 'monaco-editor';
-import type { DocumentParseService } from './documentParseService';
+import * as monaco from "monaco-editor";
+import type { DocumentParseService } from "./documentParseService";
 
-const PARSER_OWNER = 'trino-parser';
+const PARSER_OWNER = "trino-parser";
 const DEBOUNCE_MS = 300;
 
 function computeMarkers(
   model: monaco.editor.ITextModel,
-  parseService: DocumentParseService,
+  parseService: DocumentParseService
 ): monaco.editor.IMarkerData[] {
   const results = parseService.getParseResults(model);
   const markers: monaco.editor.IMarkerData[] = [];
@@ -20,9 +20,10 @@ function computeMarkers(
       const stmtLine0 = err.line - 1; // 0-based line within statement
       const docLine = stmtLine0 + stmt.startLine + 1; // 1-based document line
 
-      const col = stmtLine0 === 0
-        ? err.column + stmt.startCol + 1  // 1-based Monaco column
-        : err.column + 1;
+      const col =
+        stmtLine0 === 0
+          ? err.column + stmt.startCol + 1 // 1-based Monaco column
+          : err.column + 1;
 
       // Determine end position from the offending token if available
       let endLine = docLine;
@@ -40,7 +41,7 @@ function computeMarkers(
         endLineNumber: endLine,
         endColumn: endCol,
         message: err.message,
-        source: PARSER_OWNER,
+        source: PARSER_OWNER
       });
     }
   }
@@ -50,7 +51,7 @@ function computeMarkers(
 
 export function setupDiagnostics(
   model: monaco.editor.ITextModel,
-  parseService: DocumentParseService,
+  parseService: DocumentParseService
 ): monaco.IDisposable {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -72,6 +73,6 @@ export function setupDiagnostics(
       clearTimeout(timer);
       disposable.dispose();
       monaco.editor.setModelMarkers(model, PARSER_OWNER, []);
-    },
+    }
   };
 }

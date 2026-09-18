@@ -17,11 +17,7 @@ export class CatalogQueryError extends Error {
   }
 }
 
-async function collectColumn(
-  client: Trino,
-  sql: string,
-  column: number
-): Promise<string[]> {
+async function collectColumn(client: Trino, sql: string, column: number): Promise<string[]> {
   const iter = await client.query(sql);
   const result: string[] = [];
   for await (const chunk of iter) {
@@ -35,10 +31,7 @@ async function collectColumn(
   return result;
 }
 
-async function collectRows(
-  client: Trino,
-  sql: string
-): Promise<any[][]> {
+async function collectRows(client: Trino, sql: string): Promise<any[][]> {
   const iter = await client.query(sql);
   const result: any[][] = [];
   for await (const chunk of iter) {
@@ -122,7 +115,11 @@ export class CatalogCache {
     return this.#dedupe(
       `schemas:${catalog}`,
       async () => {
-        const rows = await collectColumn(this.#client, `SHOW SCHEMAS FROM ${qualifiedName(catalog)}`, 0);
+        const rows = await collectColumn(
+          this.#client,
+          `SHOW SCHEMAS FROM ${qualifiedName(catalog)}`,
+          0
+        );
         this.#schemas = new Map(this.#schemas).set(catalog, rows);
         return rows;
       },

@@ -83,7 +83,12 @@
     options?: monaco.editor.IStandaloneEditorConstructionOptions;
     metadataProvider?: MetadataProvider;
     markers?: monaco.editor.IMarkerData[];
-    onexecutesql?: (sql: string, startLine: number, anchorId: string, replacesResultId?: string) => void;
+    onexecutesql?: (
+      sql: string,
+      startLine: number,
+      anchorId: string,
+      replacesResultId?: string
+    ) => void;
     onshowresult?: (result: Result) => void;
     oncancelresult?: (result: Result) => void;
     onchange?: (content: string) => void;
@@ -204,7 +209,10 @@
     if (!activeFile || !editor) return;
     let model = models.get(activeFile);
     if (!model) {
-      model = monaco.editor.createModel(untrack(() => activeFile.content), "trino-sql");
+      model = monaco.editor.createModel(
+        untrack(() => activeFile.content),
+        "trino-sql"
+      );
       models.set(activeFile, model);
       fileOfModel.set(model, activeFile);
     }
@@ -417,8 +425,7 @@
     const opts = monaco.editor.EditorOption;
     const editorFontSize = editor?.getOption(opts.fontSize) ?? 14;
     const lineHeight = editor?.getOption(opts.lineHeight) ?? 19;
-    const fontSize =
-      editor?.getOption(opts.codeLensFontSize) || Math.floor(editorFontSize * 0.9);
+    const fontSize = editor?.getOption(opts.codeLensFontSize) || Math.floor(editorFontSize * 0.9);
     const factor = Math.max(1.3, lineHeight / editorFontSize);
     return { fontSize, height: Math.floor(fontSize * factor) };
   }
@@ -635,7 +642,12 @@
     for (const toolbar of toolbars) editor.layoutContentWidget(toolbar.widget);
   }
 
-  function runRange(model: monaco.editor.ITextModel, range: monaco.IRange, sql: string, startLine: number) {
+  function runRange(
+    model: monaco.editor.ITextModel,
+    range: monaco.IRange,
+    sql: string,
+    startLine: number
+  ) {
     if (!onexecutesql || !editor) return;
     const owner = fileOfModel.get(model);
     if (!owner) return;
@@ -649,7 +661,10 @@
     onexecutesql(sql, startLine, anchorId, replacesId);
   }
 
-  function runStatement(model: monaco.editor.ITextModel, editor: monaco.editor.IStandaloneCodeEditor) {
+  function runStatement(
+    model: monaco.editor.ITextModel,
+    editor: monaco.editor.IStandaloneCodeEditor
+  ) {
     const selection = editor.getSelection();
     if (selection && !selection.isEmpty()) {
       runRange(model, selection, model.getValueInRange(selection), selection.startLineNumber);

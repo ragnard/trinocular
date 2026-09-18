@@ -1,10 +1,10 @@
-import { CharStream } from 'antlr4ng';
-import { SqlBaseLexer } from '../parser/SqlBaseLexer';
+import { CharStream } from "antlr4ng";
+import { SqlBaseLexer } from "../parser/SqlBaseLexer";
 
 export interface StatementSlice {
   text: string;
-  startLine: number;  // 0-based line in the document
-  startCol: number;   // 0-based column in the document
+  startLine: number; // 0-based line in the document
+  startCol: number; // 0-based column in the document
   /** Byte offset of the first character in the original document */
   startOffset: number;
   /** Byte offset one past the last character */
@@ -15,7 +15,7 @@ function offsetToLineCol(text: string, offset: number): { line: number; col: num
   let line = 0;
   let lastNewline = -1;
   for (let i = 0; i < offset; i++) {
-    if (text[i] === '\n') {
+    if (text[i] === "\n") {
       line++;
       lastNewline = i;
     }
@@ -48,7 +48,7 @@ export function splitStatements(text: string): StatementSlice[] {
         startLine: line,
         startCol: col,
         startOffset: lastSplitOffset,
-        endOffset,
+        endOffset
       });
       lastSplitOffset = endOffset;
     }
@@ -64,7 +64,7 @@ export function splitStatements(text: string): StatementSlice[] {
         startLine: line,
         startCol: col,
         startOffset: lastSplitOffset,
-        endOffset: text.length,
+        endOffset: text.length
       });
     }
   }
