@@ -1,14 +1,13 @@
 /**
  * The workspace in this browser's localStorage: the `WorkspaceStore` a
  * deployment without a server file store uses, and where the server store
- * imports from on its first visit.
+ * imports from, dropping each document here once the server holds it.
  *
  * One key per file:
  *
  *     trinette:workspace:<workspaceId>:file:<fileId>   {id, name, content, connectionId,
  *                                                       viewFormats}
  *     trinette:workspace:<workspaceId>:ui              {activeFileId, order}
- *     trinette:workspace:<workspaceId>:imported        set once the server has them
  *
  * It used to be a single `:files` key holding every document, which made three
  * separate failures share one fate. A parse error lost the whole workspace
@@ -46,7 +45,6 @@ const prefix = (workspaceId: string) => `trinette:workspace:${workspaceId}:`;
 const filePrefix = (workspaceId: string) => `${prefix(workspaceId)}file:`;
 const fileKey = (workspaceId: string, fileId: string) => filePrefix(workspaceId) + fileId;
 const uiKey = (workspaceId: string) => `${prefix(workspaceId)}ui`;
-const importedKey = (workspaceId: string) => `${prefix(workspaceId)}imported`;
 
 /** The file id a storage key names, or null if the key is not a file of this
  *  workspace. Used to read the `storage` event, which hands over a key. */
@@ -96,16 +94,11 @@ export function loadWorkspace(workspaceId: string): LoadedWorkspace {
   return { files: orderFiles(files, ui), activeFileId: ui?.activeFileId };
 }
 
-/** Whether this browser's documents have been handed to the server already.
- *  Once per browser, not per account: another browser of the same person has
- *  its own localStorage and its own documents to bring. */
-export function markImported(workspaceId: string, imported = true): boolean {
+/** Drops one document from this browser, once the server holds it. */
+export function removeLocalFile(workspaceId: string, fileId: string): void {
   try {
-    if (imported) localStorage.setItem(importedKey(workspaceId), "1");
-    return localStorage.getItem(importedKey(workspaceId)) !== null;
-  } catch {
-    return false;
-  }
+    localStorage.removeItem(fileKey(workspaceId, fileId));
+  } catch {}
 }
 
 export class LocalWorkspaceStore implements WorkspaceStore {
