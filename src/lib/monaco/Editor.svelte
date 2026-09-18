@@ -3,7 +3,7 @@
   // are monaco-global, and an instance script would re-register them on every
   // mount.
   import * as monaco from "monaco-editor";
-  import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+  import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
 
   self.MonacoEnvironment = {
     getWorker: () => new editorWorker()
