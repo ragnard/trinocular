@@ -15,12 +15,21 @@
 </script>
 
 <header class="rail topbar">
+  <!-- The icon and the message are the operator's HTML, from the config
+       file. The CSP keeps a script in them from running; nothing else about
+       them is checked. -->
   <span class="wordmark" title={describeBuild(BUILD)}>
-    <img class="logo" src={logo} alt="" />
+    {#if branding.icon !== ""}
+      <span class="logo">
+        {#if branding.icon === undefined}
+          <img src={logo} alt="" />
+        {:else}
+          {@html branding.icon}
+        {/if}
+      </span>
+    {/if}
     {branding.name}
   </span>
-  <!-- The operator's HTML, from the config file. The CSP keeps a script in
-       it from running; nothing else about it is checked. -->
   <div class="message ell">
     {#if branding.message}{@html branding.message}{/if}
   </div>
@@ -52,9 +61,20 @@
     user-select: none;
   }
 
+  /* Whatever the operator put in the box is held to the box: CSS outranks
+     an svg's own width/height attributes, and overflow catches the rest. */
   .logo {
+    flex: none;
     width: 20px;
     height: 20px;
+    overflow: hidden;
+  }
+
+  .logo > :global(svg),
+  .logo > :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   .message {

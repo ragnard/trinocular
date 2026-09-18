@@ -144,12 +144,14 @@ with half a policy.
 ```yaml
 branding:
   name: Warehouse SQL
+  icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="#0e65eb"/></svg>'
   message: 'Questions? <a href="https://wiki.example/trino">#data-help</a>'
 ```
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `name` | `Trinocular` | The name shown at the top left of the window. |
+| `icon` | the bundled logo | HTML drawn before the name, in a 20 × 20 px box that whatever it holds is scaled and clipped to: an inline `<svg>`, or an `<img>` with a `data:` URL — the content security policy lets images come from nowhere else. Rendered as written, like `message`. An empty string shows no icon at all. |
 | `message` | — | HTML shown in the middle of the top bar: a notice, a link to where help is. It is rendered as written, so it is only ever yours; a `<script>` in it does not run, because the app's content security policy allows none. |
 
 ### `session`
