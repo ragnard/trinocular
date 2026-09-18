@@ -349,7 +349,7 @@
 <div class="browser">
   <div class="rail">
     <Globe size={14} />
-    <span class="ell title">Data browser</span>
+    <span class="ell fill">Data browser</span>
   </div>
 
   <FilterBox bind:value={filter} label="Filter schema" />
@@ -391,9 +391,9 @@
       {/snippet}
     </TreeView>
     {#if loadError}
-      <div class="hint error">Could not list catalogs: {loadError}</div>
+      <div class="hint small warn">Could not list catalogs: {loadError}</div>
     {:else if filtering}
-      <div class="hint">
+      <div class="hint meta">
         {visible.length === 0 ? "Nothing loaded matches." : "Filtering what is loaded."}
         Expand a catalog to fetch more.
       </div>
@@ -404,8 +404,8 @@
        drawn only while the row is open, and a statement is asked for from a
        closed one as often as not. -->
   {#if actionError}
-    <div class="notice">
-      <span>{actionError}</span>
+    <div class="notice small warn">
+      <span class="fill">{actionError}</span>
       <button class="chip square" title="Dismiss" onclick={() => (actionError = null)}>
         <X size={12} />
       </button>
@@ -437,14 +437,6 @@
     background: var(--s1);
   }
 
-  .rail :global(svg) {
-    color: var(--fg-3);
-  }
-
-  .title {
-    flex: 1;
-  }
-
   /* Body text, not `.meta`. This names the cluster every row in the tree below
      belongs to, which is the same weight of fact as the tree itself — at
      `--text-sm` it read as a caption on the filter above it instead. Muted, so
@@ -468,13 +460,6 @@
 
   .hint {
     padding: 8px;
-    color: var(--fg-3);
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
-  }
-
-  .hint.error {
-    color: var(--error);
   }
 
   .notice {
@@ -484,14 +469,6 @@
     flex: none;
     padding: 6px 8px 8px 12px;
     border-top: 1px solid var(--line);
-    color: var(--error);
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
     overflow-wrap: anywhere;
-  }
-
-  .notice span {
-    flex: 1;
-    min-width: 0;
   }
 </style>

@@ -76,7 +76,7 @@
     {#if result}
       <span class="dot" class:failed={!!result.error} class:running={result.running}></span>
       <span>{result.rowCount ?? 0} rows</span>
-      <span class="sep">&middot;</span>
+      <span class="muted">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
     {:else}
       <span class="soft">No result</span>
@@ -97,6 +97,7 @@
       </button>
       {#if limitRows}
         <input
+          class="field"
           type="text"
           inputmode="numeric"
           pattern="[0-9]*"
@@ -130,7 +131,7 @@
       {#if errorText.total}
         <p class="note meta">
           Showing {ERROR_LIMIT.toLocaleString()} of {errorText.total.toLocaleString()} characters
-          <button class="more" onclick={() => (expanded = result)}>Show more</button>
+          <button class="link" onclick={() => (expanded = result)}>Show more</button>
         </p>
       {/if}
       <p class="meta">
@@ -150,7 +151,7 @@
       <!-- In place of the progress strip: nothing is polled while held, so
            the stats it would draw from stop moving. -->
       <div class="notice">
-        <span class="text">
+        <span class="fill">
           Showing the first {formatCount(result.rowCount)} rows. More are available; the query is paused
           on the cluster.
         </span>
@@ -163,7 +164,7 @@
     {:else if result.stopped === "expired"}
       <!-- A stop the reader asked for needs no notice; one they did not does. -->
       <div class="notice">
-        <span class="text">
+        <span class="fill">
           Showing the first {formatCount(result.rowCount)} rows. The query was stopped after being paused
           for {MAX_HOLD_MS / 60_000} minutes; run it again to fetch more.
         </span>
@@ -213,24 +214,12 @@
     background: var(--s0);
   }
 
-  .fill {
-    flex: 1;
-  }
-
-  .sep {
-    color: var(--fg-3);
-  }
-
   .soft {
     color: var(--fg-2);
   }
 
   /* Three states, one shape: idle, running, failed. */
   .dot {
-    width: 7px;
-    height: 7px;
-    flex: none;
-    border-radius: 50%;
     background: var(--ok);
   }
 
@@ -273,11 +262,6 @@
     color: var(--fg-2);
   }
 
-  .notice .text {
-    flex: 1;
-    min-width: 0;
-  }
-
   .notice .chip {
     flex: none;
   }
@@ -307,15 +291,6 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-  }
-
-  .note .more {
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
   }
 
   /* The extension is the answer to "what will the file be called", so it sits

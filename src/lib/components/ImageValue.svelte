@@ -89,8 +89,4 @@
     display: block;
     margin-top: 4px;
   }
-
-  .warn {
-    color: var(--error);
-  }
 </style>

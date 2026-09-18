@@ -62,7 +62,7 @@
             {#if icon}{@render icon(node)}{/if}
             <span class="node-label">{node.label}</span>
             {#if node.detail}
-              <span class="node-detail">{node.detail}</span>
+              <span class="node-detail meta">{node.detail}</span>
             {/if}
           </button>
           {#if actions}
@@ -80,7 +80,7 @@
             {#if icon}{@render icon(node)}{/if}
             <span class="node-label">{node.label}</span>
             {#if node.detail}
-              <span class="node-detail">{node.detail}</span>
+              <span class="node-detail meta">{node.detail}</span>
             {/if}
           </button>
           {#if actions}
@@ -99,7 +99,7 @@
           {/if}
         </div>
         {#if isOpen && node.error}
-          <div class="node-error">{node.error}</div>
+          <div class="node-error small warn">{node.error}</div>
         {/if}
         {#if isOpen && node.children && node.children.length > 0}
           <TreeView
@@ -220,9 +220,6 @@
 
   .node-error {
     padding: 2px 8px 6px 46px;
-    color: var(--error);
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
     white-space: normal;
     overflow-wrap: anywhere;
   }
@@ -237,15 +234,14 @@
     flex: none;
     margin-left: auto;
     padding-left: 8px;
-    color: var(--fg-3);
-    font-size: var(--text-sm);
   }
 
-  :global(.toggle) {
+  /* Scoped under the row: `.toggle` is too plain a name to own globally. */
+  .label :global(.toggle) {
     transition: transform 0.12s ease;
   }
 
-  :global(.toggle.open) {
+  .label :global(.toggle.open) {
     transform: rotate(90deg);
   }
 </style>

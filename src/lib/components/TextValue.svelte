@@ -50,7 +50,7 @@
         {#if expanded}&mdash; copy for the whole value{/if}
       </span>
       {#if !expanded}
-        <button class="more" onclick={() => (expandedFor = text)}>Show more</button>
+        <button class="link" onclick={() => (expandedFor = text)}>Show more</button>
       {/if}
     {/if}
   </p>
@@ -74,18 +74,5 @@
     align-items: baseline;
     gap: 4px 8px;
     margin: 4px 0 0;
-  }
-
-  .warn {
-    color: var(--error);
-  }
-
-  .more {
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
   }
 </style>

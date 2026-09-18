@@ -13,7 +13,7 @@
   let { branding, userId, logoutPath }: Props = $props();
 </script>
 
-<header class="topbar">
+<header class="rail topbar">
   <span class="wordmark">{branding.name}</span>
   <!-- The operator's HTML, from the config file. The CSP keeps a script in
        it from running; nothing else about it is checked. -->
@@ -26,16 +26,16 @@
 </header>
 
 <style>
+  /* A rail on the page's own surface, set off by a rule twice a hairline:
+     a shadow and then a fade were tried and both read as one more hairline.
+     Grid rather than flex so the message centres on the window, not between
+     its neighbours. */
   .topbar {
     display: grid;
     grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    height: var(--h-rail);
-    padding: 0 6px 0 12px;
+    padding-right: 6px;
     background: var(--s0);
-    border-bottom: 2px solid var(--line-strong);
+    border-bottom-width: 2px;
   }
 
   .wordmark {

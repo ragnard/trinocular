@@ -62,16 +62,6 @@
 
   .filter input {
     flex: 1;
-    min-width: 0;
-    height: auto;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
     color: var(--fg);
-  }
-
-  .filter input:focus-visible {
-    outline: none;
   }
 </style>

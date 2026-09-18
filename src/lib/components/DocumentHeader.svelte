@@ -85,16 +85,6 @@
     background: var(--line-strong);
   }
 
-  .fill {
-    flex: 1;
-  }
-
-  /* The menu around these rows belongs to `Dropdown`, so what the rows say
-     about themselves is all this component can style. */
-  button.selected {
-    color: var(--accent);
-  }
-
   button.danger:hover {
     color: var(--error);
   }

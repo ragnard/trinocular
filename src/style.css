@@ -96,7 +96,7 @@ html {
 
 /* --- The handful of primitives every pane repeats ------------------------ */
 
-/* The 36px band across the top of every pane. */
+/* The 36px band across the top of every pane. Its own icons are furniture. */
 .rail {
   display: flex;
   align-items: center;
@@ -106,6 +106,18 @@ html {
   padding: 0 12px;
   background: var(--s1);
   border-bottom: 1px solid var(--line-strong);
+}
+
+.rail > svg {
+  flex: none;
+  color: var(--fg-3);
+}
+
+/* Takes whatever room a flex row has left: what pushes a rail's controls to
+   its far edge, or a document header's copy button off its title. */
+.fill {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Anything clickable that lives in a rail: chips, toggles, icon buttons. */
@@ -183,10 +195,49 @@ html {
   background: var(--line-strong);
 }
 
+/* The row that is the current choice, in a menu of choices. */
+.menu .selected {
+  color: var(--accent);
+}
+
+/* The small text size on its own, for what is small but not muted: an error
+   under a tree row, a chart's axis, a stage table. */
+.small {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* Small and muted: captions, hints, types, row numbers. */
 .meta {
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
   color: var(--fg-3);
+}
+
+.muted {
+  color: var(--fg-3);
+}
+
+.warn {
+  color: var(--error);
+}
+
+/* A button that reads as a link, inline in a sentence: "Show more". */
+.link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A 7px status dot; the caller colours it. */
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 .ell {
@@ -208,17 +259,32 @@ kbd {
   font: var(--text-sm) / 1 var(--font);
 }
 
+/* A bare text input is unstyled: most of them sit inside a box that draws
+   the border and shows the focus (the filter box, the file switcher), and
+   an input that arrived bordered had to be undressed by each of those. The
+   one that stands alone wears `.field`. */
 input[type="text"] {
   appearance: none;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+input[type="text"]:focus-visible {
+  outline: none;
+}
+
+.field {
   height: var(--h-ctl);
   padding: 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
   background: var(--s0);
-  color: inherit;
 }
 
-input[type="text"]:focus-visible,
+.field:focus-visible,
 button:focus-visible,
 [tabindex]:focus-visible {
   outline: 1px solid var(--accent);
