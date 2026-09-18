@@ -138,10 +138,12 @@ bun run perf --compare perf/out.before perf/out  # two runs side by side
 ```
 
 `PERF_CHROME` names the browser if it is not `chromium-browser`, `chromium` or `google-chrome`
-on the path; `--out <dir>` picks where the traces go (`perf/out` by default). Each scenario
+on the path, and `--out <dir>` picks where the traces go (`perf/out` by default). Each scenario
 leaves a `trace.json` the DevTools Performance panel can load, a `.cpuprofile` per phase, and a
 `summary.json` that `--compare` reads. The heap checks only mean something against
-`bun run build`: Svelte's dev runtime retains every result, and the scenario says so.
+`bun run build`: Svelte's dev runtime retains every result, and the scenario says so. The
+harness is type-checked by `bun run check:perf`, on its own — it is ad hoc tooling, not part of
+`check` or CI.
 
 ## Configuration
 

@@ -14,11 +14,9 @@
 !src/
 !static/
 !packages/
-!perf/
 
 # Re-exclude build state nested inside the allowed trees.
 **/node_modules
 **/.svelte-kit
 **/dist
 **/*.timestamp-*
-perf/out
