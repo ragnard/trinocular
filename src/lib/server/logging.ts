@@ -94,9 +94,9 @@ export const LoggingHandler: () => Promise<Handle> = async () => {
         );
       } else {
         // `error`, unlike the two branches above. This is the one that was not
-        // thrown deliberately: an HttpError has already been logged at error
-        // level by the `error()` helper that threw it, and a redirect is not a
-        // failure at all. Reached only by something thrown by a handler in the
+        // thrown deliberately: an HttpError has already been logged, at the
+        // level its status earns, by the `error()` helper that threw it, and a
+        // redirect is not a failure at all. Reached only by something thrown by a handler in the
         // sequence itself — a route's own exception is caught by SvelteKit
         // before it gets here, which is what `handleError` is for.
         requestIdLogger.error(

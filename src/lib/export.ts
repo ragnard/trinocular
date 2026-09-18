@@ -7,7 +7,8 @@
  * A format is one entry in `EXPORT_FORMATS`. The menu is drawn from that list,
  * so adding ndjson later is a serializer and an entry, and nothing in the UI.
  */
-import type { DataType, Dictionary, Field, Struct } from "./components/table/types";
+import { isDictionary, isList, isStruct } from "./components/table/types";
+import type { DataType, Field } from "./components/table/types";
 
 export interface ExportFormat {
   id: string;
@@ -26,14 +27,6 @@ export interface ExportFormat {
   serialize(fields: Field[], rows: Iterable<readonly unknown[]>): string;
 }
 
-function isStruct(dataType: DataType): dataType is Struct {
-  return typeof dataType === "object" && !Array.isArray(dataType) && "fields" in dataType;
-}
-
-function isDictionary(dataType: DataType): dataType is Dictionary {
-  return typeof dataType === "object" && !Array.isArray(dataType) && "key" in dataType;
-}
-
 /**
  * A structured value shaped for JSON. Trino sends a row as an *array* of its
  * field values, so the names only exist in the type — putting them back is the
@@ -49,7 +42,7 @@ function toJson(value: unknown, dataType: DataType): unknown {
       dataType.fields.map((field, i) => [field.name, toJson(value[i], field.dataType)])
     );
   }
-  if (Array.isArray(dataType) && Array.isArray(value)) {
+  if (isList(dataType) && Array.isArray(value)) {
     return value.map((element) => toJson(element, dataType[0]));
   }
   if (isDictionary(dataType) && typeof value === "object") {

@@ -25,6 +25,14 @@ export interface Dictionary {
 
 export type DataType = "string" | "integer" | "binary" | Struct | List | Dictionary;
 
+export const isStruct = (dataType: DataType): dataType is Struct =>
+  typeof dataType === "object" && !Array.isArray(dataType) && "fields" in dataType;
+
+export const isList = (dataType: DataType): dataType is List => Array.isArray(dataType);
+
+export const isDictionary = (dataType: DataType): dataType is Dictionary =>
+  typeof dataType === "object" && !Array.isArray(dataType) && "key" in dataType;
+
 export type ValueConverter = (value: any, field: Field, colIndex: number) => any;
 
 export interface SelectionData {
