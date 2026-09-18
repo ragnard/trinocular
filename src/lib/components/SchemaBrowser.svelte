@@ -63,6 +63,8 @@
     kind: NodeKind;
     /** Only the three levels that live on the cluster have anything to fetch. */
     load?: (fresh?: boolean) => Promise<unknown>;
+    /** The cache's key for that fetch, where `loading` and `errors` record it. */
+    key?: string;
     /** The parts of a table's name, for the statements written about it. */
     table?: TableRef;
   }
@@ -73,12 +75,16 @@
    * and which stopped meaning anything at all once a column's own fields hang
    * below it at no fixed depth. Saying it once, here, where the node is built,
    * is the only version that cannot drift from what was built.
+   *
+   * Built from what the cache *holds* and nothing else. It used to read the
+   * cache's `loading` and `errors` too, and write them onto the nodes, which
+   * made a spinner starting on one row rebuild every node under every catalog
+   * and re-parse every loaded column's type on the way — a cost paid per
+   * click, per reload, and per completion that touched the cache, growing
+   * with everything you had ever opened. Status is `status`, below.
    */
   let tree: { nodes: TreeNode[]; meta: Map<string, NodeMeta> } = $derived.by(() => {
     const cache = workspace.catalog;
-    const loading = cache.loading;
-    const errors = cache.errors;
-    const working = busy;
     const meta = new Map<string, NodeMeta>();
 
     /**
@@ -109,39 +115,35 @@
     const nodes = cache.catalogs.map((catalog) => {
       meta.set(catalog, {
         kind: "catalog",
-        load: (fresh) => cache.loadSchemas(catalog, fresh)
+        load: (fresh) => cache.loadSchemas(catalog, fresh),
+        key: `schemas:${catalog}`
       });
       return {
         id: catalog,
         label: catalog,
-        loading: loading.has(`schemas:${catalog}`),
-        error: errors.get(`schemas:${catalog}`),
         reloadable: true,
         children: cache.getSchemas(catalog).map((schema) => {
           const schemaId = `${catalog}${SEP}${schema}`;
           meta.set(schemaId, {
             kind: "schema",
-            load: (fresh) => cache.loadTables(catalog, schema, fresh)
+            load: (fresh) => cache.loadTables(catalog, schema, fresh),
+            key: `tables:${catalog}.${schema}`
           });
           return {
             id: schemaId,
             label: schema,
-            loading: loading.has(`tables:${catalog}.${schema}`),
-            error: errors.get(`tables:${catalog}.${schema}`),
             reloadable: true,
             children: cache.getTables(catalog, schema).map((table) => {
               const tableId = `${schemaId}${SEP}${table}`;
               meta.set(tableId, {
                 kind: "table",
                 load: (fresh) => cache.loadColumns(catalog, schema, table, fresh),
+                key: `columns:${catalog}.${schema}.${table}`,
                 table: { catalog, schema, table }
               });
               return {
                 id: tableId,
                 label: table,
-                loading:
-                  loading.has(`columns:${catalog}.${schema}.${table}`) || working.has(tableId),
-                error: errors.get(`columns:${catalog}.${schema}.${table}`),
                 reloadable: true,
                 children: cache.getColumns(catalog, schema, table).map((col) => {
                   const colId = `${tableId}${SEP}${col.name}`;
@@ -166,6 +168,25 @@
 
   let nodes: TreeNode[] = $derived(tree.nodes);
   let meta: Map<string, NodeMeta> = $derived(tree.meta);
+
+  /**
+   * Which nodes are fetching and which last failed, by node id: the cache's
+   * keys translated through `meta`, plus the table rows with a statement on
+   * the way. A walk over the ids and nothing more, so it is what a status
+   * change costs.
+   */
+  let status: { loading: Set<string>; errors: Map<string, string> } = $derived.by(() => {
+    const cache = workspace.catalog;
+    const loading = new Set<string>();
+    const errors = new Map<string, string>();
+    for (const [id, node] of meta) {
+      if (!node.key) continue;
+      if (cache.loading.has(node.key) || busy.has(id)) loading.add(id);
+      const error = cache.errors.get(node.key);
+      if (error) errors.set(id, error);
+    }
+    return { loading, errors };
+  });
 
   /**
    * Narrows what is already on screen — it never asks the cluster for more.
@@ -364,7 +385,14 @@
   </div>
 
   <div class="tree">
-    <TreeView nodes={visible} expanded={open} ontoggle={handleToggle} onreload={handleReload}>
+    <TreeView
+      nodes={visible}
+      expanded={open}
+      loading={status.loading}
+      errors={status.errors}
+      ontoggle={handleToggle}
+      onreload={handleReload}
+    >
       {#snippet actions(node)}
         {#if meta.get(node.id)?.kind === "table"}
           <button

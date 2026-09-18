@@ -121,6 +121,29 @@ function splitFieldName(arg: string): { name: string | null; type: string } {
  * one indent further right for no information.
  */
 export function typeChildren(type: string): TypeField[] {
+  let children = childrenOf.get(type);
+  if (!children) {
+    children = parseChildren(type);
+    // Bounded, so a session that browses a great many distinct types cannot
+    // grow it without limit; a miss after a clear is one parse.
+    if (childrenOf.size >= CHILDREN_CACHE_LIMIT) childrenOf.clear();
+    childrenOf.set(type, children);
+  }
+  return children;
+}
+
+/**
+ * Parsed once per distinct type string. The schema browser rebuilds its tree
+ * whenever the cache learns something — a table's columns landing, say — and
+ * every column already on screen is parsed again on the way; most of a cluster
+ * shares a few hundred type strings, so this is the difference between a
+ * rebuild that parses and one that looks up. The arrays are handed out shared,
+ * and nobody writes to them.
+ */
+const childrenOf = new Map<string, TypeField[]>();
+const CHILDREN_CACHE_LIMIT = 10_000;
+
+function parseChildren(type: string): TypeField[] {
   const { base, args } = decompose(type);
   if (args === null || args.trim() === "") return [];
 
