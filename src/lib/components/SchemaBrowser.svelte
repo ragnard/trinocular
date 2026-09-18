@@ -374,7 +374,9 @@
     <span class="ell fill">Data browser</span>
   </div>
 
-  <FilterBox bind:value={filter} label="Filter schema" />
+  <div class="filter">
+    <FilterBox bind:value={filter} label="Filter schema" />
+  </div>
 
   <!-- Says what the tree is. The connection also appears in the document
        header, where it says what the file runs on; sitting on one band the
@@ -466,6 +468,14 @@
     flex-direction: column;
     height: 100%;
     background: var(--s1);
+  }
+
+  /* The same padding as the inspector's filter row, so the two line up
+     across the window. */
+  .filter {
+    display: flex;
+    flex: none;
+    padding: 6px;
   }
 
   /* Body text, not `.meta`. This names the cluster every row in the tree below

@@ -3,6 +3,7 @@
   import type { Selection, SelectionData, Field } from "./table/types";
   import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
+  import FilterBox from "./FilterBox.svelte";
   import {
     DEFAULT_FORMAT,
     formatsFor,
@@ -92,7 +93,7 @@
     onstep(delta, event.shiftKey && !expanded);
   }
 
-  let fieldInput: HTMLInputElement | undefined = $state();
+  let fieldInput: FilterBox | undefined = $state();
 
   $effect(() => {
     if (expanded) void tick().then(() => fieldInput?.focus());
@@ -260,15 +261,6 @@
   let fieldFilter = $state("");
   let valueFilter = $state("");
 
-  function clearOnEscape(event: KeyboardEvent) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (event.key === "Escape" && input.value) {
-      event.preventDefault();
-      if (input === fieldInput) fieldFilter = "";
-      else valueFilter = "";
-    }
-  }
-
   /** A case-insensitive regex, or null for an empty box or one that will not
    *  compile — which is shown on the box, and filters nothing meanwhile. */
   function compile(source: string): RegExp | null {
@@ -434,30 +426,20 @@
 
   <div class="filters">
     <span class="key">
-      <input
-        type="text"
-        class="textbox"
+      <FilterBox
         bind:this={fieldInput}
         bind:value={fieldFilter}
-        placeholder="Filter…"
-        spellcheck="false"
-        aria-label="Filter fields"
-        aria-invalid={fieldInvalid}
+        label="Filter fields"
+        invalid={fieldInvalid}
         title={fieldInvalid ? "Not a valid regular expression" : "Regular expression"}
-        onkeydown={clearOnEscape}
       />
     </span>
     <span class="value">
-      <input
-        type="text"
-        class="textbox"
+      <FilterBox
         bind:value={valueFilter}
-        placeholder="Filter…"
-        spellcheck="false"
-        aria-label="Filter values"
-        aria-invalid={valueInvalid}
+        label="Filter values"
+        invalid={valueInvalid}
         title={valueInvalid ? "Not a valid regular expression" : "Regular expression"}
-        onkeydown={clearOnEscape}
       />
     </span>
   </div>
@@ -578,8 +560,18 @@
   .filters {
     flex: none;
     align-items: center;
-    height: var(--h-rail);
     border-bottom: 1px solid var(--line-strong);
+  }
+
+  .header {
+    height: var(--h-rail);
+  }
+
+  /* Tighter at the sides than the header, with the key track widened by the
+     difference so the separator stays under the header's. */
+  .filters {
+    grid-template-columns: calc(var(--key) + 6px) minmax(0, 1fr);
+    padding: 6px;
   }
 
   .header .key,
@@ -595,12 +587,13 @@
     color: var(--fg);
   }
 
-  .filters .value {
-    display: flex;
+  .filters .key {
+    padding-right: 6px;
   }
 
-  .filters input {
-    flex: 1;
+  .filters .value {
+    display: flex;
+    padding-left: 6px;
   }
 
   .resize-handle {
