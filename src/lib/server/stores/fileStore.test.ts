@@ -3,9 +3,11 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import type { FileStore, PutResult } from "./fileStore";
-import { InMemoryFileStore } from "./memoryFileStore";
-import { SqliteFileStore } from "./sqliteFileStore";
+import type { FileStore, PutResult } from "../fileStore";
+import { InMemoryFileStore } from "./memory/fileStore";
+import { SqliteFileStore } from "./sqlite/fileStore";
+import { silent, testValkey } from "./testValkey";
+import { ValkeyFileStore } from "./valkey/fileStore";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinette-files-"));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -120,5 +122,27 @@ describe("sqlite", () => {
     const second = SqliteFileStore.create({ kind: "sqlite", path: own });
     expect((await second.list("u")).files.map((f) => f.id)).toEqual(["a"]);
     await second.dispose();
+  });
+});
+
+const valkey = testValkey();
+describe.skipIf(valkey === null)("valkey", () => {
+  let store: ValkeyFileStore | undefined;
+  const open = async () =>
+    (store ??= await ValkeyFileStore.create(
+      { kind: "valkey", ...valkey!.connection, keyPrefix: valkey!.keyPrefix },
+      silent
+    ));
+  afterAll(() => store?.dispose());
+
+  contract("valkey", open);
+
+  test("versions are never reused once a document is removed", async () => {
+    const s = await open();
+    const first = await saved(s.put("u", file("a"), null));
+    await s.remove("u", "a");
+    const again = await saved(s.put("u", file("a"), null));
+    expect(again).not.toBe(first);
+    expect(await s.put("u", file("a", "stale"), first)).toMatchObject({ status: "conflict" });
   });
 });

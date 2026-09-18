@@ -34,10 +34,13 @@ const ValkeyTlsSchema = z.union([
   })
 ]);
 
-const ValkeyCommon = {
-  kind: z.literal("valkey"),
-  secret: z.string().min(32, "store secret must be at least 32 characters for adequate security"),
-  keyPrefix: z.string().default("trinette:session:"),
+const SecretSchema = z
+  .string()
+  .min(32, "store secret must be at least 32 characters for adequate security");
+
+// How to reach a Valkey (or Redis): what the session store and the file store
+// share, each adding what is its own on top.
+const ValkeyConnection = {
   username: z.string().optional(),
   password: z.string().optional(),
   tls: ValkeyTlsSchema.default(false),
@@ -46,7 +49,7 @@ const ValkeyCommon = {
 };
 
 const ValkeySingleSchema = z.object({
-  ...ValkeyCommon,
+  ...ValkeyConnection,
   mode: z.literal("single"),
   host: z.string().default("127.0.0.1"),
   port: z.number().int().positive().default(6379),
@@ -54,13 +57,13 @@ const ValkeySingleSchema = z.object({
 });
 
 const ValkeyClusterSchema = z.object({
-  ...ValkeyCommon,
+  ...ValkeyConnection,
   mode: z.literal("cluster"),
   nodes: z.array(ValkeyNodeSchema(6379)).min(1)
 });
 
 const ValkeySentinelSchema = z.object({
-  ...ValkeyCommon,
+  ...ValkeyConnection,
   mode: z.literal("sentinel"),
   sentinels: z.array(ValkeyNodeSchema(26379)).min(1),
   name: z.string(),
@@ -70,29 +73,44 @@ const ValkeySentinelSchema = z.object({
   db: z.number().int().nonnegative().default(0)
 });
 
+export type ValkeyConnectionConfig = z.infer<
+  typeof ValkeySingleSchema | typeof ValkeyClusterSchema | typeof ValkeySentinelSchema
+>;
+
 // `mode` is required rather than defaulting to `single`: zod matches a
 // discriminator against the raw input, so a defaulted one never matches an
 // absent key.
-const ValkeyStoreSchema = z.discriminatedUnion("mode", [
-  ValkeySingleSchema,
-  ValkeyClusterSchema,
-  ValkeySentinelSchema
-]);
+const valkeyStore = <T extends z.ZodRawShape>(own: T) =>
+  z.discriminatedUnion("mode", [
+    ValkeySingleSchema.extend(own),
+    ValkeyClusterSchema.extend(own),
+    ValkeySentinelSchema.extend(own)
+  ]);
+
+const ValkeySessionStoreSchema = valkeyStore({
+  kind: z.literal("valkey"),
+  secret: SecretSchema,
+  keyPrefix: z.string().default("trinette:session:")
+});
 
 // A database file on a volume of this one replica. Sealed like Valkey, and for
 // the same reason: the file is what a volume snapshot or a backup copies.
 const SqliteSessionStoreSchema = z.object({
   kind: z.literal("sqlite"),
   path: z.string().min(1),
-  secret: z.string().min(32, "store secret must be at least 32 characters for adequate security")
+  secret: SecretSchema
 });
 
 const StoreSchema = z
-  .discriminatedUnion("kind", [MemoryStoreSchema, ValkeyStoreSchema, SqliteSessionStoreSchema])
+  .discriminatedUnion("kind", [
+    MemoryStoreSchema,
+    ValkeySessionStoreSchema,
+    SqliteSessionStoreSchema
+  ])
   .default({ kind: "memory" });
 
 export type StoreConfig = z.infer<typeof StoreSchema>;
-export type ValkeyStoreConfig = z.infer<typeof ValkeyStoreSchema>;
+export type ValkeySessionStoreConfig = z.infer<typeof ValkeySessionStoreSchema>;
 export type SqliteSessionStoreConfig = z.infer<typeof SqliteSessionStoreSchema>;
 
 const SessionSchema = z
@@ -107,18 +125,21 @@ const SessionSchema = z
   });
 
 // Where users' query files live. `browser` is this browser's localStorage,
-// which is where they have always been; the other two are the server's, keyed
+// which is where they have always been; the others are the server's, keyed
 // by the signed-in user, so a file follows the person and not the machine.
+// No secret for Valkey here: files are not sealed, in any store.
 const FileStoreSchema = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("browser") }),
     z.object({ kind: z.literal("memory") }),
-    z.object({ kind: z.literal("sqlite"), path: z.string().min(1) })
+    z.object({ kind: z.literal("sqlite"), path: z.string().min(1) }),
+    valkeyStore({ kind: z.literal("valkey"), keyPrefix: z.string().default("trinette:files:") })
   ])
   .default({ kind: "browser" });
 
 export type FileStoreConfig = z.infer<typeof FileStoreSchema>;
 export type SqliteFileStoreConfig = Extract<FileStoreConfig, { kind: "sqlite" }>;
+export type ValkeyFileStoreConfig = Extract<FileStoreConfig, { kind: "valkey" }>;
 
 const FilesSchema = z
   .object({
