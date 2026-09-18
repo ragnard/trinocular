@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import type {
     Field,
     DataType,
@@ -418,16 +418,23 @@
     sampled = sample.length;
   });
 
-  // Sync selection prop from internal selection state
+  // Sync selection prop from internal selection state.
+  //
+  // `rows` is deliberately not a dependency: a result's `Rows` is a new
+  // reference on every page that arrives, so a selection open during a long
+  // stream was rebuilt — and the inspector re-flattened and re-drew every
+  // selected document — about once a megabyte. The rows a selection covers
+  // are the ones already here, and they do not change; `getData` reads
+  // whatever the table holds when it is called, untracked so the caller's
+  // effect does not pick the dependency up in this one's place.
   $effect(() => {
     const rect = selectionRect;
-    if (!rect || !schema || !rows) {
+    if (!rect || !schema) {
       selection = null;
       return;
     }
     const { minRow, maxRow, minCol, maxCol } = rect;
     const s = schema;
-    const r = rows;
     const vc = valueConverter;
     selection = {
       minRow,
@@ -435,10 +442,11 @@
       minCol,
       maxCol,
       getData() {
+        const r = untrack(() => rows);
         const fields = s.fields.slice(minCol, maxCol + 1);
-        const selectedRows = r
-          .slice(minRow, maxRow + 1)
-          .map((row) => fields.map((field, i) => vc(row[minCol + i], field, minCol + i)));
+        const selectedRows = (r?.slice(minRow, maxRow + 1) ?? []).map((row) =>
+          fields.map((field, i) => vc(row[minCol + i], field, minCol + i))
+        );
         return { fields, rows: selectedRows };
       }
     };
