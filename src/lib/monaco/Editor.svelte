@@ -663,7 +663,10 @@
     editor = monaco.editor.create(container, {
       language: "trino-sql",
       theme: theme === "dark" ? "trino-dark" : "trino-light",
-      fontFamily: "Iosevka SS08",
+      // The stylesheet's monospace stack, so the editor, the table and the
+      // inspector agree. It used to name "Iosevka SS08", which nothing ships,
+      // so the editor was silently on monaco's own fallback.
+      fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-mono"),
       fontSize: 16,
       fontLigatures: true,
       minimap: { enabled: false },

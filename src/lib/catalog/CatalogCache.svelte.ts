@@ -122,7 +122,7 @@ export class CatalogCache {
     return this.#dedupe(
       `schemas:${catalog}`,
       async () => {
-        const rows = await collectColumn(this.#client, `SHOW SCHEMAS FROM "${catalog}"`, 0);
+        const rows = await collectColumn(this.#client, `SHOW SCHEMAS FROM ${qualifiedName(catalog)}`, 0);
         this.#schemas = new Map(this.#schemas).set(catalog, rows);
         return rows;
       },
@@ -139,7 +139,7 @@ export class CatalogCache {
       async () => {
         const rows = await collectColumn(
           this.#client,
-          `SHOW TABLES FROM "${catalog}"."${schema}"`,
+          `SHOW TABLES FROM ${qualifiedName(catalog, schema)}`,
           0
         );
         this.#tables = new Map(this.#tables).set(key, rows);
@@ -163,7 +163,7 @@ export class CatalogCache {
       async () => {
         const rows = await collectRows(
           this.#client,
-          `SHOW COLUMNS FROM "${catalog}"."${schema}"."${table}"`
+          `SHOW COLUMNS FROM ${qualifiedName(catalog, schema, table)}`
         );
         const columns = rows.map((row) => ({ name: row[0], type: row[1] }));
         this.#columns = new Map(this.#columns).set(key, columns);

@@ -1,13 +1,6 @@
 <script lang="ts">
-  import type {
-    Selection,
-    SelectionData,
-    DataType,
-    Field,
-    Struct,
-    List,
-    Dictionary
-  } from "./table/types";
+  import { isDictionary, isList, isStruct } from "./table/types";
+  import type { Selection, SelectionData, Field } from "./table/types";
   import { Copy, Eye, Search } from "@lucide/svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
@@ -52,6 +45,13 @@
 
   interface FlatEntry {
     /**
+     * What the row list is keyed on: the column's index, then a field's
+     * ordinal, an element's index or an entry's key at each level down. Not
+     * `key`, which Trino does not keep unique — `SELECT 1 a, 2 a` is legal and
+     * so is `row(a integer, a integer)` — and a keyed each throws on a repeat.
+     */
+    id: string;
+    /**
      * What the field is called on screen, and what a view format is normally
      * remembered against: `items[3].meta`, indices and all. A varchar array
      * can hold a JSON document in one element and a sentence in the next, so
@@ -72,37 +72,37 @@
     empty?: boolean;
   }
 
-  function isStruct(dt: DataType): dt is Struct {
-    return typeof dt === "object" && !Array.isArray(dt) && "fields" in dt;
-  }
-
-  function isList(dt: DataType): dt is List {
-    return Array.isArray(dt);
-  }
-
-  function isDictionary(dt: DataType): dt is Dictionary {
-    return typeof dt === "object" && !Array.isArray(dt) && "key" in dt;
-  }
-
   /** Structs, maps and arrays become dotted paths, which is what makes a row
       read as a document rather than a handful of unopenable cells. A map's
       entries read like a row's fields, and a view format picked for one is
       kept by key: the key is data rather than schema, but the same key in
       another row is far more likely the same kind of value than not. */
-  function flatten(value: any, field: Field, key: string, path: string): FlatEntry[] {
+  function flatten(
+    value: any,
+    field: Field,
+    id: string,
+    key: string,
+    path: string
+  ): FlatEntry[] {
     const { dataType } = field;
     if (value === null || value === undefined) {
-      return [{ key, path, value: null, field }];
+      return [{ id, key, path, value: null, field }];
     }
     if (isStruct(dataType) && Array.isArray(value)) {
       const entries = dataType.fields.flatMap((f, i) =>
-        flatten(value[i], f, key ? `${key}.${f.name}` : f.name, path ? `${path}.${f.name}` : f.name)
+        flatten(
+          value[i],
+          f,
+          `${id}.${i}`,
+          key ? `${key}.${f.name}` : f.name,
+          path ? `${path}.${f.name}` : f.name
+        )
       );
-      return entries.length ? entries : [{ key, path, value: "{}", field, empty: true }];
+      return entries.length ? entries : [{ id, key, path, value: "{}", field, empty: true }];
     }
     if (isList(dataType) && Array.isArray(value)) {
       if (value.length === 0) {
-        return [{ key, path, value: "[]", field, empty: true }];
+        return [{ id, key, path, value: "[]", field, empty: true }];
       }
       const elementField: Field = {
         name: "",
@@ -111,13 +111,13 @@
         nullable: true
       };
       return value.flatMap((element, i) =>
-        flatten(element, elementField, `${key}[${i + 1}]`, `${path}[]`)
+        flatten(element, elementField, `${id}[${i}]`, `${key}[${i + 1}]`, `${path}[]`)
       );
     }
     if (isDictionary(dataType) && typeof value === "object") {
       const entries = Object.entries(value);
       if (entries.length === 0) {
-        return [{ key, path, value: "{}", field, empty: true }];
+        return [{ id, key, path, value: "{}", field, empty: true }];
       }
       const valueField: Field = {
         name: "",
@@ -126,10 +126,10 @@
         nullable: true
       };
       return entries.flatMap(([k, v]) =>
-        flatten(v, valueField, key ? `${key}.${k}` : k, path ? `${path}.${k}` : k)
+        flatten(v, valueField, `${id}.${k}`, key ? `${key}.${k}` : k, path ? `${path}.${k}` : k)
       );
     }
-    return [{ key, path, value, field }];
+    return [{ id, key, path, value, field }];
   }
 
   /**
@@ -145,7 +145,7 @@
     const firstRow = selection.minRow;
     return data.rows.map((row, i) => {
       let entries = data!.fields.flatMap((field, c) =>
-        flatten(row[c], field, field.name, field.name)
+        flatten(row[c], field, String(c), field.name, field.name)
       );
       if (hideNulls) entries = entries.filter((e) => e.value !== null);
       if (hideEmpty) entries = entries.filter((e) => !e.empty);
@@ -257,7 +257,7 @@
           <Copy size={12} />
         </button>
       </div>
-      {#each doc.entries as entry (entry.key)}
+      {#each doc.entries as entry (entry.id)}
         {@const choices = formatsFor(entry.field)}
         {@const chosen = resolveFormat(entry.field, formatId(entry))}
         {@const { view } = render(entry.value, entry.field, formatId(entry))}

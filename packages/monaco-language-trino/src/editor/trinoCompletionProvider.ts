@@ -232,6 +232,14 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
     const matches = (name: string) =>
       filterPrefix.length === 0 || name.toLowerCase().startsWith(filterPrefix);
 
+    // A dotted part is only asked about if a list already holds it. Most of
+    // what precedes a dot in SQL is a table alias, and `t.` used to send
+    // `SHOW SCHEMAS FROM "t"` to the cluster on every keystroke — a query
+    // that fails there and is recorded as a failure here. Unquoted names are
+    // lowercased by Trino, so `TPCH.` still finds `tpch`.
+    const known = (names: string[], name: string) =>
+      names.includes(name) || names.includes(name.toLowerCase());
+
     try {
       if (completedParts.length === 0) {
         // No dots: suggest tables from default catalog.schema + schemas from default catalog + all catalogs
@@ -275,19 +283,21 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
         const part = completedParts[0];
 
         // Try as catalog → suggest schemas
-        const schemasFromCatalog = await mp.getSchemas(part);
-        for (const schema of schemasFromCatalog) {
-          if (!matches(schema)) continue;
-          suggestions.push(makeSuggestion(schema, monaco.languages.CompletionItemKind.Struct, wordRange, {
-            detail: part,
-            insertText: schema + '.',
-            command: RETRIGGER_COMMAND,
-          }));
+        if (known(await mp.getCatalogs(), part)) {
+          const schemasFromCatalog = await mp.getSchemas(part);
+          for (const schema of schemasFromCatalog) {
+            if (!matches(schema)) continue;
+            suggestions.push(makeSuggestion(schema, monaco.languages.CompletionItemKind.Struct, wordRange, {
+              detail: part,
+              insertText: schema + '.',
+              command: RETRIGGER_COMMAND,
+            }));
+          }
         }
 
         // Try as schema in default catalog → suggest tables
         const defaultCatalog = await mp.getDefaultCatalog();
-        if (defaultCatalog) {
+        if (defaultCatalog && known(await mp.getSchemas(defaultCatalog), part)) {
           const tablesFromSchema = await mp.getTables(defaultCatalog, part);
           for (const table of tablesFromSchema) {
             if (!matches(table)) continue;
@@ -299,12 +309,14 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
       } else if (completedParts.length === 2) {
         // Two parts: catalog.schema → suggest tables
         const [catalog, schema] = completedParts;
-        const tables = await mp.getTables(catalog, schema);
-        for (const table of tables) {
-          if (!matches(table)) continue;
-          suggestions.push(makeSuggestion(table, monaco.languages.CompletionItemKind.Field, wordRange, {
-            detail: `${catalog}.${schema}`,
-          }));
+        if (known(await mp.getCatalogs(), catalog) && known(await mp.getSchemas(catalog), schema)) {
+          const tables = await mp.getTables(catalog, schema);
+          for (const table of tables) {
+            if (!matches(table)) continue;
+            suggestions.push(makeSuggestion(table, monaco.languages.CompletionItemKind.Field, wordRange, {
+              detail: `${catalog}.${schema}`,
+            }));
+          }
         }
       }
     } catch (e) {

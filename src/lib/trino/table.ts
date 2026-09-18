@@ -1,4 +1,5 @@
 import type { TypeSignature } from "./index";
+import { isDictionary, isList, isStruct } from "$lib/components/table/types";
 import type { Field, DataType, Struct, Dictionary } from "$lib/components/table/types";
 
 export function convertRow(row: any[], fields: Field[]): any[] {
@@ -8,15 +9,15 @@ export function convertRow(row: any[], fields: Field[]): any[] {
 export function convertValue(value: any, dataType: DataType): any {
   if (value === null || value === undefined) return value;
   if (dataType === "binary") {
-    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
   }
-  if (Array.isArray(dataType) && Array.isArray(value)) {
+  if (isList(dataType) && Array.isArray(value)) {
     return value.map((v) => convertValue(v, dataType[0]));
   }
-  if (typeof dataType === "object" && "fields" in dataType && Array.isArray(value)) {
+  if (isStruct(dataType) && Array.isArray(value)) {
     return value.map((v, i) => convertValue(v, dataType.fields[i].dataType));
   }
-  if (typeof dataType === "object" && "key" in dataType && typeof value === "object") {
+  if (isDictionary(dataType) && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([k, v]) => [k, convertValue(v, dataType.value)])
     );
