@@ -10,6 +10,15 @@ import { WorkspaceSaver } from "$lib/workspaceSaver";
 
 const MAX_RESULTS_PER_FILE = 10;
 
+/**
+ * How many finished results per file keep their rows. The rest keep their
+ * columns, stats and error and let the rows go: ten results a file, every
+ * file, for the session, with "fetch all" among them, is how a tab comes to
+ * hold a few million rows nobody is looking at. The active result and any
+ * still running are never released, whatever their place in the list.
+ */
+const RESULTS_WITH_ROWS_PER_FILE = 2;
+
 export const DEFAULT_ROW_LIMIT = 1000;
 
 /** Must stay under Trino's `query.client.timeout`, five minutes by default. */
@@ -118,6 +127,8 @@ export class Result {
   held: boolean = $state(false);
   /** Stopped at the cap, by the reader or by the hold running out. */
   stopped: false | "user" | "expired" = $state(false);
+  /** The rows were let go to free memory; how many there were, or null. */
+  released: number | null = $state(null);
   /** The part of the page that crossed the cap; `fetchMore` takes from it first. */
   #pending: readonly QueryData[] = [];
   #resume?: (action: Resume) => void;
@@ -296,6 +307,20 @@ export class Result {
   }
 
   /**
+   * Lets the rows go, keeping everything else — the columns, the stats, the
+   * error — so the result still reads as what it was. Only for a result that
+   * has settled: a running one is still being filled, and a held one still
+   * has a query on the cluster to answer for.
+   */
+  release() {
+    if (this.released !== null || !this.completed || this.held) return;
+    if (this.data.length === 0) return;
+    this.released = this.data.length;
+    this.data = Rows.empty;
+    this.#pending = [];
+  }
+
+  /**
    * Records one split-count reading. Trino answers a poll as soon as it has
    * anything to say, so chunks arrive far faster than the picture changes;
    * readings are thinned to `#sampleInterval`. A state change is always
@@ -434,6 +459,23 @@ export class SqlFile {
       this.results.pop()!.discard();
     }
     this.activeResult = result;
+    this.#releaseRows();
+  }
+
+  /**
+   * Keeps rows for the newest few results and releases the rest. Newest-first
+   * is the list's order, so the first `RESULTS_WITH_ROWS_PER_FILE` that still
+   * have rows keep them; `release` itself declines the active, the running
+   * and the held.
+   */
+  #releaseRows() {
+    let kept = 0;
+    for (const result of this.results) {
+      if (result.released !== null || result.data.length === 0) continue;
+      if (result === this.activeResult || !result.completed || result.held) continue;
+      if (kept < RESULTS_WITH_ROWS_PER_FILE) kept++;
+      else result.release();
+    }
   }
 
   /**
