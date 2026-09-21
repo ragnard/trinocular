@@ -6,13 +6,14 @@ import type { Identity } from "./identity";
 /**
  * A policy written as a CEL expression over the identity.
  *
- * `require-role` answers one question — is this string in that list — and
+ * The role check answers one question — is this string in that list — and
  * every other question ("either of these groups", "this role *and* a verified
  * email", "these two people, on this cluster") was going to be a new `kind`
  * each. An expression answers all of them in a line, and reads nothing but
  * what every authorizer reads: the claims. So it is one more arm of
  * `createAuthorizer`, and the gate, the proxy and the connection listing are
- * none the wiser.
+ * none the wiser — and the role check is now written in it too (below), so
+ * there is one evaluator and one set of rules for what refuses.
  *
  * The environment is two variables. `claims` is the identity's claim set as
  * one map rather than each claim as a variable of its own: `has()` only works
@@ -100,3 +101,34 @@ export const CelAuthorizer = (expression: string): Authorizer => {
     }
   };
 };
+
+/** A CEL string literal. JSON's escapes are a subset of CEL's, so this is
+ *  `JSON.stringify` — which is also what keeps a role or client id containing
+ *  a quote from ending the literal early. */
+const literal = (value: string): string => JSON.stringify(value);
+
+/** The words CEL keeps for itself, which cannot be a field selection even
+ *  when they are identifier-shaped. */
+const RESERVED = new Set(
+  "false in null true as break const continue else for function if import let loop package namespace return var void while".split(
+    " "
+  )
+);
+
+/** One step into a map: `.name` when the key can be written as a field, and
+ *  `["the.name"]` otherwise — an OIDC clientId is free text, and
+ *  `com.example.app` is an ordinary one. */
+const select = (key: string): string =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && !RESERVED.has(key) ? `.${key}` : `[${literal(key)}]`;
+
+/**
+ * Keycloak's client roles — `resource_access.<client>.roles`, distinct from
+ * the realm-wide roles in `realm_access.roles`, so a user can be an admin of
+ * one application without being one everywhere — as the expression it is
+ * sugar for. The authorizer's name is that expression, so the startup log says
+ * what will actually be checked rather than what was written; and a missing
+ * client, or a `roles` that is not a list, refuses the way any expression's
+ * error does. A rule shaped any other way is an expression of its own.
+ */
+export const RequireKeycloakClientRole = (opts: { role: string; client: string }): Authorizer =>
+  CelAuthorizer(`${literal(opts.role)} in claims.resource_access${select(opts.client)}.roles`);

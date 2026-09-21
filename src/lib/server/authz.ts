@@ -1,14 +1,7 @@
 import { redirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 
-import {
-  claim,
-  formatClaimPath,
-  parseClaimPath,
-  stringList,
-  type ClaimPath,
-  type Identity
-} from "./identity";
-import { CelAuthorizer, ExpressionError } from "./celAuthz";
+import type { Identity } from "./identity";
+import { CelAuthorizer, ExpressionError, RequireKeycloakClientRole } from "./celAuthz";
 import type { AuthzConfig } from "./config";
 import { logger } from "./logging";
 
@@ -30,29 +23,6 @@ export const AllowAll = (): Authorizer => ({
   authorize: () => ({ allowed: true })
 });
 
-/** Requires a role granted to a specific OIDC client — Keycloak writes those to
- *  `resource_access.<client>.roles`, distinct from the realm-wide roles in
- *  `realm_access.roles`, so a user can be an admin of one application without
- *  being one everywhere. The claim path is configurable because only the
- *  default is Keycloak's; the shape (a list of strings under a path) is what
- *  every provider has in common. */
-export const RequireRole = (opts: { role: string; claimPath: ClaimPath }): Authorizer => {
-  const path = formatClaimPath(opts.claimPath);
-  return {
-    name: `require-role(${path} contains "${opts.role}")`,
-    authorize(identity) {
-      const roles = stringList(claim(identity.claims, opts.claimPath));
-      if (roles.includes(opts.role)) return { allowed: true };
-      return {
-        allowed: false,
-        reason: `identity has no "${opts.role}" in ${path} (found: ${
-          roles.length ? roles.join(", ") : "nothing"
-        })`
-      };
-    }
-  };
-};
-
 /**
  * Turns a written policy into an authorizer. The one thing authz borrows from
  * authn is the default client for a role lookup: "the role I granted Trinocular"
@@ -69,24 +39,18 @@ export const createAuthorizer = (
   switch (authz.kind) {
     case "allow":
       return AllowAll();
-    case "require-role": {
-      if (authz.claim) {
-        return RequireRole({ role: authz.role, claimPath: parseClaimPath(authz.claim) });
-      }
+    case "require-keycloak-client-role": {
       const client = authz.client ?? opts.defaultClient;
       if (!client) {
         // At startup, not at the first request: a policy that cannot be built
         // would otherwise refuse everyone at runtime with nothing said about
         // why.
         logger.error(
-          `${opts.where}: require-role needs a \`client\` or \`claim\`, and there is no OIDC clientId to default to`
+          `${opts.where}: require-keycloak-client-role needs a \`client\`, and there is no OIDC clientId to default to`
         );
         process.exit(1);
       }
-      // Segments, not `resource_access.${client}.roles`: a clientId may itself
-      // contain a dot, and interpolating one into a dotted path would send the
-      // lookup down levels that do not exist.
-      return RequireRole({ role: authz.role, claimPath: ["resource_access", client, "roles"] });
+      return RequireKeycloakClientRole({ role: authz.role, client });
     }
     case "cel": {
       try {

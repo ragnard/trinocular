@@ -397,10 +397,9 @@ authz:
 
 ```yaml
 authz:
-  kind: require-role
+  kind: require-keycloak-client-role
   role: user
   client: trinocular     # optional
-  claim: realm_access.roles   # optional, overrides `client`
 ```
 
 **`cel`** is a [CEL](https://cel.dev) expression that must come out `true`. It sees two
@@ -435,17 +434,18 @@ evaluation is refused too — and CEL treats a missing map key as an error, so
 rather that read as `false` in the log. A client id with dots in it is an ordinary map key:
 `claims.resource_access["com.example.app"].roles`.
 
-**`require-role`** is the Keycloak role check written out:
+**`require-keycloak-client-role`** is shorthand for the expression
+`"<role>" in claims.resource_access.<client>.roles` — Keycloak's client roles — and is checked
+exactly as that expression would be (the startup log prints it). It exists because it knows
+this app's own `clientId`, which an expression cannot name.
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `role` | **required** | The role a user must hold. |
-| `client` | this app's `clientId` | Which OIDC client's roles are consulted — Keycloak's `resource_access.<client>.roles`. |
-| `claim` | — | A dotted path to a list of strings, for providers laid out differently: `realm_access.roles`, `groups`. Overrides `client`. |
+| `client` | this app's `clientId` | Which OIDC client's roles are consulted. |
 
-A missing claim, or one that is not a list of strings, counts as no roles and is refused. It
-is what `"<role>" in claims.resource_access.<client>.roles` says, kept because it knows this
-app's own `clientId` and an expression cannot.
+Roles laid out any other way — Keycloak's realm roles in `realm_access.roles`, a `groups`
+claim — are an expression: `"user" in claims.realm_access.roles`.
 
 ### `connections` — the Trino clusters
 
