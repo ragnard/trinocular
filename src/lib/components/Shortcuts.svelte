@@ -12,6 +12,7 @@
    * you pressed `?` in the table, so the table's keys are the ones you were
    * after.
    */
+  import { tick } from "svelte";
   import { X } from "@lucide/svelte";
   import { SHORTCUTS, formatKeys, type Pane } from "$lib/shortcuts";
 
@@ -22,9 +23,19 @@
   }
 
   let { current, onclose }: Props = $props();
+
+  // A modal dialog focuses its first focusable descendant, which here is the
+  // close button, and a card that opens with a focus ring on its `✕` looks
+  // like it is asking to be closed. The card takes focus itself (after
+  // `tick()`, so it lands after `showModal()` has done its own focusing),
+  // and Escape and Tab go on working from there.
+  let root: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    void tick().then(() => root?.focus());
+  });
 </script>
 
-<div class="shortcuts">
+<div class="shortcuts" bind:this={root} tabindex="-1">
   <div class="rail">
     <span class="title">Keyboard shortcuts</span>
     <span class="fill"></span>
@@ -57,6 +68,13 @@
     display: flex;
     flex-direction: column;
     width: min(60em, calc(100vw - 48px));
+    outline: none;
+  }
+
+  /* As the inspector's rail: a square chip at the end overhangs the inset by
+     its own padding, so its icon lands where a bare rail icon would. */
+  .rail {
+    padding-right: 6px;
   }
 
   .title {
