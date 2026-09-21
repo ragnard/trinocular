@@ -304,9 +304,35 @@ const AuthzSchema = z.preprocess(
 
 export type AuthzConfig = z.infer<typeof AuthzSchema>;
 
+/** How the proxy authenticates *itself* to a cluster — the principal the
+ *  cluster's authenticator sees. Who the query runs as is separate and never
+ *  configured: it is always `X-Trino-User: <the gate's identity>`.
+ *
+ *  - `none`: no credential. For a cluster with no authenticator, which trusts
+ *    the user header as sent.
+ *  - `basic`: one service account for the whole connection. The cluster
+ *    authenticates the account and runs the query as the user, which is
+ *    Trino's impersonation and has to be allowed by the cluster's access
+ *    control (an `impersonation` rule from the account to `.*`). The password
+ *    is a credential, so it is written as `${VAR}`.
+ *  - `user-token`: the user's own OIDC access token as a bearer. Only under
+ *    `authn: oidc` (checked on the whole config, below), and only on a
+ *    connection that says so, since a token is not something to send to every
+ *    host in the file. */
+const ConnectionAuthSchema = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("none") }),
+    z.object({ kind: z.literal("basic"), username: z.string().min(1), password: z.string() }),
+    z.object({ kind: z.literal("user-token") })
+  ])
+  .default({ kind: "none" });
+
+export type ConnectionAuth = z.infer<typeof ConnectionAuthSchema>;
+
 const ConnectionSchema = z.object({
   name: z.string(),
   uri: z.url(),
+  auth: ConnectionAuthSchema,
   // Who may use *this cluster*, on top of the application-wide rule rather
   // than instead of it: a connection rule can only ever narrow. Absent means
   // the connection adds no condition of its own, which is not the same as
@@ -325,15 +351,30 @@ const BrandingSchema = z.object({
 
 export type Branding = z.infer<typeof BrandingSchema>;
 
-const ConfigSchema = z.object({
-  branding: BrandingSchema.prefault({}),
-  session: SessionSchema,
-  files: FilesSchema,
-  results: ResultsSchema,
-  authn: z.discriminatedUnion("kind", [NoAuthnSchema, PasswordAuthnSchema, OIDCAuthnSchema]),
-  authz: AuthzSchema.default({ kind: "allow" }),
-  connections: z.record(z.string(), ConnectionSchema).optional()
-});
+const ConfigSchema = z
+  .object({
+    branding: BrandingSchema.prefault({}),
+    session: SessionSchema,
+    files: FilesSchema,
+    results: ResultsSchema,
+    authn: z.discriminatedUnion("kind", [NoAuthnSchema, PasswordAuthnSchema, OIDCAuthnSchema]),
+    authz: AuthzSchema.default({ kind: "allow" }),
+    connections: z.record(z.string(), ConnectionSchema).optional()
+  })
+  // A connection that forwards the user's token needs there to be one. Judged
+  // at startup like every other policy that cannot work, rather than as a 401
+  // on the first query.
+  .superRefine((cfg, ctx) => {
+    if (cfg.authn.kind === "oidc") return;
+    for (const [id, connection] of Object.entries(cfg.connections ?? {})) {
+      if (connection.auth.kind !== "user-token") continue;
+      ctx.addIssue({
+        code: "custom",
+        path: ["connections", id, "auth", "kind"],
+        message: `"user-token" needs "authn: oidc"; under "${cfg.authn.kind}" there is no token`
+      });
+    }
+  });
 
 export type Config = z.infer<typeof ConfigSchema>;
 export type Connection = z.infer<typeof ConnectionSchema>;

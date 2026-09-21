@@ -294,18 +294,52 @@ authz:
 # ── connections ──────────────────────────────────────────────────────────────
 #
 # The Trino clusters. Each key is the connection's id, used internally and in
-# what the app stores; name is what users see. Users reach a cluster as
-# themselves (their user id, and their access token under OIDC), so the
-# cluster's own access control still applies. A connection's authz is the
-# same vocabulary as above, applied on top: it can keep people out of this
-# cluster, but never let anyone past the front door.
+# what the app stores; name is what users see. A query always runs as the
+# signed-in user (X-Trino-User is their user id, never anything the browser
+# says), so the cluster's own access control still applies; auth is how the
+# server authenticates *itself* to the cluster on the way:
+#
+#   none        No credential. For a cluster with no authenticator, which
+#               takes the user header as sent.
+#   basic       One service account for the connection. The cluster
+#               authenticates the account and runs the query as the user,
+#               which is impersonation and has to be allowed by the
+#               cluster's access control (an impersonation rule from the
+#               account to `.*` in file-based access control; the default
+#               allow-all permits it). Covers LDAP, a password file, and
+#               Starburst Galaxy.
+#   user-token  The user's own OIDC access token, as a bearer. Needs
+#               authn: oidc, and a cluster whose OAuth2 or JWT authenticator
+#               accepts tokens from the same issuer for this audience.
+#
+# A connection's authz is the same vocabulary as above, applied on top: it
+# can keep people out of this cluster, but never let anyone past the front
+# door.
 #
 connections:
   warehouse:
     name: Warehouse                            # Required; shown in the UI
     uri: https://trino.example:8443            # Required; only the server talks to it
+    auth:
+      kind: none                               # none, basic or user-token. Default: none
   finance:
     name: Finance
     uri: https://trino-finance.example:8443
     authz:                                     # Optional; on top of the rule above
       expression: '"finance" in claims.groups'
+#
+# Alternatives ──
+#
+#   warehouse:
+#     name: Warehouse
+#     uri: https://trino.example:8443
+#     auth:
+#       kind: basic
+#       username: trinocular                   # Required: the service account
+#       password: ${TRINO_PASSWORD}            # Required
+#
+#   warehouse:
+#     name: Warehouse
+#     uri: https://trino.example:8443
+#     auth:
+#       kind: user-token                       # Only with authn: oidc
