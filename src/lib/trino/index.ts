@@ -31,13 +31,46 @@ import {
 
 export type { SessionDelta, SessionState } from "./session";
 
+/**
+ * An answer that was not a 2xx. The message is what the body had to say, when
+ * it was JSON with a `message` (SvelteKit's `error()` body, which is how the
+ * proxy reports an unknown connection, a bad path or a cluster it could not
+ * reach) or an `error` (the access gate's `refuse()` body), with the status
+ * after it; a body with nothing to say leaves just the status. Without this a
+ * dead cluster read as `HTTP error 502: Bad Gateway`, which says nothing about
+ * whether the cluster, the proxy or the user's access is what failed — and
+ * under HTTP/2 `statusText` is empty, so it read `HTTP error 502:`. `status`
+ * stays a field so a 401 can still be told apart.
+ */
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, statusText: string) {
-    super(`HTTP error ${status}: ${statusText}`);
+  constructor(status: number, statusText: string, detail?: string) {
+    const code = statusText ? `HTTP ${status} ${statusText}` : `HTTP ${status}`;
+    super(detail ? `${detail} (${code})` : code);
     this.name = "HttpError";
     this.status = status;
   }
+
+  /** Builds one from an answer, reading its body for the message. */
+  static async from(response: Response): Promise<HttpError> {
+    return new HttpError(response.status, response.statusText, await errorDetail(response));
+  }
+}
+
+/** The `message` or `error` string of a JSON error body, if the body is one. */
+async function errorDetail(response: Response): Promise<string | undefined> {
+  let body: unknown;
+  try {
+    body = JSON.parse(await response.text());
+  } catch {
+    return undefined;
+  }
+  if (typeof body !== "object" || body === null) return undefined;
+  for (const key of ["message", "error"]) {
+    const value = (body as Record<string, unknown>)[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
 }
 
 const DEFAULT_SOURCE = "trinocular";
@@ -231,7 +264,7 @@ export default class Trino {
     const response = await fetch(url, init);
 
     if (!response.ok) {
-      throw new HttpError(response.status, response.statusText);
+      throw await HttpError.from(response);
     }
 
     const delta = sessionDelta(response.headers);
