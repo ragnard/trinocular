@@ -3,6 +3,7 @@ import path from "path";
 import { z } from "zod";
 
 import { logger } from "./logging";
+import { EnvSubstitutionError, substituteEnv } from "./configEnv";
 import { env } from "$env/dynamic/private";
 
 const CookieSchema = z.object({
@@ -377,6 +378,17 @@ function loadConfig(configPath?: string, trinoUrl?: string): Config {
     raw = parseFile(fs.readFileSync(resolvedPath, "utf-8"), resolvedPath);
   } catch (err) {
     logger.error(`Failed to read config from ${resolvedPath}: ${err}`);
+    process.exit(1);
+  }
+
+  // `${VAR}` in the file is the environment. Before validation, so that the
+  // schema judges the value the variable held, and only for a file: the
+  // defaults have nothing to substitute.
+  try {
+    raw = substituteEnv(raw, env);
+  } catch (err) {
+    if (!(err instanceof EnvSubstitutionError)) throw err;
+    logger.error(`Config (${resolvedPath}): ${err.message}`);
     process.exit(1);
   }
 

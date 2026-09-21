@@ -128,6 +128,20 @@ The config file is JSON or YAML, named by the `TRINOCULAR_CONFIG` environment va
 is validated at startup; anything invalid stops the server rather than letting it come up
 with half a policy.
 
+`${NAME}` anywhere in a string value is replaced with the environment variable of that
+name, which is how the secrets stay out of the file — the cookie and store secrets, the
+OIDC client secret — so that the file can be a ConfigMap with one Secret behind it:
+
+```yaml
+session:
+  cookie:
+    secret: ${COOKIE_SECRET}
+```
+
+A variable that is not set stops the server. Substitution is done on the parsed file's
+strings, so a value stays a string whatever it held (`port: ${PORT}` is not a number),
+and `$${` writes a literal `${`; a `$` followed by anything else is left as it is.
+
 ### Environment variables
 
 | Variable | Required | Description |
