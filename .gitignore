@@ -9,6 +9,7 @@ src/**/*.js
 .wrangler
 /.svelte-kit
 /build
+/perf/out
 
 # OS
 .DS_Store

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isDictionary, isList, isStruct } from "./table/types";
+  import { MARK, mark } from "$lib/perfMarks";
   import type { Selection, SelectionData, Field } from "./table/types";
   import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
@@ -302,6 +303,10 @@
 
   let fieldCount = $derived(documents[0]?.entries.length ?? 0);
 
+  $effect(() => {
+    mark(MARK.inspectorRendered, { documents: documents.length, fields: fieldCount });
+  });
+
   /**
    * The picker: one menu for the whole pane, pointed at by every row's button.
    * A `Dropdown` per field would put a popover element behind every row of
@@ -453,7 +458,12 @@
     {#if !documents.length}
       <p class="empty">Select cells in the results to inspect them.</p>
     {/if}
-    {#each documents as doc (doc.row)}
+    <!-- By position, not by row number: stepping is the same block showing
+         the next row, and a key of the row number tore every field down and
+         built it again on each step, in this instance and the pane's — four
+         times the cost of updating it in place. The fields inside are keyed
+         by column, so what a step touches is the text that changed. -->
+    {#each documents as doc}
       <div class="doc-head">
         <span class="caps small">Row {doc.row}</span>
         <span class="fill"></span>

@@ -120,7 +120,32 @@ connections:
 See [Configuration](#configuration) for everything else.
 
 Other commands: `bun run build` (production build), `bun run preview`, `bun run check`
-(type-check), `bun run format` (prettier).
+(type-check), `bun run format` (prettier), `bun run test` (unit tests).
+
+### Performance checks
+
+`bun run perf` drives the app in a headless Chromium through a set of scenarios — streaming a
+large result, selecting rows into the inspector, stepping the full-window inspector through a
+wide result, typing in a big file, filtering the schema browser, re-running a statement to
+watch the heap — and reports main-thread time per page, per key, per selection or per row,
+long tasks with the function behind them, and a few structural checks (no request on a
+keystroke, the heap coming back after a result is dropped). It needs a running Trinocular with
+a `tpch` catalog on its default connection, and a Chromium:
+
+```bash
+TRINO_URL=http://localhost:8080 bun run dev      # or the build, for memory numbers
+PERF_URL=http://localhost:5173/ bun run perf     # every scenario
+bun run perf editor filter                       # some of them
+bun run perf --compare perf/out.before perf/out  # two runs side by side
+```
+
+`PERF_CHROME` names the browser if it is not `chromium-browser`, `chromium` or `google-chrome`
+on the path, and `--out <dir>` picks where the traces go (`perf/out` by default). Each scenario
+leaves a `trace.json` the DevTools Performance panel can load, a `.cpuprofile` per phase, and a
+`summary.json` that `--compare` reads. The heap checks only mean something against
+`bun run build`: Svelte's dev runtime retains every result, and the scenario says so. The
+harness is type-checked by `bun run check:perf`, on its own — it is ad hoc tooling, not part of
+`check` or CI.
 
 ## Configuration
 
