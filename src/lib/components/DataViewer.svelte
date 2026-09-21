@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isDictionary, isList, isStruct } from "./table/types";
+  import { MARK, mark } from "$lib/perfMarks";
   import type { Selection, SelectionData, Field } from "./table/types";
   import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
@@ -301,6 +302,10 @@
   });
 
   let fieldCount = $derived(documents[0]?.entries.length ?? 0);
+
+  $effect(() => {
+    mark(MARK.inspectorRendered, { documents: documents.length, fields: fieldCount });
+  });
 
   /**
    * The picker: one menu for the whole pane, pointed at by every row's button.

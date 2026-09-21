@@ -1,4 +1,5 @@
 import Trino, { HttpError } from "$lib/trino";
+import { MARK, mark } from "./perfMarks";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
@@ -206,6 +207,7 @@ export class Result {
           this.#take(pending);
         }
       }
+      mark(MARK.resultSettled, { rows: this.data.length });
     } catch (e) {
       if (signedOut(e)) return;
       this.fail(e instanceof Error ? e.message : String(e));
@@ -214,6 +216,7 @@ export class Result {
 
   /** Settles the result on a failure of ours rather than the cluster's. */
   fail(message: string) {
+    mark(MARK.resultSettled, { rows: this.data.length, failed: true });
     this.error = {
       message,
       errorCode: 0,
@@ -229,6 +232,7 @@ export class Result {
    * sharing the pages already held, which is how $state.raw notices.
    */
   #take(page: readonly QueryData[]) {
+    mark(MARK.resultPage, { rows: page.length });
     const room = this.limit == null ? Infinity : this.limit - this.data.length;
     if (page.length <= room) {
       this.data = this.data.append(page);
