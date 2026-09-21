@@ -1,6 +1,6 @@
 <script lang="ts">
   import Account from "./Account.svelte";
-  import logo from "$lib/assets/logo.svg";
+  import logo from "$lib/assets/logo.svg?raw";
   import { BUILD, describeBuild } from "$lib/build";
   import type { Branding } from "$lib/server/config";
 
@@ -20,13 +20,7 @@
        them is checked. -->
   <span class="wordmark" title={describeBuild(BUILD)}>
     {#if branding.logo !== ""}
-      <span class="logo">
-        {#if branding.logo === undefined}
-          <img src={logo} alt="" />
-        {:else}
-          {@html branding.logo}
-        {/if}
-      </span>
+      <span class="logo">{@html branding.logo ?? logo}</span>
     {/if}
     {branding.name}
   </span>
@@ -62,12 +56,14 @@
   }
 
   /* Whatever the operator put in the box is held to the box: CSS outranks
-     an svg's own width/height attributes, and overflow catches the rest. */
+     an svg's own width/height attributes, and overflow catches the rest.
+     The bundled logo is filled with currentColor, so this is its colour. */
   .logo {
     flex: none;
     width: 20px;
     height: 20px;
     overflow: hidden;
+    color: #e83e8c;
   }
 
   .logo > :global(svg),
