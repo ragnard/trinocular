@@ -1,11 +1,14 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import postgres from "postgres";
 
 import type { SessionStore } from "../sessionStore";
 import { InMemorySessionStore } from "./memory/sessionStore";
+import { PostgresSessionStore } from "./postgres/sessionStore";
 import { SqliteSessionStore } from "./sqlite/sessionStore";
+import { testPostgres } from "./testPostgres";
 import { silent, testValkey } from "./testValkey";
 import { ValkeySessionStore } from "./valkey/sessionStore";
 
@@ -92,6 +95,47 @@ describe.skipIf(valkey === null)("valkey", () => {
     await one.save("s1", { user: "alice" }, 60);
     await one.dispose();
     const two = await openValkey(secret + "-rotated");
+    expect(await two.load("s1")).toBeNull();
+    await two.dispose();
+  });
+});
+
+const pg = testPostgres();
+describe.skipIf(pg === null)("postgres", () => {
+  const openPostgres = (s = secret) =>
+    PostgresSessionStore.create({ kind: "postgres", ...pg!.connection, secret: s }, silent);
+
+  let store: PostgresSessionStore | undefined;
+  contract("postgres", async () => (store ??= await openPostgres()));
+  beforeAll(() => pg!.setup());
+  afterAll(async () => {
+    await store?.dispose();
+    await pg!.teardown();
+  });
+
+  test("an expired session reads as none", async () => {
+    const s = await openPostgres();
+    await s.save("expired", { user: "alice" }, -1);
+    expect(await s.load("expired")).toBeNull();
+    await s.dispose();
+  });
+
+  test("is sealed: the table never holds the session in the clear", async () => {
+    const s = await openPostgres();
+    await s.save("sealed", { refreshToken: "very-secret-token" }, 60);
+    const sql = postgres(pg!.connection.url, { max: 1 });
+    const [row] = await sql<{ data: string }[]>`
+      SELECT data FROM ${sql(pg!.connection.schema)}.sessions WHERE id = 'sealed'`;
+    await sql.end();
+    expect(row.data).not.toContain("very-secret-token");
+    await s.dispose();
+  });
+
+  test("a session sealed under another secret is dropped", async () => {
+    const one = await openPostgres();
+    await one.save("s1", { user: "alice" }, 60);
+    await one.dispose();
+    const two = await openPostgres(secret + "-rotated");
     expect(await two.load("s1")).toBeNull();
     await two.dispose();
   });

@@ -1,11 +1,13 @@
-import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import fs from "fs";
 import os from "os";
 import path from "path";
 
 import type { FileStore, PutResult } from "../fileStore";
 import { InMemoryFileStore } from "./memory/fileStore";
+import { PostgresFileStore } from "./postgres/fileStore";
 import { SqliteFileStore } from "./sqlite/fileStore";
+import { testPostgres } from "./testPostgres";
 import { silent, testValkey } from "./testValkey";
 import { ValkeyFileStore } from "./valkey/fileStore";
 
@@ -152,5 +154,55 @@ describe.skipIf(valkey === null)("valkey", () => {
     const again = await saved(s.put("u", file("a"), null));
     expect(again).not.toBe(first);
     expect(await s.put("u", file("a", "stale"), first)).toMatchObject({ status: "conflict" });
+  });
+});
+
+const pg = testPostgres();
+describe.skipIf(pg === null)("postgres", () => {
+  let store: PostgresFileStore | undefined;
+  const open = async () =>
+    (store ??= await PostgresFileStore.create({ kind: "postgres", ...pg!.connection }, silent));
+  beforeAll(() => pg!.setup());
+  afterAll(async () => {
+    await store?.dispose();
+    await pg!.teardown();
+  });
+
+  contract("postgres", open);
+
+  test("versions are never reused once a document is removed", async () => {
+    const s = await open();
+    const first = await saved(s.put("u", file("a"), null));
+    await s.remove("u", "a");
+    const again = await saved(s.put("u", file("a"), null));
+    expect(again).not.toBe(first);
+    expect(await s.put("u", file("a", "stale"), first)).toMatchObject({ status: "conflict" });
+  });
+
+  test("of two concurrent creates, exactly one is saved", async () => {
+    const s = await open();
+    const results = await Promise.all(
+      Array.from({ length: 4 }, (_, i) => s.put("race", file("a", `select ${i}`), null))
+    );
+    expect(results.filter((r) => r.status === "saved")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "conflict")).toHaveLength(3);
+  });
+
+  test("of two concurrent updates against one version, exactly one is saved", async () => {
+    const s = await open();
+    const version = await saved(s.put("race2", file("a"), null));
+    const results = await Promise.all(
+      Array.from({ length: 4 }, (_, i) => s.put("race2", file("a", `select ${i}`), version))
+    );
+    expect(results.filter((r) => r.status === "saved")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "conflict")).toHaveLength(3);
+  });
+
+  test("a second store on the same schema finds the tables already made", async () => {
+    const s = await open();
+    await s.put("u2", file("a"), null);
+    const other = await PostgresFileStore.create({ kind: "postgres", ...pg!.connection }, silent);
+    expect((await other.list("u2")).files.map((f) => f.id)).toEqual(["a"]);
+    await other.dispose();
   });
 });

@@ -181,7 +181,7 @@ session:
 | `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
 | `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
 | `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |
-| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite` or `valkey`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinocular. |
+| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite`, `valkey` or `postgres`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinocular. |
 
 #### `store.kind: valkey`
 
@@ -264,6 +264,36 @@ session:
 | `path` | **required** | The database file. Created if it does not exist; the directory must. |
 | `secret` | **required** | Key sessions in the file are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
 
+#### `store.kind: postgres`
+
+Sessions in [PostgreSQL](https://www.postgresql.org), so they survive a restart and any
+number of copies of Trinocular can serve them — and if the files are in Postgres too
+(below), one database is all a deployment needs. Each session is one row, encrypted with
+the store's own `secret` as in Valkey, since the database is what gets backed up and
+replicated. The tables are made on startup and brought up to date on upgrade; the
+schema they go in must already exist (`public` always does).
+
+```yaml
+session:
+  store:
+    kind: postgres
+    url: postgres://trinocular:...@postgres.example:5432/trinocular
+    secret: <at least 32 characters>
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `url` | **required** | A `postgres://` (or `postgresql://`) URL with the user, password and database. A `sslmode=` query parameter is honoured. This is what a provider hands out — on [CloudNativePG](https://cloudnative-pg.io) it is the `uri` key of the cluster's `-app` secret. |
+| `secret` | **required** | Key sessions in the store are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
+| `schema` | `public` | The schema the tables go in. Sessions and files can share one, or a database with something else in it can keep Trinocular in one of its own. |
+| `tls` | from the URL | `false` for plain TCP, `true` to connect over TLS trusting the system's CAs, or `{ ca: <path> }` for a PEM bundle of your own — a CloudNativePG cluster's is in its `-ca` secret. Unset, the URL's `sslmode` decides (`require` encrypts without checking the certificate, `verify-full` checks it), and it is off if the URL says nothing. Set, this wins over the URL. |
+| `poolSize` | `4` | The most connections one copy of Trinocular opens. |
+| `connectTimeoutMs` | `10000` | How long to wait for a connection. |
+| `statementTimeoutMs` | `5000` | How long the server may spend on one statement. A request that has to wait longer fails rather than hanging. |
+
+Trinocular refuses to start if it cannot reach the database, and never logs the URL,
+which carries the password.
+
 ### `files` — where query files are kept
 
 By default a user's files live in their browser, and only there: another browser, or the
@@ -286,7 +316,7 @@ files:
 | Option | Default | Description |
 | --- | --- | --- |
 | `maxBytes` | `524288` | The most one document may be, in bytes of its stored record. A save over it is refused, and the editor says so. The default is the server's own request body limit; raise `BODY_SIZE_LIMIT` with it. |
-| `store.kind` | `browser` | `browser`, `memory`, `sqlite` or `valkey`. `memory` is for development: the files are gone when the process is. |
+| `store.kind` | `browser` | `browser`, `memory`, `sqlite`, `valkey` or `postgres`. `memory` is for development: the files are gone when the process is. |
 
 Files are not encrypted in the store, whichever it is — the SQL text is what a copy of
 the store is for.
@@ -330,6 +360,24 @@ needs, `username`, `password`, `tls`, `connectTimeoutMs`, `commandTimeoutMs` —
 that there is no `secret`, and `keyPrefix` defaults to `trinocular:files:`. The two blocks
 are independent: they can name the same server, where the prefixes keep them apart, or
 different ones.
+
+#### `store.kind: postgres`
+
+Files in PostgreSQL, so any number of copies of Trinocular can serve them, and a backup
+of the database is a backup of everyone's queries. A document is one row, versioned
+from a sequence so that a document removed and made again never repeats a version.
+
+```yaml
+files:
+  store:
+    kind: postgres
+    url: postgres://trinocular:...@postgres.example:5432/trinocular
+```
+
+It takes the same options as the session store's `postgres` — `url`, `schema`, `tls`,
+`poolSize`, `connectTimeoutMs`, `statementTimeoutMs` — except that there is no `secret`.
+The two blocks are independent, and naming the same database and schema in both is the
+expected arrangement: the tables do not collide.
 
 ### `authn` — who the user is
 

@@ -1,13 +1,11 @@
 import fs from "fs";
 import type { ConnectionOptions } from "tls";
 import { Cluster, Redis as Valkey, type RedisOptions } from "iovalkey";
-import type { Logger } from "pino";
 
 import type { ValkeyConnectionConfig } from "../../config";
+import type { Log } from "../log";
 
-/** Handed in rather than imported: the app's logger reads the environment,
- *  which only vite resolves, and the stores are what the tests import. */
-export type Log = Pick<Logger, "info" | "warn">;
+export type { Log };
 
 /** The subset both `Valkey` and `Cluster` provide, so a store never learns
  *  which it holds. Everything on it works on keys of one slot. */

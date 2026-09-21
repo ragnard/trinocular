@@ -59,5 +59,21 @@ export const createSessionStore = async (cfg: StoreConfig): Promise<SessionStore
         process.exit(1);
       }
     }
+    case "postgres": {
+      const { PostgresSessionStore } = await import("./stores/postgres/sessionStore");
+      const { describe } = await import("./stores/postgres/client");
+      const where = describe(cfg);
+      try {
+        const store = await PostgresSessionStore.create(
+          cfg,
+          logger.child({ component: "postgres-session-store" })
+        );
+        logger.info({ store: "postgres", ...where }, "session store configured");
+        return store;
+      } catch (err) {
+        logger.error({ err, ...where }, "failed to connect to the session store");
+        process.exit(1);
+      }
+    }
   }
 };
