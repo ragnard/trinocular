@@ -195,6 +195,25 @@ const NoAuthnSchema = z.object({
   claims: z.record(z.string(), z.unknown()).default({})
 });
 
+// A list of users in the config, for a deployment with no identity provider
+// to ask. The passwords are plain: a hash field was considered and dropped,
+// since with a plain one beside it nobody would use it, and alone it is a
+// step to remember and get wrong. So the `users` block is a credential, and
+// `${VAR}` substitution is how it stays out of a file that is not one.
+const PasswordAuthnSchema = z.object({
+  kind: z.literal("password"),
+  users: z
+    .record(
+      z.string().min(1),
+      z.object({
+        password: z.string().min(1),
+        // What the authorizer sees for this user, the same as `authn: none`'s.
+        claims: z.record(z.string(), z.unknown()).default({})
+      })
+    )
+    .refine((users) => Object.keys(users).length > 0, "at least one user is required")
+});
+
 const OIDCAuthnSchema = z.object({
   kind: z.literal("oidc"),
   issuer: z.url(),
@@ -295,7 +314,7 @@ const ConfigSchema = z.object({
   branding: BrandingSchema.prefault({}),
   session: SessionSchema,
   files: FilesSchema,
-  authn: z.discriminatedUnion("kind", [NoAuthnSchema, OIDCAuthnSchema]),
+  authn: z.discriminatedUnion("kind", [NoAuthnSchema, PasswordAuthnSchema, OIDCAuthnSchema]),
   authz: AuthzSchema.default({ kind: "allow" }),
   connections: z.record(z.string(), ConnectionSchema).optional()
 });
@@ -423,8 +442,12 @@ export const loginPath =
 /** Where the gate sends a refused user: a page, so a fixed route. */
 export const forbiddenPath = `${AUTH_PAGES}/forbidden`;
 
-/** Where `Sign out` posts. Undefined with no provider to sign out of, which is
+/** Where `Sign out` posts. Undefined with nothing to sign out of, which is
  *  what makes the button disappear rather than offer a way out of a session
  *  `authn: none` never opened. */
 export const logoutPath =
-  config.authn.kind === "oidc" ? `${authPrefix}/${config.authn.paths.logout}` : undefined;
+  config.authn.kind === "oidc"
+    ? `${authPrefix}/${config.authn.paths.logout}`
+    : config.authn.kind === "password"
+      ? `${AUTH_PAGES}/logout`
+      : undefined;

@@ -33,7 +33,8 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 - Keep your files between visits and jump between them with a keystroke — and, when the
   server keeps them, find them from any browser you sign in from.
 - Read it light or dark, following your system or whichever you prefer.
-- Put a login in front of it, and decide who gets to reach which cluster.
+- Put a login in front of it — your identity provider's, or a list of users and passwords
+  in the config — and decide who gets to reach which cluster.
 - Run more than one copy of it, and restart it, without signing anyone out.
 
 ## Trying it
@@ -130,7 +131,8 @@ with half a policy.
 
 `${NAME}` anywhere in a string value is replaced with the environment variable of that
 name, which is how the secrets stay out of the file — the cookie and store secrets, the
-OIDC client secret — so that the file can be a ConfigMap with one Secret behind it:
+OIDC client secret, the passwords of `authn: password` — so that the file can be a
+ConfigMap with one Secret behind it:
 
 ```yaml
 session:
@@ -148,7 +150,7 @@ and `$${` writes a literal `${`; a `$` followed by anything else is left as it i
 | --- | --- | --- |
 | `TRINOCULAR_CONFIG` | no | Path to the config file. Without it, and without `TRINO_URL`, the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
 | `TRINO_URL` | no | One Trino cluster's base URL, standing in for a config file — no login, sessions in memory, a cookie secret generated afresh on every start, and the cluster named after the URL's host. It is read **only** when `TRINOCULAR_CONFIG` is unset: setting both stops the server, since a config file is where a connection belongs once there is one. |
-| `ORIGIN` | for OIDC, and for the container | The URL the app is served from, e.g. `https://trinocular.example.com`. Used to build the OIDC redirect, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
+| `ORIGIN` | for any login, and for the container | The URL the app is served from, e.g. `https://trinocular.example.com`. Used to build the OIDC redirect, to check that the `password` login form was posted from this site, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
 | `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
 | `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
 | `BODY_SIZE_LIMIT` | no | The most a request body may be, `512K` by default. Raise it together with `files.maxBytes` if documents are allowed to be bigger than that. |
@@ -395,7 +397,7 @@ expected arrangement: the tables do not collide.
 
 ### `authn` — who the user is
 
-Either no login at all, or OpenID Connect.
+No login at all, a list of users with passwords, or OpenID Connect.
 
 ```yaml
 authn:
@@ -409,6 +411,37 @@ authn:
 | --- | --- | --- |
 | `user` | **required** | The user everybody is signed in as. |
 | `claims` | `{}` | Claims to pretend this user has, so an authorization rule can be tried without an identity provider. |
+
+```yaml
+authn:
+  kind: password
+  users:
+    alice:
+      password: ${ALICE_PASSWORD}
+      claims:
+        groups: [admins]
+    bob:
+      password: ${BOB_PASSWORD}
+      claims:
+        groups: [analysts]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `users` | **required** | The people who can sign in, by user id; at least one. |
+| `users.<id>.password` | **required** | Their password, as written. |
+| `users.<id>.claims` | `{}` | What an authorization rule sees for them, in place of a provider's token claims. |
+
+A form asks for the username and password, and the login is kept in the session store
+like an OIDC one; `Sign out` in the account menu ends it. The passwords are plain text,
+which makes the `users` block a credential: write them as `${VAR}` and put the variables
+in a Secret. A user removed from the config, or whose claims change, is affected on their
+next request after a restart, not when their session happens to expire. After five wrong
+passwords in a row a name has to wait before the next attempt is checked — a second,
+doubling to thirty — which is a brake on guessing and not a lock: it is counted per copy
+of Trinocular, and a name left alone for ten minutes starts over. This is for a handful
+of people on an internal deployment; for more than that, or for anything facing the
+internet, put an identity provider in front of it.
 
 ```yaml
 authn:
