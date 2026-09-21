@@ -3,7 +3,12 @@
   import { Workspace } from "$lib/State.svelte";
   import { page } from "$app/state";
 
-  const workspace = new Workspace(page.data.connections, page.data.store, page.data.loaded);
+  const workspace = new Workspace(
+    page.data.connections,
+    page.data.store,
+    page.data.loaded,
+    page.data.results
+  );
 </script>
 
 <Application {workspace} />

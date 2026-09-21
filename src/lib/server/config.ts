@@ -186,6 +186,21 @@ const FilesSchema = z
 
 export type FilesConfig = z.infer<typeof FilesSchema>;
 
+const ResultsSchema = z
+  .object({
+    // The most one run brings into the browser, whichever is crossed first:
+    // rows, and bytes of result JSON as it arrived (a row costs a multiple of
+    // its wire size in the heap). A run that reaches either is stopped there
+    // and keeps what it has; "Fetch all" fetches up to it. It is a guard for
+    // the browser's memory, not a control on what leaves the cluster: the
+    // page enforces it, and the proxy streams what it is asked for.
+    maxRows: z.number().int().positive().default(1_000_000),
+    maxBytes: z.number().int().positive().default(268_435_456)
+  })
+  .prefault({});
+
+export type ResultsConfig = z.infer<typeof ResultsSchema>;
+
 const NoAuthnSchema = z.object({
   kind: z.literal("none"),
   user: z.string(),
@@ -314,6 +329,7 @@ const ConfigSchema = z.object({
   branding: BrandingSchema.prefault({}),
   session: SessionSchema,
   files: FilesSchema,
+  results: ResultsSchema,
   authn: z.discriminatedUnion("kind", [NoAuthnSchema, PasswordAuthnSchema, OIDCAuthnSchema]),
   authz: AuthzSchema.default({ kind: "allow" }),
   connections: z.record(z.string(), ConnectionSchema).optional()

@@ -5,6 +5,7 @@ import { describeIgnored } from "$lib/trino/session";
 import { TrinoSession } from "$lib/trino/TrinoSession.svelte";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import type { ClientConnection } from "$lib/server/connectionAuthz";
+import type { ResultsConfig } from "$lib/server/config";
 import { underPath } from "$lib/viewFormats";
 import type { FileRecord, StoredFile } from "$lib/workspaceRecord";
 import type { LoadedWorkspace, WorkspaceStore } from "$lib/workspaceStore";
@@ -23,6 +24,23 @@ const MAX_RESULTS_PER_FILE = 10;
 export const ROW_BUDGET = 500_000;
 
 export const DEFAULT_ROW_LIMIT = 1000;
+
+/**
+ * The most a single run may bring into the browser, `results` in the config:
+ * `maxRows`, and `maxBytes` of the JSON its pages arrived as, whichever is
+ * crossed first. Rows are what the banner can say and what the rail's limit
+ * is clamped to; bytes are what actually bounds memory, since a row of one
+ * integer and a row of twenty JSON documents are the same count. A row's
+ * heap cost is some multiple of its wire size (V8's string headers on a wide
+ * row of short strings, mostly), so the bytes side is a proxy too, but one
+ * that holds for any shape of row. Unlike the cap, which *holds* the query
+ * and asks, the ceiling *stops* it: there is no "more" to ask for past it,
+ * and a held query keeps its memory and its slot on the cluster.
+ */
+export type ResultCeiling = ResultsConfig;
+
+/** Why a result stopped short of the cluster's last row. */
+export type Stopped = "user" | "expired" | "max-rows" | "max-bytes";
 
 /** Must stay under Trino's `query.client.timeout`, five minutes by default. */
 const HEARTBEAT_MS = 30_000;
@@ -130,12 +148,19 @@ export class Result {
   #step: number;
   /** Paused at the cap with more rows to be had; heartbeats keep the query alive. */
   held: boolean = $state(false);
-  /** Stopped at the cap, by the reader or by the hold running out. */
-  stopped: false | "user" | "expired" = $state(false);
+  /** Stopped at the cap — by the reader or by the hold running out — or at the ceiling. */
+  stopped: false | Stopped = $state(false);
   /** The rows were let go to free memory; how many there were, or null. */
   released: number | null = $state(null);
+  /** Characters of JSON the rows arrived as; the ceiling's bytes side counts this. */
+  size: number = $state(0);
+  readonly ceiling: ResultCeiling;
   /** The part of the page that crossed the cap; `fetchMore` takes from it first. */
   #pending: readonly QueryData[] = [];
+  /** `#pending`'s share of its page's size, counted when it is taken. */
+  #pendingSize = 0;
+  /** What cut the page `#pending` came from, when it was the ceiling. */
+  #cutBy: "max-rows" | "max-bytes" | null = null;
   #resume?: (action: Resume) => void;
   #heldUri?: string;
 
@@ -144,6 +169,7 @@ export class Result {
     sql: string,
     startLine: number,
     anchorId: string,
+    ceiling: ResultCeiling,
     limit: number | null = null
   ) {
     this.client = client;
@@ -151,6 +177,7 @@ export class Result {
     this.sql = sql;
     this.startLine = startLine;
     this.anchorId = anchorId;
+    this.ceiling = ceiling;
     this.limit = limit;
     this.#step = limit ?? DEFAULT_ROW_LIMIT;
   }
@@ -198,16 +225,23 @@ export class Result {
         if (chunk.warnings) this.warnings = chunk.warnings;
         if (chunk.error) this.error = chunk.error;
 
-        if (chunk.data) this.#take(chunk.data);
+        if (chunk.data) this.#take(chunk.data, chunk.size ?? 0);
 
         // A loop: the held-back tail can exceed the step a resume adds, in
         // which case the query is held again without another page requested.
         while (this.#atCap()) {
+          // Cut by the ceiling rather than the cap: nothing to hold for.
+          if (this.#cutBy) {
+            this.#truncate(this.#cutBy, chunk.nextUri);
+            return;
+          }
           const action = await this.#hold(chunk.nextUri);
           if (action === "stop") return;
           const pending = this.#pending;
+          const pendingSize = this.#pendingSize;
           this.#pending = [];
-          this.#take(pending);
+          this.#pendingSize = 0;
+          this.#take(pending, pendingSize);
         }
       }
     } catch (e) {
@@ -233,27 +267,46 @@ export class Result {
   }
 
   /**
-   * Appends a page, cut at the cap: a page is sized in bytes, and one of
-   * narrow rows can run to tens of thousands. `append` returns a new Rows
-   * sharing the pages already held, which is how $state.raw notices.
+   * Appends a page, cut at the cap or the ceiling, whichever is nearer: a
+   * page is sized in bytes, and one of narrow rows can run to tens of
+   * thousands. The ceiling's bytes side cuts a page in proportion, every row
+   * taken as the page's average, since the rows are not measured one by one;
+   * `size` is the page's share of the wire, and pending rows carry theirs
+   * with them. `append` returns a new Rows sharing the pages already held,
+   * which is how $state.raw notices.
    */
-  #take(page: readonly QueryData[]) {
-    const room = this.limit == null ? Infinity : this.limit - this.data.length;
+  #take(page: readonly QueryData[], size: number) {
+    const capRoom = this.limit == null ? Infinity : this.limit - this.data.length;
+    const rowsRoom = this.ceiling.maxRows - this.data.length;
+    const bytesRoom =
+      this.size + size > this.ceiling.maxBytes
+        ? Math.floor((page.length * (this.ceiling.maxBytes - this.size)) / size)
+        : Infinity;
+    const room = Math.max(0, Math.min(capRoom, rowsRoom, bytesRoom));
     if (page.length <= room) {
       this.data = this.data.append(page);
+      this.size += size;
+      this.#cutBy = null;
       return;
     }
     this.data = this.data.append(page.slice(0, room));
+    const taken = Math.floor((size * room) / page.length);
+    this.size += taken;
     this.#pending = page.slice(room);
+    this.#pendingSize = size - taken;
+    // The ceiling wins a tie with the cap: holding for a "more" that cannot
+    // be answered would keep the query on the cluster for nothing.
+    this.#cutBy = bytesRoom <= room ? "max-bytes" : rowsRoom <= room ? "max-rows" : null;
   }
 
   /**
    * Held only once rows have actually been held back, not the moment the
    * count reaches the cap: with rows still to come the next page settles it
    * either way, and a query of exactly the cap ends instead of claiming more.
+   * The same rule serves the ceiling, with `#cutBy` saying which it was.
    */
   #atCap(): boolean {
-    return this.limit != null && this.data.length >= this.limit && this.#pending.length > 0;
+    return this.#pending.length > 0;
   }
 
   /**
@@ -295,6 +348,7 @@ export class Result {
     this.#resume?.("more");
   }
 
+  /** "All" is up to the ceiling, which `#take` applies whatever the cap says. */
   fetchAll() {
     if (!this.held) return;
     this.limit = null;
@@ -307,13 +361,23 @@ export class Result {
    */
   stop(reason: "user" | "expired" = "user") {
     if (!this.held) return;
+    this.#truncate(reason, this.#heldUri);
+    this.#resume?.("stop");
+  }
+
+  /**
+   * Settles the result short of the cluster's last row, keeping what it has.
+   * With a `nextUri` there is a query still on the cluster to cancel; without
+   * one the last page has already arrived and there is nothing to stop.
+   */
+  #truncate(reason: Stopped, nextUri: string | undefined) {
     this.#pending = [];
+    this.#pendingSize = 0;
     this.stopped = reason;
-    if (this.#heldUri) {
+    if (nextUri) {
       this.cancelRequested = true;
       void this.#sendCancel();
     }
-    this.#resume?.("stop");
   }
 
   /**
@@ -522,6 +586,8 @@ export class Workspace {
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
+  /** The most any run brings into the browser; see `ResultCeiling`. */
+  readonly ceiling: ResultCeiling;
   /** Rows a new run shows before pausing to ask, when `limitRows` is on. */
   rowLimit: number = $state(DEFAULT_ROW_LIMIT);
   limitRows: boolean = $state(true);
@@ -578,10 +644,14 @@ export class Workspace {
     connections: readonly ClientConnection[],
     store: WorkspaceStore,
     loaded: LoadedWorkspace,
+    ceiling: ResultCeiling,
     id: string = "default"
   ) {
     this.id = id;
     this.connections = connections;
+    this.ceiling = ceiling;
+    // A cap above the ceiling would never hold, only stop.
+    this.rowLimit = Math.min(DEFAULT_ROW_LIMIT, ceiling.maxRows);
     this.#store = store;
     this.#saver = new WorkspaceSaver(store, {
       isActive: (fileId) => this.activeFile?.id === fileId,
@@ -798,6 +868,7 @@ export class Workspace {
       sql,
       startLine,
       anchorId,
+      this.ceiling,
       this.limitRows ? this.rowLimit : null
     );
     file.addResult(result, replacesId);
