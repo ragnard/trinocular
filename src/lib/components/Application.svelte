@@ -5,9 +5,10 @@
   import { DelegatingMetadataProvider } from "$lib/catalog/DelegatingMetadataProvider";
   import { NOTHING_TO_DESCRIBE, TrinoMetadataProvider } from "$lib/catalog/TrinoMetadataProvider";
   import { theme } from "$lib/theme.svelte";
+  import { readPref, writePref } from "$lib/prefs";
   import { untrack } from "svelte";
 
-  import { SplitPane } from "./split-pane";
+  import { SplitPane, sizesOf, withSizes, type PaneLayout } from "./split-pane";
   import TopBar from "./TopBar.svelte";
   import Result from "./Result.svelte";
   import DataViewer from "./DataViewer.svelte";
@@ -58,6 +59,40 @@
   $effect(() => {
     document.documentElement.dataset.theme = palette;
   });
+
+  // The pane layout is a browser preference like the theme (`prefs.ts`):
+  // dragging the inspector wide to read JSON is done once, not on every
+  // visit. The bounds are declared here and never stored — only the sizes
+  // are, and a stored size outside the bounds is dropped (`withSizes`). The
+  // defaults are written as the absence of a key, so a browser nobody has
+  // dragged in follows a change to them.
+  const WORKSPACE_LAYOUT: PaneLayout[] = [
+    { size: 19, min: "180px", max: "40%" },
+    { size: 54, min: "30%" },
+    { size: 27, min: "12%" }
+  ];
+  const DOCUMENT_LAYOUT: PaneLayout[] = [
+    { size: 38, min: "10%" },
+    { size: 62, min: "10%" }
+  ];
+  const LAYOUT_PREF = "layout";
+  const storedLayout = readPref(LAYOUT_PREF, (v) =>
+    typeof v === "object" && v !== null
+      ? (v as { workspace?: unknown; document?: unknown })
+      : undefined
+  );
+  let workspaceLayout = $state(withSizes(WORKSPACE_LAYOUT, storedLayout?.workspace));
+  let documentLayout = $state(withSizes(DOCUMENT_LAYOUT, storedLayout?.document));
+
+  $effect(() => {
+    const value = { workspace: sizesOf(workspaceLayout), document: sizesOf(documentLayout) };
+    const unchanged =
+      same(value.workspace, sizesOf(WORKSPACE_LAYOUT)) &&
+      same(value.document, sizesOf(DOCUMENT_LAYOUT));
+    writePref(LAYOUT_PREF, unchanged ? undefined : value);
+  });
+
+  const same = (a: number[], b: number[]) => a.length === b.length && a.every((n, i) => n === b[i]);
 
   // One delegate per connection, swapped when the workspace is pointed
   // somewhere else, so completions describe the cluster it actually runs on.
@@ -175,14 +210,7 @@
   <div class="document">
     <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
     <div class="document-body">
-      <SplitPane
-        type="vertical"
-        panes={[editor, results]}
-        layout={[
-          { size: 38, min: "10%" },
-          { size: 62, min: "10%" }
-        ]}
-      />
+      <SplitPane type="vertical" panes={[editor, results]} bind:layout={documentLayout} />
     </div>
   </div>
 {/snippet}
@@ -202,15 +230,7 @@
 <main>
   <TopBar {branding} {userId} {logoutPath} />
   <div class="workspace">
-    <SplitPane
-      type="horizontal"
-      panes={[browser, doc, inspector]}
-      layout={[
-        { size: 19, min: "180px", max: "40%" },
-        { size: 54, min: "30%" },
-        { size: 27, min: "12%" }
-      ]}
-    />
+    <SplitPane type="horizontal" panes={[browser, doc, inspector]} bind:layout={workspaceLayout} />
   </div>
 
   {#if switcherOpen}
