@@ -53,8 +53,11 @@
     color: var(--fg-2);
   }
 
+  /* `.textbox` is sized for a rail (--h-ctl); standing alone on a page it
+     takes the height the filter box does, so the two read as one control. */
   .auth :global(.textbox) {
     width: 100%;
+    height: var(--h-row);
     color: var(--fg);
   }
 
