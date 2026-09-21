@@ -167,6 +167,7 @@
     bind:selection
     bind:rowLimit={workspace.rowLimit}
     bind:limitRows={workspace.limitRows}
+    ceiling={workspace.ceiling}
     onopen={openRecord}
   />
 {/snippet}

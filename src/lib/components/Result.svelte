@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { MAX_HOLD_MS, type Result as ResultModel } from "$lib/State.svelte";
-  import { formatCount } from "$lib/format";
+  import { MAX_HOLD_MS, type ResultCeiling, type Result as ResultModel } from "$lib/State.svelte";
+  import { formatBytes, formatCount } from "$lib/format";
   import { Table, fieldFromTypeSignature, convertValue } from "./table";
   import type { Schema, Selection, ValueConverter } from "./table/types";
   import type { Columns } from "$lib/trino";
@@ -17,6 +17,8 @@
     /** Rows the next run shows before pausing to ask, while `limitRows` is on. */
     rowLimit?: number;
     limitRows?: boolean;
+    /** The most the next run may bring into the browser, cap or no cap. */
+    ceiling: ResultCeiling;
     /** Enter on the table's selection. */
     onopen?: () => void;
   }
@@ -26,8 +28,14 @@
     selection = $bindable(null),
     rowLimit = $bindable(1000),
     limitRows = $bindable(true),
+    ceiling,
     onopen
   }: Props = $props();
+
+  /** What the ceiling amounts to, for the tooltips that say how far "all" goes. */
+  let ceilingText = $derived(
+    `${formatCount(ceiling.maxRows)} rows or ${formatBytes(ceiling.maxBytes)}`
+  );
 
   let table: ReturnType<typeof Table> | undefined = $state();
 
@@ -46,9 +54,10 @@
     table?.focus();
   }
 
+  /** Clamped to the ceiling: a cap above it would never hold, only stop. */
   function setLimit(input: HTMLInputElement) {
     const n = Math.floor(Number(input.value));
-    if (Number.isFinite(n) && n >= 1) rowLimit = n;
+    if (Number.isFinite(n) && n >= 1) rowLimit = Math.min(n, ceiling.maxRows);
     input.value = String(rowLimit);
   }
 
@@ -138,7 +147,7 @@
         aria-pressed={limitRows}
         title={limitRows
           ? `New runs pause after ${formatCount(rowLimit)} rows and ask before fetching more`
-          : "New runs fetch every row"}
+          : `New runs fetch every row, up to ${ceilingText}`}
         onclick={() => (limitRows = !limitRows)}
       >
         <ListEnd size={14} />
@@ -216,7 +225,15 @@
         <button class="chip" onclick={() => result.fetchMore()}>
           Fetch {formatCount(result.step)} more
         </button>
-        <button class="chip" onclick={() => result.fetchAll()}>Fetch all</button>
+        <button
+          class="chip"
+          title={`Up to ${formatCount(result.ceiling.maxRows)} rows or ${formatBytes(
+            result.ceiling.maxBytes
+          )}, the most a result may bring into the browser`}
+          onclick={() => result.fetchAll()}
+        >
+          Fetch all
+        </button>
         <button class="chip" onclick={() => result.stop()}>Stop</button>
       </div>
     {:else if result.stopped === "expired"}
@@ -225,6 +242,17 @@
         <span class="fill">
           Showing the first {formatCount(result.rowCount)} rows. The query was stopped after being paused
           for {MAX_HOLD_MS / 60_000} minutes; run it again to fetch more.
+        </span>
+      </div>
+    {:else if result.stopped === "max-rows" || result.stopped === "max-bytes"}
+      <!-- The ceiling is the one stop with nothing to offer after it, so this
+           says where the rest of the result can be had instead. -->
+      <div class="notice">
+        <span class="fill">
+          Showing the first {formatCount(result.rowCount)} rows{#if result.stopped === "max-bytes"},
+            {formatBytes(result.size)} of results{/if} — the most a result may bring into the browser.
+          The query was stopped there; for more, narrow it, or run it from a Trino client that writes
+          to a file.
         </span>
       </div>
     {:else if result.running}

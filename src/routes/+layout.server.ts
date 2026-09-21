@@ -20,6 +20,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     // Where the browser keeps the documents: its own localStorage, or the
     // server's file store behind /api/workspace.
     fileStorage: config.files.store.kind === "browser" ? "browser" : "server",
+    // The most a run may bring into the browser; enforced there, by `Result`.
+    results: config.results,
     // Where the account menu's — and the forbidden page's — `Sign out` posts.
     logoutPath
   };

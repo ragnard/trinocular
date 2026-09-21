@@ -187,6 +187,13 @@ export type QueryResult = {
   stats?: QueryStats;
   warnings?: string[];
   error?: QueryError;
+  /**
+   * Characters of JSON the chunk arrived as — set by this client, never sent
+   * by Trino. It is what a result's byte ceiling counts: a row's footprint in
+   * the browser is some multiple of its wire size, and the wire size is known
+   * without measuring the rows one by one.
+   */
+  size?: number;
 };
 
 export type Query = {
@@ -250,6 +257,23 @@ export default class Trino {
    * @returns The response data.
    */
   async request<T>(cfg: FetchRequestConfig): Promise<T> {
+    const text = await this.requestText(cfg);
+    return (text === undefined ? undefined : JSON.parse(text)) as T;
+  }
+
+  /** A chunk of a query's results with its wire size on it; see `QueryResult.size`. */
+  private async requestChunk(cfg: FetchRequestConfig): Promise<QueryResult> {
+    const text = await this.requestText(cfg);
+    const chunk = JSON.parse(text ?? "{}") as QueryResult;
+    chunk.size = text?.length ?? 0;
+    return chunk;
+  }
+
+  /**
+   * The response body as text, so that a caller can measure it before it is
+   * parsed; `json()` makes the same string and keeps it to itself.
+   */
+  private async requestText(cfg: FetchRequestConfig): Promise<string | undefined> {
     const url = cfg.url?.startsWith("http") ? cfg.url : `${this.baseURL}${cfg.url ?? ""}`;
 
     const init: globalThis.RequestInit = {
@@ -276,10 +300,10 @@ export default class Trino {
     // Cancelling a query answers 204 with an empty body, and a HEAD has none
     // by definition — json() throws on either.
     if (response.status === 204 || init.method === "HEAD") {
-      return undefined as T;
+      return undefined;
     }
 
-    return response.json() as Promise<T>;
+    return response.text();
   }
 
   /**
@@ -295,9 +319,12 @@ export default class Trino {
       data: req.query,
       headers: req.extraHeaders ?? {}
     };
-    return this.request<QueryResult>(requestConfig).then(
-      (result) => new QueryIterator(this, result)
-    );
+    return this.requestChunk(requestConfig).then((result) => new QueryIterator(this, result));
+  }
+
+  /** The page at `nextUri`, sized; what `QueryIterator` walks with. */
+  async nextChunk(nextUri: string): Promise<QueryResult> {
+    return this.requestChunk({ url: nextUri });
   }
 
   /**
@@ -351,10 +378,8 @@ export class QueryIterator implements AsyncIterableIterator<QueryResult> {
    * finish in a single batch.
    */
   async next(): Promise<IteratorResult<QueryResult>> {
-    if (this.hasNext()) {
-      this.queryResult = await this.client.request<QueryResult>({
-        url: this.queryResult.nextUri
-      });
+    if (this.queryResult.nextUri) {
+      this.queryResult = await this.client.nextChunk(this.queryResult.nextUri);
       return { value: this.queryResult, done: false };
     }
     if (this.finished) {

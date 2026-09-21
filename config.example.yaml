@@ -170,6 +170,22 @@ files:
   #   url: postgres://trinocular:${PGPASSWORD}@postgres.example:5432/trinocular # Required
   #   schema: public                           # Default: public
 
+# ── results ──────────────────────────────────────────────────────────────────
+#
+# The most one run may bring into the browser, whichever is crossed first:
+# rows, and bytes of the result as it arrived. A run that reaches either is
+# stopped there and keeps what it has, with a note saying so; "Fetch all" on
+# a paused run fetches up to it. It is a guard for the browser's memory —
+# six million rows of a wide table was measured at a 1.5 GB heap, which is a
+# tab lost with no warning — and not a control on what leaves the cluster:
+# the page enforces it, and the proxy passes on whatever it is asked for.
+# Sized for a laptop with other tabs open; a row costs a few times its wire
+# size in the heap.
+#
+results:
+  maxRows: 1000000                             # Default: 1000000
+  maxBytes: 268435456                          # 256 MiB. Default: 268435456
+
 # ── authn ────────────────────────────────────────────────────────────────────
 #
 # Who the user is: no login at all, a list of users with passwords, or

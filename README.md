@@ -132,6 +132,7 @@ swaps in, with its trade-offs, commented out and ready. In outline:
 | `branding` | The name, logo and a message in the top bar. |
 | `session` | The cookie, and where sessions live: `memory`, `sqlite`, `valkey` or `postgres`. |
 | `files` | Where users' query files live: the `browser` (localStorage, the default), `memory`, `sqlite`, `valkey` or `postgres`. |
+| `results` | The most one query may bring into the browser, in rows and in bytes; past it the run is stopped and keeps what it has. |
 | `authn` | Who the user is: `none` (everybody is one named user), `password` (users and passwords in the config) or `oidc`. |
 | `authz` | Who is allowed in: `allow` (the default), a `cel` expression over the user's claims, or `require-keycloak-client-role`. |
 | `connections` | The Trino clusters, each with an optional `authz` rule of its own that can only narrow the one above. |
