@@ -1,7 +1,7 @@
 <script lang="ts">
   import { isDictionary, isList, isStruct } from "./table/types";
   import type { Selection, SelectionData, Field } from "./table/types";
-  import { ChevronDown, ChevronUp, Copy, Eye, Maximize2, Search, X } from "@lucide/svelte";
+  import { ChevronDown, ChevronUp, Copy, Maximize2, Search, X } from "@lucide/svelte";
   import Menu from "./Menu.svelte";
   import FilterBox from "./FilterBox.svelte";
   import {
@@ -36,9 +36,11 @@
     /**
      * Moves the selection by `delta` rows (±Infinity for either end), keeping
      * the anchor when `extend`. Given, the rail grows a navigator and the
-     * arrow keys step; the selection itself stays the table's to own.
+     * arrow keys step; the selection itself stays the table's to own. `reveal`
+     * is whether the table should scroll to the row now — false from the
+     * dialog, which covers it.
      */
-    onstep?: (delta: number, extend: boolean) => void;
+    onstep?: (delta: number, extend: boolean, reveal: boolean) => void;
     /**
      * Full-window: the columns start at half the width each, the arrow keys
      * step wherever focus is, one row is shown at a time, and the filter takes
@@ -90,7 +92,7 @@
         return;
     }
     event.preventDefault();
-    onstep(delta, event.shiftKey && !expanded);
+    onstep(delta, event.shiftKey && !expanded, !expanded);
   }
 
   let fieldInput: FilterBox | undefined = $state();
@@ -380,7 +382,7 @@
     {#if onstep}
       <button
         class="chip square"
-        onclick={() => onstep(-1, false)}
+        onclick={() => onstep(-1, false, !expanded)}
         disabled={atFirst}
         title="Previous row (↑)"
       >
@@ -388,7 +390,7 @@
       </button>
       <button
         class="chip square"
-        onclick={() => onstep(1, false)}
+        onclick={() => onstep(1, false, !expanded)}
         disabled={atLast}
         title="Next row (↓)"
       >
@@ -453,7 +455,14 @@
     {#if !documents.length}
       <p class="empty">Select cells in the results to inspect them.</p>
     {/if}
-    {#each documents as doc (doc.row)}
+    <!-- Positional on purpose, not keyed on `doc.row`: stepping changes the
+         row number, and a key that changes is a document torn down and built
+         again — every field, its value component and its buttons — for what
+         is the same set of columns with new values in them. Positional, a step
+         is a diff of the inner list by column path, which is what `entry.id`
+         is for; only the fields that appeared or vanished (nulls hidden, an
+         array of a different length) are mounted or removed. -->
+    {#each documents as doc}
       <div class="doc-head">
         <span class="caps small">Row {doc.row}</span>
         <span class="fill"></span>
@@ -476,6 +485,14 @@
           <div class="value" class:null={entry.value === null}>
             <view.component {...view.props} title={entry.key} />
           </div>
+          <!-- The two icons are lucide's `Eye` and `Copy` written out as
+               markup rather than mounted as components. A lucide component is
+               two components deep and costs a rest-props object, three
+               deriveds, a spread on the `<svg>` and an effect per child
+               element; at two per field, building them was half the time a
+               step through a wide row spent in JS, and the effects were most
+               of what the collector then had to reclaim. Static markup is part
+               of the row's cloned template and costs nothing at all. -->
           <div class="controls">
             {#if choices.length > 1}
               <button
@@ -485,11 +502,37 @@
                 onclick={(e) => startPick(entry, e.currentTarget)}
                 title={`Show "${entry.key}" as… (${chosen.label})`}
               >
-                <Eye size={12} />
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
               </button>
             {/if}
             <button class="chip square copy" onclick={() => copyValue(entry)} title="Copy value">
-              <Copy size={12} />
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
             </button>
           </div>
         </div>
