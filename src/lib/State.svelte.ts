@@ -384,11 +384,20 @@ export class Result {
   discard() {
     if (this.#discarded) return;
     this.#discarded = true;
-    if (this.completed) return;
-    if (this.held) return this.stop();
-    // Also makes `execute` fire the DELETE if the query id has not arrived yet.
-    this.cancelRequested = true;
-    void this.#sendCancel();
+    if (!this.completed) {
+      if (this.held) this.stop();
+      else {
+        // Also makes `execute` fire the DELETE if the query id has not arrived yet.
+        this.cancelRequested = true;
+        void this.#sendCancel();
+      }
+    }
+    // Nothing can show these rows again, and a `$derived` that read `data`
+    // keeps the old signal, value and all, until it is next evaluated — which
+    // for a result pane whose result went null is never. Dropping them here
+    // is what actually frees them.
+    this.data = Rows.empty;
+    this.#pending = [];
   }
 
   async #sendCancel() {
