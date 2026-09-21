@@ -65,7 +65,7 @@ branding:
 session:
   maxLifetimeSeconds: 86400                    # Seconds. Default: 86400
   cookie:
-    secret: replace-with-32-or-more-characters # Required
+    secret: ${COOKIE_SECRET}                   # Required: 32 or more characters
     name: trinocular-session                   # Default: trinocular-session
     path: /                                    # Default: /
     httpOnly: true                             # Default: true
