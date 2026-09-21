@@ -31,8 +31,10 @@ vite.config.ts.timestamp-*
 .fontbuild/
 
 # Local-only: the dev/preview configs hold cookie and client secrets, and
-# hack/ holds a TLS key and connector properties for a local stack.
+# hack/ holds a TLS key and connector properties for a local stack. The
+# example is the one config file that is documentation rather than a secret.
 /config.*.yaml
+!/config.example.yaml
 /hack/
 
 # Worktrees and other per-machine state from Claude Code sessions.

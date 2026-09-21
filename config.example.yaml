@@ -1,0 +1,295 @@
+# Trinocular configuration: every option, with its default where it has one.
+#
+# Point TRINOCULAR_CONFIG at a file like this (YAML or JSON). It is validated
+# at startup, and anything invalid stops the server.
+#
+# As written, this file is the simplest complete configuration: no login,
+# everyone allowed, sessions in memory, files in the browser, two clusters.
+# What a deployment swaps in — a login, a required role, a store that
+# outlives the process — is under each section's alternatives. Each section opens with a
+# few lines on what it decides, then the settings in use, each with a note and
+# its default. Where a setting has alternatives — another store, no login —
+# they follow, commented out, under "Alternatives".
+#
+# ${NAME} in any string value is the environment variable of that name: how
+# the secrets stay out of the file, so it can be a ConfigMap with one Secret
+# behind it. A variable that is not set stops the server, and $${ writes a
+# literal ${. The secrets in use below are placeholders, so that the file
+# starts as written; the alternatives show the ${VAR} form a deployment wants.
+#
+# Besides the file, the server reads these from the environment:
+#
+#   TRINOCULAR_CONFIG   Path to this file.
+#   TRINO_URL           One cluster's URL standing in for the whole file: no login,
+#                       sessions in memory, a cookie that is Secure only under https.
+#                       Read only when TRINOCULAR_CONFIG is unset; both set is an error.
+#   ORIGIN              The URL the app is served from, e.g. https://trinocular.example.com.
+#                       Required for any login, and in the container: the OIDC
+#                       redirect, the check that the password form was posted from
+#                       this site, and the cookie's Secure flag all come from it.
+#   LOG_LEVEL           trace, debug, info (default), warn, error, fatal or silent.
+#   PORT, HOST          Where to listen. 3000 on all interfaces by default.
+#   BODY_SIZE_LIMIT     The most a request body may be, 512K by default. Raise it
+#                       together with files.maxBytes.
+
+# ── branding ─────────────────────────────────────────────────────────────────
+#
+# What the top bar shows. logo and message are HTML rendered as written; a
+# <script> in them does not run, since the content security policy allows none.
+# The logo is scaled into a 20×20 px box: an inline <svg>, or an <img> with a
+# data: URL; "" shows none. Both default to unset, the logo to the bundled one.
+#
+branding:
+  name: Trinocular                             # Default: Trinocular
+  # logo: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>'
+  # message: 'Questions? <a href="https://wiki.example/trino">#data-help</a>'
+
+# ── session ──────────────────────────────────────────────────────────────────
+#
+# The session cookie, and where sessions live. Where they live decides what a
+# restart costs and how many copies of Trinocular can run:
+#
+#   memory    One copy, and a restart signs everyone out. Nothing to run.
+#   sqlite    One copy; sessions survive a restart, in a file on its volume.
+#   valkey    Any number of copies; sessions survive a restart, in a Valkey
+#             or Redis you run.
+#   postgres  Any number of copies; sessions survive a restart, in a
+#             PostgreSQL you run — and with the files there too, one
+#             database is all a deployment needs.
+#
+# Outside memory, the sessions are encrypted with the store's own secret,
+# which must differ from cookie.secret so that either can be rotated alone.
+# Startup fails if the store cannot be reached. The postgres tables are made
+# on startup and brought up to date on upgrade; the schema must already exist.
+#
+session:
+  maxLifetimeSeconds: 86400                    # Seconds. Default: 86400
+  cookie:
+    secret: replace-with-32-or-more-characters # Required
+    name: trinocular-session                   # Default: trinocular-session
+    path: /                                    # Default: /
+    httpOnly: true                             # Default: true
+    sameSite: lax                              # strict, lax or none. Default: lax
+    # secure: true                             # Default: true unless ORIGIN is http://
+    # domain: trinocular.example.com           # Only if wider than the host. Default: unset
+    # maxAge: 86400                            # Seconds, to outlive the browser. Default: unset
+  store:
+    kind: memory                               # memory, sqlite, valkey or postgres. Default: memory
+  #
+  # Alternatives ──
+  #
+  # store:
+  #   kind: sqlite
+  #   path: /data/sessions.sqlite              # Created if missing; the directory must exist.
+  #   secret: ${SESSION_STORE_SECRET}          # Required; not cookie.secret
+  #
+  # store:
+  #   kind: valkey
+  #   secret: ${SESSION_STORE_SECRET}          # Required; not cookie.secret
+  #   keyPrefix: "trinocular:session:"         # Default: trinocular:session:
+  #   mode: single                             # Required: single, cluster or sentinel
+  #   host: 127.0.0.1                          # Default: 127.0.0.1
+  #   port: 6379                               # Default: 6379
+  #   db: 0                                    # Default: 0
+  #   username: ...                            # ACL user. Default: unset
+  #   password: ${VALKEY_PASSWORD}             # Default: unset
+  #   tls: false                               # true: system CAs; { ca: /path.pem }: your own
+  #   connectTimeoutMs: 10000                  # Default: 10000
+  #   commandTimeoutMs: 5000                   # Default: 5000
+  #
+  # mode: cluster takes, instead of host, port and db:
+  #   nodes:                                   # One reachable node finds the rest
+  #     - { host: valkey-1.example, port: 6379 }
+  #
+  # mode: sentinel takes, instead of host and port:
+  #   sentinels:
+  #     - { host: sentinel-1.example, port: 26379 }
+  #   name: mymaster                           # The master's name as the sentinels know it
+  #   sentinelUsername: ...                    # If the sentinels are secured on their own
+  #   sentinelPassword: ...
+  #   db: 0
+  #
+  # store:
+  #   kind: postgres
+  #   url: postgres://trinocular:${PGPASSWORD}@postgres.example:5432/trinocular # Required
+  #   secret: ${SESSION_STORE_SECRET}          # Required; not cookie.secret
+  #   schema: public                           # The schema the tables go in. Default: public
+  #   tls: true                                # true or { ca: /path.pem }. Default: URL's sslmode
+  #   poolSize: 4                              # Connections one copy opens. Default: 4
+  #   connectTimeoutMs: 10000                  # Default: 10000
+  #   statementTimeoutMs: 5000                 # Default: 5000
+
+# ── files ────────────────────────────────────────────────────────────────────
+#
+# Where users' SQL files live:
+#
+#   browser   In the user's browser (localStorage), and only there: another
+#             browser, or the same one with its site data cleared, starts
+#             empty. Nothing to run.
+#   memory    On the server, gone with the process. For development.
+#   sqlite    On the server, in a file on this one copy's volume.
+#   valkey    On the server, in a Valkey or Redis, for any number of copies.
+#             Make sure it persists to disk (AOF or RDB): unlike a session, a
+#             lost file is not something a user can sign in again to get back.
+#   postgres  On the server, in a PostgreSQL, for any number of copies; a
+#             backup of the database is a backup of everyone's queries.
+#
+# On the server, files are keyed by the user id authn gives the user, so they
+# follow the person and not the machine. A browser that had files of its own
+# hands them over on its next visit and then forgets them, so a move to the
+# server is not meant to be undone. Files are not encrypted, in any store.
+# The sqlite, valkey and postgres options are the session store's, minus the
+# secret. Keep the sqlite file apart from the sessions', so that one can be
+# deleted to sign everyone out without touching a document; a postgres
+# database and schema can be shared with the sessions', since the tables
+# do not collide.
+#
+files:
+  maxBytes: 524288                             # Largest document, bytes. Default: 524288
+  store:
+    kind: browser                              # browser (default), memory, sqlite, valkey, postgres
+  #
+  # Alternatives ──
+  #
+  # store:
+  #   kind: memory
+  #
+  # store:
+  #   kind: sqlite
+  #   path: /data/files.sqlite                 # Created if missing; the directory must exist
+  #
+  # store:
+  #   kind: valkey                             # The session store's options, minus the secret
+  #   keyPrefix: "trinocular:files:"           # Default: trinocular:files:
+  #   mode: single
+  #   host: valkey.example
+  #   port: 6379
+  #
+  # store:
+  #   kind: postgres                           # The session store's options, minus the secret
+  #   url: postgres://trinocular:${PGPASSWORD}@postgres.example:5432/trinocular # Required
+  #   schema: public                           # Default: public
+
+# ── authn ────────────────────────────────────────────────────────────────────
+#
+# Who the user is: no login at all, a list of users with passwords, or
+# OpenID Connect.
+#
+#   none      Everybody is one named user. For development, or behind
+#             something that already decides who gets in. Nothing to run.
+#   password  A login form, checked against users written here, each with
+#             the claims an authz rule sees for them. For a handful of people
+#             on an internal deployment: the passwords are plain text, so
+#             write them as ${VAR}, and after five wrong passwords a name
+#             waits before the next try is checked (a brake, not a lock —
+#             per copy of Trinocular, forgotten after ten quiet minutes).
+#             Removing a user, or changing their claims, takes effect on
+#             their next request after a restart.
+#   oidc      A login at your identity provider (Keycloak, Entra, Okta, ...).
+#             Sessions carry the user's tokens, and the user reaches Trino as
+#             themselves. For more than a handful of people, or anything
+#             facing the internet.
+#
+# Under oidc, the redirect URI to register with the provider is ORIGIN +
+# paths.prefix + paths.callback, e.g. https://trinocular.example.com/auth/callback;
+# signing out also ends the session at the provider, so register ORIGIN + / as
+# a post-logout redirect URI too. claimsFrom decides which token authz reads:
+# Keycloak puts client roles in the access token unless "Add to ID token" is
+# ticked on the mapper, so a role rule usually wants access_token.
+#
+authn:
+  kind: none                                   # none, password or oidc
+  user: alice                                  # Required: the user everybody is signed in as
+  claims:                                      # Pretend claims, to try an authz rule. Default: none
+    groups: [finance]                          # What the finance connection below asks for
+#
+# Alternatives ──
+#
+# authn:
+#   kind: password
+#   users:                                     # Required; at least one, by user id
+#     alice:
+#       password: ${ALICE_PASSWORD}            # Required
+#       claims:                                # What an authz rule sees for them. Default: none
+#         groups: [admins]
+#     bob:
+#       password: ${BOB_PASSWORD}
+#       claims:
+#         groups: [analysts]
+#
+# authn:
+#   kind: oidc
+#   issuer: https://keycloak.example/realms/prod # Required; metadata is discovered
+#   clientId: trinocular                       # Required
+#   clientSecret: ${OIDC_CLIENT_SECRET}        # Required
+#   scope: openid profile email                # Required
+#   userIdClaim: preferred_username            # Names the user. Default: preferred_username
+#   claimsFrom: id_token                       # id_token or access_token. Default: id_token
+#   paths:
+#     prefix: /auth                            # Default: /auth
+#     login: login                             # Default: login
+#     logout: logout                           # Default: logout
+#     callback: callback                       # Default: callback
+#     error: error                             # Default: error
+
+# ── authz ────────────────────────────────────────────────────────────────────
+#
+# Who is allowed in, judged on the claims authn produced and nothing else.
+#
+#   allow                        Anyone who signed in. The default when
+#                                authz is left out.
+#   cel                          A CEL expression (https://cel.dev) over the
+#                                user's claims that must come out true. The
+#                                kind a rule gets when it names none, so
+#                                `authz: { expression: "..." }` is enough.
+#   require-keycloak-client-role Shorthand for the expression
+#                                "<role>" in claims.resource_access.<client>.roles
+#                                — Keycloak's client roles — kept as a kind
+#                                because it knows this app's own clientId.
+#
+# An expression sees two variables: `claims`, the user's claims as one map
+# (from the token claimsFrom names, or the claims written under authn: none),
+# and `userId`. Only exactly `true` allows, and an evaluation error refuses —
+# CEL makes a missing map key an error, so `"x" in claims.groups` refuses a
+# user with no groups claim rather than letting them through; guard it with
+# `has(claims.groups) && ...` if you would rather that read as false. A
+# syntax error, a variable other than the two, or an expression that can
+# never be a boolean stops the server at startup.
+#
+authz:
+  kind: allow                                  # allow, cel or require-keycloak-client-role
+#
+# Alternatives ──
+#
+# authz:
+#   expression: '"analysts" in claims.groups || "admins" in claims.groups'
+#
+# authz:
+#   expression: 'claims.email_verified == true && claims.email.endsWith("@example.com")'
+#
+# authz:
+#   expression: 'userId in ["alice", "bob"]'
+#
+# authz:
+#   kind: require-keycloak-client-role
+#   role: user                                 # Required: the role a user must hold
+#   client: trinocular                         # Whose roles. Default: this app's clientId
+
+# ── connections ──────────────────────────────────────────────────────────────
+#
+# The Trino clusters. Each key is the connection's id, used internally and in
+# what the app stores; name is what users see. Users reach a cluster as
+# themselves (their user id, and their access token under OIDC), so the
+# cluster's own access control still applies. A connection's authz is the
+# same vocabulary as above, applied on top: it can keep people out of this
+# cluster, but never let anyone past the front door.
+#
+connections:
+  warehouse:
+    name: Warehouse                            # Required; shown in the UI
+    uri: https://trino.example:8443            # Required; only the server talks to it
+  finance:
+    name: Finance
+    uri: https://trino-finance.example:8443
+    authz:                                     # Optional; on top of the rule above
+      expression: '"finance" in claims.groups'

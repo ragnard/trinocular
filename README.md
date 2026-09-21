@@ -2,56 +2,41 @@
 
 A web-based SQL query IDE for the [Trino](https://trino.io) distributed query engine.
 
+![Trinocular: the schema browser on the left, a SQL file with two statements and the result of one of them in the middle, and the selected row's fields in the inspector on the right](docs/screenshot.png)
+
 ## Features
 
-- Write SQL with autocompletion, highlighting and errors marked as you type.
-- Keep many statements in one file and run any of them on its own, each with its own
-  results.
-- See what a running query is actually doing, and stop it if it is doing too much.
-- Keep a big result from flooding the screen: a run pauses after the first thousand
-  rows, or however many you set, and asks before fetching more, or all of them. Switch
-  the cap off for runs that should not stop.
-- Inspect one or more rows of a result set, field by field, with nested values spelled
-  out — in a side pane, or opened full-window to step from row to row — and narrow it
-  by field name or by what a value shows, with a regular expression.
-- Flexible value display — read a field as text, as a hex dump, as JSON, as rendered
-  Markdown or HTML, or see the image a binary column holds, and have the choice
-  remembered. Rendered
-  documents are sandboxed: nothing in a result can run script or reach the network.
-- Browse a cluster's catalogs, schemas, tables and columns, search what you have
-  opened, and reload any branch the cluster has changed underneath — and see why
-  when it will not list one.
-- Take a ready-made SELECT of every column, or the CREATE statement the cluster itself
-  writes, for any table in the browser — copied, or dropped straight into your file.
-- Query more than one Trino cluster: pick the one to work in from the data browser, and
-  every file runs against it.
-- Read results in columns sized to what is in them, filling the width you give the
-  table; drag a column's edge to size it yourself, or double-click it to fit its contents.
-- Copy a cell as it is, or a block of cells as CSV, with the usual shortcut — nested
-  values come out as JSON.
-- Save any result as CSV or NDJSON without running the query again.
-- Keep your files between visits and jump between them with a keystroke — and, when the
-  server keeps them, find them from any browser you sign in from.
-- Read it light or dark, following your system or whichever you prefer.
-- Put a login in front of it — your identity provider's, or a list of users and passwords
-  in the config — and decide who gets to reach which cluster.
-- Run more than one copy of it, and restart it, without signing anyone out.
+- Web application for querying and interacting with Trino clusters
+  - Write and execute SQL statements
+  - Browse and inspect results
+  - Explore catalogs, schemas and tables
+  - Multi-cluster support
+- Strong multi-user support
+  - Authenticate using OIDC, or a list of users and passwords in the config
+  - Authorize access to both the app and individual connections with rules over user claims
+- Persistent storage of SQL files per user, in the browser or on the server
+- Multiple options for persisting sessions and state (memory, SQLite, Valkey/Redis, PostgreSQL)
 
 ## Trying it
 
-[`demo/compose.yaml`](demo/compose.yaml) runs Trinocular with nothing to configure. If you
+Nothing to clone: [`demo/compose.yaml`](demo/compose.yaml) runs Trinocular with nothing to
+configure, and a recent Docker Compose can read it straight out of this repository. If you
 have no Trino, it starts one:
 
 ```bash
-cd demo
-docker compose up
+docker compose -f "https://github.com/ragnard/trinocular.git#main:demo/compose.yaml" up
 ```
 
 If you have one, name it and no second Trino is started:
 
 ```bash
-TRINO_URL=http://host.docker.internal:8080 docker compose up
+TRINO_URL=http://host.docker.internal:8080 \
+  docker compose -f "https://github.com/ragnard/trinocular.git#main:demo/compose.yaml" up
 ```
+
+A Compose too old for the `.git#ref:path` form can be handed the file instead —
+`curl -fsSL https://raw.githubusercontent.com/ragnard/trinocular/main/demo/compose.yaml | docker compose -f - up`
+— and from a clone, `docker compose up` in `demo/` is the same thing.
 
 Either way, Trinocular is on [http://localhost:3000](http://localhost:3000). There is no
 login — everyone is `alice` — and nothing survives the containers. The bundled Trino is a
@@ -127,447 +112,35 @@ Other commands: `bun run build` (production build), `bun run preview`, `bun run 
 
 The config file is JSON or YAML, named by the `TRINOCULAR_CONFIG` environment variable. It
 is validated at startup; anything invalid stops the server rather than letting it come up
-with half a policy.
-
-`${NAME}` anywhere in a string value is replaced with the environment variable of that
-name, which is how the secrets stay out of the file — the cookie and store secrets, the
-OIDC client secret, the passwords of `authn: password` — so that the file can be a
-ConfigMap with one Secret behind it:
-
-```yaml
-session:
-  cookie:
-    secret: ${COOKIE_SECRET}
-```
-
-A variable that is not set stops the server. Substitution is done on the parsed file's
-strings, so a value stays a string whatever it held (`port: ${PORT}` is not a number),
-and `$${` writes a literal `${`; a `$` followed by anything else is left as it is.
-
-### Environment variables
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `TRINOCULAR_CONFIG` | no | Path to the config file. Without it, and without `TRINO_URL`, the server starts with no clusters, no login, and a cookie secret generated afresh on every start. |
-| `TRINO_URL` | no | One Trino cluster's base URL, standing in for a config file — no login, sessions in memory, a cookie secret generated afresh on every start, and the cluster named after the URL's host. It is read **only** when `TRINOCULAR_CONFIG` is unset: setting both stops the server, since a config file is where a connection belongs once there is one. |
-| `ORIGIN` | for any login, and for the container | The URL the app is served from, e.g. `https://trinocular.example.com`. Used to build the OIDC redirect, to check that the `password` login form was posted from this site, and to decide whether the session cookie is marked `Secure` (it is, unless `ORIGIN` starts with `http://` — or unless there is no config file at all, where an absent `ORIGIN` means a laptop rather than a deployment and the flag defaults to off). |
-| `LOG_LEVEL` | no | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` or `silent`. An unrecognised value warns and falls back to `info`. |
-| `PORT`, `HOST` | no | Where the server listens. Defaults to `3000` on all interfaces. |
-| `BODY_SIZE_LIMIT` | no | The most a request body may be, `512K` by default. Raise it together with `files.maxBytes` if documents are allowed to be bigger than that. |
-
-### `branding`
-
-```yaml
-branding:
-  name: Warehouse SQL
-  logo: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="#0e65eb"/></svg>'
-  message: 'Questions? <a href="https://wiki.example/trino">#data-help</a>'
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `name` | `Trinocular` | The name shown at the top left of the window. |
-| `logo` | the bundled one | HTML drawn before the name, in a 20 × 20 px box that whatever it holds is scaled and clipped to: an inline `<svg>`, or an `<img>` with a `data:` URL — the content security policy lets images come from nowhere else. Rendered as written, like `message`. An empty string shows no logo at all. |
-| `message` | — | HTML shown in the middle of the top bar: a notice, a link to where help is. It is rendered as written, so it is only ever yours; a `<script>` in it does not run, because the app's content security policy allows none. |
-
-### `session`
-
-```yaml
-session:
-  maxLifetimeSeconds: 86400
-  cookie:
-    name: trinocular-session
-    secret: <at least 32 characters>
-    path: /
-    httpOnly: true
-    secure: true
-    sameSite: lax
-    domain: trinocular.example.com
-    maxAge: 86400
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `maxLifetimeSeconds` | `86400` | How long a session lives, in seconds. |
-| `cookie.secret` | **required** | Key the session cookie is encrypted with. At least 32 characters. |
-| `cookie.name` | `trinocular-session` | Cookie name. |
-| `cookie.path` | `/` | Cookie path. |
-| `cookie.httpOnly` | `true` | Hide the cookie from scripts. |
-| `cookie.secure` | from `ORIGIN` | Send the cookie over HTTPS only. Defaults to true unless `ORIGIN` is `http://` (with no config file, an absent `ORIGIN` defaults it to false instead). |
-| `cookie.sameSite` | `lax` | `strict`, `lax` or `none`. |
-| `cookie.domain` | — | Cookie domain, if it must be wider than the host. |
-| `cookie.maxAge` | — | Cookie lifetime in seconds, if the cookie should outlive the browser session. |
-| `store.kind` | `memory` | Where sessions are kept: `memory`, `sqlite`, `valkey` or `postgres`. In memory, a restart signs everyone out and every request from a user has to reach the same copy of Trinocular. |
-
-#### `store.kind: valkey`
-
-Sessions in [Valkey](https://valkey.io) or Redis, so they survive a restart and any
-number of copies of Trinocular can serve them. Each session is one key, encrypted with
-the store's own `secret` — a copy of the store gives away nothing without it, and
-changing it signs everyone out. It is deliberately not `cookie.secret`: the cookie
-secret guards what the browser holds and this one guards what the store holds, and
-either can be rotated without touching the other.
-
-```yaml
-session:
-  store:
-    kind: valkey
-    secret: <at least 32 characters>
-    mode: single           # or cluster, or sentinel
-    host: valkey.example
-    port: 6379
-    db: 0
-    password: ...
-    tls: true
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `mode` | **required** | `single`, `cluster` or `sentinel`. |
-| `secret` | **required** | Key sessions in the store are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
-| `keyPrefix` | `trinocular:session:` | Prefix on every key, if the store is shared with something else. |
-| `username` | — | ACL user (Valkey 6 or later). |
-| `password` | — | Password for the nodes. |
-| `tls` | `false` | `true` to connect over TLS trusting the system's CAs, or `{ ca: <path> }` for a PEM bundle of your own. In `sentinel` mode this applies to the sentinels too. |
-| `connectTimeoutMs` | `10000` | How long to wait for a connection. |
-| `commandTimeoutMs` | `5000` | How long to wait for an answer. A request that has to wait longer fails rather than hanging. |
-
-With `mode: single`:
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `host` | `127.0.0.1` | |
-| `port` | `6379` | |
-| `db` | `0` | Database number. |
-
-With `mode: cluster`:
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `nodes` | **required** | A list of `{ host, port }` (port defaults to `6379`). One reachable node is enough to discover the rest. |
-
-With `mode: sentinel`:
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `sentinels` | **required** | A list of `{ host, port }` (port defaults to `26379`). |
-| `name` | **required** | The master's name as the sentinels know it. |
-| `sentinelUsername` | — | ACL user for the sentinels, if they are secured separately from the nodes. |
-| `sentinelPassword` | — | Password for the sentinels. |
-| `db` | `0` | Database number. |
-
-Trinocular refuses to start if it cannot reach the store, for the same reason it refuses
-a config it cannot validate.
-
-#### `store.kind: sqlite`
-
-Sessions in a [SQLite](https://sqlite.org) file, so they survive a restart with nothing
-else to run. It is for a single copy of Trinocular: the file is opened for this process
-alone, and a second copy pointed at the same file refuses to start rather than share it.
-Sessions are encrypted with the store's own `secret`, as in Valkey, since the file is
-what a volume snapshot or a backup copies.
-
-```yaml
-session:
-  store:
-    kind: sqlite
-    path: /data/sessions.sqlite
-    secret: <at least 32 characters>
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `path` | **required** | The database file. Created if it does not exist; the directory must. |
-| `secret` | **required** | Key sessions in the file are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
-
-#### `store.kind: postgres`
-
-Sessions in [PostgreSQL](https://www.postgresql.org), so they survive a restart and any
-number of copies of Trinocular can serve them — and if the files are in Postgres too
-(below), one database is all a deployment needs. Each session is one row, encrypted with
-the store's own `secret` as in Valkey, since the database is what gets backed up and
-replicated. The tables are made on startup and brought up to date on upgrade; the
-schema they go in must already exist (`public` always does).
-
-```yaml
-session:
-  store:
-    kind: postgres
-    url: postgres://trinocular:...@postgres.example:5432/trinocular
-    secret: <at least 32 characters>
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `url` | **required** | A `postgres://` (or `postgresql://`) URL with the user, password and database. A `sslmode=` query parameter is honoured. This is what a provider hands out — on [CloudNativePG](https://cloudnative-pg.io) it is the `uri` key of the cluster's `-app` secret. |
-| `secret` | **required** | Key sessions in the store are encrypted with. At least 32 characters, and not the same string as `cookie.secret`. |
-| `schema` | `public` | The schema the tables go in. Sessions and files can share one, or a database with something else in it can keep Trinocular in one of its own. |
-| `tls` | from the URL | `false` for plain TCP, `true` to connect over TLS trusting the system's CAs, or `{ ca: <path> }` for a PEM bundle of your own — a CloudNativePG cluster's is in its `-ca` secret. Unset, the URL's `sslmode` decides (`require` encrypts without checking the certificate, `verify-full` checks it), and it is off if the URL says nothing. Set, this wins over the URL. |
-| `poolSize` | `4` | The most connections one copy of Trinocular opens. |
-| `connectTimeoutMs` | `10000` | How long to wait for a connection. |
-| `statementTimeoutMs` | `5000` | How long the server may spend on one statement. A request that has to wait longer fails rather than hanging. |
-
-Trinocular refuses to start if it cannot reach the database, and never logs the URL,
-which carries the password.
-
-### `files` — where query files are kept
-
-By default a user's files live in their browser, and only there: another browser, or the
-same one with its storage cleared, starts empty. With a server store they follow the
-person instead — keyed by their user id, so what `authn` says the user's id is decides
-whose files they see — and a browser that had files of its own hands them over the
-next time it visits, then forgets its own copies, so the server is the only place they
-are. Switching back to `browser` therefore starts each browser from whatever it made
-since, not from what it had before: a move to the server is not meant to be undone,
-and the files are in the store if it has to be.
-
-```yaml
-files:
-  maxBytes: 524288
-  store:
-    kind: sqlite
-    path: /data/files.sqlite
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `maxBytes` | `524288` | The most one document may be, in bytes of its stored record. A save over it is refused, and the editor says so. The default is the server's own request body limit; raise `BODY_SIZE_LIMIT` with it. |
-| `store.kind` | `browser` | `browser`, `memory`, `sqlite`, `valkey` or `postgres`. `memory` is for development: the files are gone when the process is. |
-
-Files are not encrypted in the store, whichever it is — the SQL text is what a copy of
-the store is for.
-
-#### `store.kind: sqlite`
-
-Files in a SQLite file, for a single copy of Trinocular: as for sessions, the file is this
-process's alone, and a second copy pointed at it refuses to start.
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `path` | **required** | The database file. Created if it does not exist; the directory must. |
-
-Sessions and files can share a directory but should be two files: the session file can
-be deleted to sign everyone out without touching a document.
-
-For Kubernetes, that is one replica, a `ReadWriteOnce` volume mounted at `/data`, and a
-Deployment with `strategy: Recreate` so an update stops the old pod before starting the
-new one — the volume can only be attached to one node at a time, and the old pod holds
-it until it is gone.
-
-#### `store.kind: valkey`
-
-Files in Valkey or Redis, so any number of copies of Trinocular can serve them. A user's
-documents are one hash under their user id; make sure the server persists to disk (AOF
-or RDB), since unlike a session a lost file is not something a user can sign in again to
-get back.
-
-```yaml
-files:
-  store:
-    kind: valkey
-    mode: single           # or cluster, or sentinel
-    host: valkey.example
-    port: 6379
-    password: ...
-```
-
-It takes the same options as the session store's `valkey` — `mode` and what each mode
-needs, `username`, `password`, `tls`, `connectTimeoutMs`, `commandTimeoutMs` — except
-that there is no `secret`, and `keyPrefix` defaults to `trinocular:files:`. The two blocks
-are independent: they can name the same server, where the prefixes keep them apart, or
-different ones.
-
-#### `store.kind: postgres`
-
-Files in PostgreSQL, so any number of copies of Trinocular can serve them, and a backup
-of the database is a backup of everyone's queries. A document is one row, versioned
-from a sequence so that a document removed and made again never repeats a version.
-
-```yaml
-files:
-  store:
-    kind: postgres
-    url: postgres://trinocular:...@postgres.example:5432/trinocular
-```
-
-It takes the same options as the session store's `postgres` — `url`, `schema`, `tls`,
-`poolSize`, `connectTimeoutMs`, `statementTimeoutMs` — except that there is no `secret`.
-The two blocks are independent, and naming the same database and schema in both is the
-expected arrangement: the tables do not collide.
-
-### `authn` — who the user is
-
-No login at all, a list of users with passwords, or OpenID Connect.
-
-```yaml
-authn:
-  kind: none
-  user: alice
-  claims:
-    groups: [analysts]
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `user` | **required** | The user everybody is signed in as. |
-| `claims` | `{}` | Claims to pretend this user has, so an authorization rule can be tried without an identity provider. |
-
-```yaml
-authn:
-  kind: password
-  users:
-    alice:
-      password: ${ALICE_PASSWORD}
-      claims:
-        groups: [admins]
-    bob:
-      password: ${BOB_PASSWORD}
-      claims:
-        groups: [analysts]
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `users` | **required** | The people who can sign in, by user id; at least one. |
-| `users.<id>.password` | **required** | Their password, as written. |
-| `users.<id>.claims` | `{}` | What an authorization rule sees for them, in place of a provider's token claims. |
-
-A form asks for the username and password, and the login is kept in the session store
-like an OIDC one; `Sign out` in the account menu ends it. The passwords are plain text,
-which makes the `users` block a credential: write them as `${VAR}` and put the variables
-in a Secret. A user removed from the config, or whose claims change, is affected on their
-next request after a restart, not when their session happens to expire. After five wrong
-passwords in a row a name has to wait before the next attempt is checked — a second,
-doubling to thirty — which is a brake on guessing and not a lock: it is counted per copy
-of Trinocular, and a name left alone for ten minutes starts over. This is for a handful
-of people on an internal deployment; for more than that, or for anything facing the
-internet, put an identity provider in front of it.
-
-```yaml
-authn:
-  kind: oidc
-  issuer: https://keycloak.example/realms/prod
-  clientId: trinocular
-  clientSecret: ...
-  scope: openid profile email
-  userIdClaim: preferred_username
-  claimsFrom: id_token
-  paths:
-    prefix: /auth
-    login: login
-    logout: logout
-    callback: callback
-    error: error
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `issuer` | **required** | Issuer URL; the provider's metadata is discovered from it. |
-| `clientId` | **required** | Client Trinocular signs in as. |
-| `clientSecret` | **required** | Its secret. |
-| `scope` | **required** | Scopes to request, e.g. `openid profile email`. |
-| `userIdClaim` | `preferred_username` | Which claim names the user. |
-| `claimsFrom` | `id_token` | Which token the claims are read from. Keycloak puts client roles in the `access_token` unless the client roles mapper has "Add to ID token" ticked, so a role rule usually wants `access_token`. |
-| `paths.prefix` | `/auth` | Where the login, logout and callback routes live. |
-| `paths.login` / `logout` / `callback` / `error` | as named | The segments under that prefix. |
-
-The redirect URI to register with the provider is `ORIGIN` + prefix + callback, e.g.
-`https://trinocular.example.com/auth/callback`. Signing out also ends the session at the
-provider, so register `ORIGIN` + `/` as a valid post-logout redirect URI too.
-
-### `authz` — who is allowed in
-
-Three kinds of rule. Leaving `authz` out means `allow`; writing one without a `kind`
-means `cel`.
-
-```yaml
-authz:
-  kind: allow          # the default: anyone who signed in
-```
-
-```yaml
-authz:
-  expression: '"user" in claims.resource_access.trinocular.roles'   # kind: cel
-```
-
-```yaml
-authz:
-  kind: require-keycloak-client-role
-  role: user
-  client: trinocular     # optional
-```
-
-**`cel`** is a [CEL](https://cel.dev) expression that must come out `true`. It sees two
-variables: `claims`, the user's claims as one map (from the token `claimsFrom` names, or the
-`claims` written under `authn: none`), and `userId`. Anything CEL can say about them is a
-rule:
-
-```yaml
-authz:
-  expression: >-
-    has(claims.groups) && ("analysts" in claims.groups || "admins" in claims.groups)
-```
-
-```yaml
-authz:
-  expression: 'claims.email_verified == true && claims.email.endsWith("@example.com")'
-```
-
-```yaml
-authz:
-  expression: 'userId in ["alice", "bob"]'
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `expression` | **required** | The CEL expression. A syntax error, a variable other than `claims` and `userId`, or an expression that can never be a boolean (`1 + 2`) stops the server at startup. |
-
-Only exactly `true` allows; a result that is not a boolean is refused. An error during
-evaluation is refused too — and CEL treats a missing map key as an error, so
-`"analyst" in claims.resource_access.finance.roles` refuses a user with no
-`resource_access.finance` rather than letting them through. Guard with `has()` if you would
-rather that read as `false` in the log. A client id with dots in it is an ordinary map key:
-`claims.resource_access["com.example.app"].roles`.
-
-**`require-keycloak-client-role`** is shorthand for the expression
-`"<role>" in claims.resource_access.<client>.roles` — Keycloak's client roles — and is checked
-exactly as that expression would be (the startup log prints it). It exists because it knows
-this app's own `clientId`, which an expression cannot name.
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `role` | **required** | The role a user must hold. |
-| `client` | this app's `clientId` | Which OIDC client's roles are consulted. |
-
-Roles laid out any other way — Keycloak's realm roles in `realm_access.roles`, a `groups`
-claim — are an expression: `"user" in claims.realm_access.roles`.
-
-### `connections` — the Trino clusters
-
-Each key is the connection's id, used internally and in what the app stores; the `name`
-is what users see.
-
-```yaml
-connections:
-  warehouse:
-    name: Warehouse
-    uri: https://trino.example:8443
-  finance:
-    name: Finance
-    uri: https://trino-finance.example:8443
-    authz:
-      expression: '"finance" in claims.groups'
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `name` | **required** | Label shown in the UI. |
-| `uri` | **required** | The cluster's base URL. Only the server talks to it; browsers reach it through Trinocular. |
-| `authz` | — | An extra rule for this cluster, in the same vocabulary as the top-level one. It can only narrow: the application-wide rule has already been applied, so a connection rule can keep people out of one cluster but never let anyone past the front door. A cluster a user may not use is not offered to them. |
-
-Signed-in users reach a cluster as themselves — Trinocular passes their user id, and their
-access token if they logged in with OIDC — so the cluster's own access control still
-applies.
+with half a policy. `${NAME}` in any string value is replaced with the environment
+variable of that name — which is how the secrets stay out of the file, so that it can be
+a ConfigMap with one Secret behind it; a variable that is not set stops the server, and
+`$${` writes a literal `${`.
+
+**[`config.example.yaml`](config.example.yaml) is the reference**: every option, with a
+note saying what it does and what it defaults to, and at the top the environment variables
+the server reads (`ORIGIN`, `TRINO_URL`, `LOG_LEVEL`, `PORT`/`HOST`, `BODY_SIZE_LIMIT`). As
+written it is the simplest complete configuration — no login, everyone allowed, sessions in
+memory, files in the browser, two clusters — and each section ends with what a deployment
+swaps in, with its trade-offs, commented out and ready. In outline:
+
+| Section | Decides |
+| --- | --- |
+| `branding` | The name, logo and a message in the top bar. |
+| `session` | The cookie, and where sessions live: `memory`, `sqlite`, `valkey` or `postgres`. |
+| `files` | Where users' query files live: the `browser` (localStorage, the default), `memory`, `sqlite`, `valkey` or `postgres`. |
+| `authn` | Who the user is: `none` (everybody is one named user), `password` (users and passwords in the config) or `oidc`. |
+| `authz` | Who is allowed in: `allow` (the default), a `cel` expression over the user's claims, or `require-keycloak-client-role`. |
+| `connections` | The Trino clusters, each with an optional `authz` rule of its own that can only narrow the one above. |
+
+The SQLite stores are for a single copy of Trinocular — the file is opened for this process
+alone, and a second copy pointed at it refuses to start — which on Kubernetes is one
+replica, a `ReadWriteOnce` volume mounted at `/data`, and a Deployment with
+`strategy: Recreate` so an update stops the old pod before starting the new one. The Valkey
+and Postgres stores are for any number of copies, and with sessions and files both in
+Postgres one database is all a deployment needs. Sessions are encrypted in every store but
+memory, with a secret of the store's own; files are not, in any store, since the SQL text is
+what a copy of the store is for.
 
 ## Running the container
 
