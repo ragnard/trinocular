@@ -81,11 +81,24 @@
    */
   let canSave = $derived(!!schema && !result?.error && result?.released === null);
 
+  /**
+   * Why the last save did not produce a file, shown in the rail for the result
+   * it was asked of. Serializing a few million rows can run the tab out of
+   * memory, and a `RangeError` thrown inside a click handler is a button that
+   * does nothing with the only trace in the console.
+   */
+  let saveError: { result: ResultModel | null; message: string } | null = $state.raw(null);
+
   function save(format: ExportFormat) {
     if (!schema) return;
+    saveError = null;
     // The query id, so a saved file still says which run it came from.
     const name = `${result?.queryId ?? "query"}.${format.extension}`;
-    downloadText(name, format.mimeType, format.serialize(schema.fields, result?.data ?? []));
+    try {
+      downloadText(name, format.mimeType, format.serialize(schema.fields, result?.data ?? []));
+    } catch (e) {
+      saveError = { result, message: e instanceof Error ? e.message : String(e) };
+    }
   }
 </script>
 
@@ -132,6 +145,12 @@
         {limitRows ? "Limit" : "No limit"}
       </button>
     </div>
+    {#if saveError && saveError.result === result}
+      <span class="warn small" title={saveError.message}>
+        <TriangleAlert size={12} />
+        Could not save
+      </span>
+    {/if}
     <Dropdown icon={Download} label="Save" title="Save these results to a file" disabled={!canSave}>
       {#snippet menu()}
         {#each EXPORT_FORMATS as format (format.id)}
@@ -338,6 +357,12 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 
   /* The extension is the answer to "what will the file be called", so it sits
