@@ -1,5 +1,7 @@
 node_modules
 dist
+# bun.lock is the lockfile; an npm install would put this back.
+package-lock.json
 src/**/*.js
 
 # Output

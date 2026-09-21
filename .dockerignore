@@ -7,7 +7,6 @@
 
 !bun.lock
 !package.json
-!.npmrc
 !svelte.config.ts
 !vite.config.ts
 !tsconfig.json
