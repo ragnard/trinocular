@@ -382,9 +382,17 @@ provider, so register `ORIGIN` + `/` as a valid post-logout redirect URI too.
 
 ### `authz` — who is allowed in
 
+Three kinds of rule. Leaving `authz` out means `allow`; writing one without a `kind`
+means `cel`.
+
 ```yaml
 authz:
   kind: allow          # the default: anyone who signed in
+```
+
+```yaml
+authz:
+  expression: '"user" in claims.resource_access.trinocular.roles'   # kind: cel
 ```
 
 ```yaml
@@ -395,13 +403,49 @@ authz:
   claim: realm_access.roles   # optional, overrides `client`
 ```
 
+**`cel`** is a [CEL](https://cel.dev) expression that must come out `true`. It sees two
+variables: `claims`, the user's claims as one map (from the token `claimsFrom` names, or the
+`claims` written under `authn: none`), and `userId`. Anything CEL can say about them is a
+rule:
+
+```yaml
+authz:
+  expression: >-
+    has(claims.groups) && ("analysts" in claims.groups || "admins" in claims.groups)
+```
+
+```yaml
+authz:
+  expression: 'claims.email_verified == true && claims.email.endsWith("@example.com")'
+```
+
+```yaml
+authz:
+  expression: 'userId in ["alice", "bob"]'
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `expression` | **required** | The CEL expression. A syntax error, a variable other than `claims` and `userId`, or an expression that can never be a boolean (`1 + 2`) stops the server at startup. |
+
+Only exactly `true` allows; a result that is not a boolean is refused. An error during
+evaluation is refused too — and CEL treats a missing map key as an error, so
+`"analyst" in claims.resource_access.finance.roles` refuses a user with no
+`resource_access.finance` rather than letting them through. Guard with `has()` if you would
+rather that read as `false` in the log. A client id with dots in it is an ordinary map key:
+`claims.resource_access["com.example.app"].roles`.
+
+**`require-role`** is the Keycloak role check written out:
+
 | Option | Default | Description |
 | --- | --- | --- |
 | `role` | **required** | The role a user must hold. |
 | `client` | this app's `clientId` | Which OIDC client's roles are consulted — Keycloak's `resource_access.<client>.roles`. |
 | `claim` | — | A dotted path to a list of strings, for providers laid out differently: `realm_access.roles`, `groups`. Overrides `client`. |
 
-A missing claim, or one that is not a list of strings, counts as no roles and is refused.
+A missing claim, or one that is not a list of strings, counts as no roles and is refused. It
+is what `"<role>" in claims.resource_access.<client>.roles` says, kept because it knows this
+app's own `clientId` and an expression cannot.
 
 ### `connections` — the Trino clusters
 
@@ -417,8 +461,7 @@ connections:
     name: Finance
     uri: https://trino-finance.example:8443
     authz:
-      kind: require-role
-      role: finance
+      expression: '"finance" in claims.groups'
 ```
 
 | Option | Default | Description |

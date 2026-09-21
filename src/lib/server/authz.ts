@@ -8,6 +8,7 @@ import {
   type ClaimPath,
   type Identity
 } from "./identity";
+import { CelAuthorizer, ExpressionError } from "./celAuthz";
 import type { AuthzConfig } from "./config";
 import { logger } from "./logging";
 
@@ -86,6 +87,21 @@ export const createAuthorizer = (
       // contain a dot, and interpolating one into a dotted path would send the
       // lookup down levels that do not exist.
       return RequireRole({ role: authz.role, claimPath: ["resource_access", client, "roles"] });
+    }
+    case "cel": {
+      try {
+        return CelAuthorizer(authz.expression);
+      } catch (error) {
+        // A syntax error, an unknown variable, or a type that can never be a
+        // boolean: everything the checker can say before the first request,
+        // and all of it the same startup failure as a config that will not
+        // validate.
+        if (!(error instanceof ExpressionError)) throw error;
+        logger.error(
+          `${opts.where}: expression ${JSON.stringify(authz.expression)}: ${error.message}`
+        );
+        process.exit(1);
+      }
     }
   }
 };

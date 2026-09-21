@@ -209,9 +209,29 @@ const RequireRoleAuthzSchema = z.object({
   claim: z.string().optional()
 });
 
+const CelAuthzSchema = z.object({
+  kind: z.literal("cel"),
+  // A CEL expression over `claims` (the identity's claim set, one map) and
+  // `userId`, which must come out exactly `true`. Checked at startup; an
+  // evaluation error at runtime is a refusal.
+  expression: z.string().min(1)
+});
+
 /** The same policy vocabulary wherever a policy is written — once at the top
- *  level for the application, and optionally again under a connection. */
-const AuthzSchema = z.discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema]);
+ *  level for the application, and optionally again under a connection.
+ *
+ *  A policy with no `kind` is a `cel` one, so the general case is also the
+ *  short one: `authz: { expression: "..." }`. The default is put in by a
+ *  preprocess rather than by `.default("cel")` on the literal, because zod
+ *  matches a discriminator against the raw input, and a defaulted one never
+ *  matches an absent key. */
+const AuthzSchema = z.preprocess(
+  (value) =>
+    value && typeof value === "object" && !Array.isArray(value) && !("kind" in value)
+      ? { kind: "cel", ...value }
+      : value,
+  z.discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema, CelAuthzSchema])
+);
 
 export type AuthzConfig = z.infer<typeof AuthzSchema>;
 
