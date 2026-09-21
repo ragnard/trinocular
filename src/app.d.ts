@@ -30,6 +30,7 @@ declare global {
       branding: Branding;
       connections: ClientConnection[];
       userId?: string;
+      loginPath: string;
       logoutPath?: string;
     }
     // interface PageState {}

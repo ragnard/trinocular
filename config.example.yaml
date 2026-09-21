@@ -62,8 +62,13 @@ branding:
 # Startup fails if the store cannot be reached. The postgres tables are made
 # on startup and brought up to date on upgrade; the schema must already exist.
 #
+# A session lasts maxLifetimeSeconds from login however active it is, except
+# under oidc, where each token refresh renews it and the provider's refresh
+# token lifetime is what bounds it instead. A page whose session has run out
+# is sent to the login page on its next request, and back once signed in.
+#
 session:
-  maxLifetimeSeconds: 86400                    # Seconds. Default: 86400
+  maxLifetimeSeconds: 86400                    # Seconds from login. Default: 86400
   cookie:
     secret: ${COOKIE_SECRET}                   # Required: 32 or more characters
     name: trinocular-session                   # Default: trinocular-session

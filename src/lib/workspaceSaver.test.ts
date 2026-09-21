@@ -42,6 +42,8 @@ const file = (id: string, content: string): StoredFile => ({
 });
 const ui: StoredUi = { order: [] };
 const tick = () => new Promise((r) => setTimeout(r, 0));
+/** The failure the hooks recognise as the session being gone. */
+const SIGNED_OUT = new Error("unauthorized (HTTP 401)");
 
 const setup = (active = "a") => {
   const store = new FakeStore();
@@ -49,15 +51,25 @@ const setup = (active = "a") => {
   const removed: string[] = [];
   const reports: string[] = [];
   let trouble = false;
+  let signedOut = 0;
   const hooks: SaverHooks = {
     isActive: (id) => id === active,
     applyRemote: (f) => applied.push(f),
     applyRemoved: (id) => removed.push(id),
     onTrouble: (f) => (trouble = f),
+    signedOut: (e) => e === SIGNED_OUT && ++signedOut > 0,
     report: (m) => reports.push(m)
   };
   const saver = new WorkspaceSaver(store, hooks);
-  return { store, saver, applied, removed, reports, trouble: () => trouble };
+  return {
+    store,
+    saver,
+    applied,
+    removed,
+    reports,
+    trouble: () => trouble,
+    signedOut: () => signedOut
+  };
 };
 
 describe("WorkspaceSaver", () => {
@@ -155,6 +167,29 @@ describe("WorkspaceSaver", () => {
     store.puts[1].settle({ status: "saved", version: "1" });
     await tick();
     expect(trouble()).toBe(false);
+  });
+
+  test("a signed-out answer stops the queue, for good, rather than retrying it", async () => {
+    const { store, saver, trouble, signedOut } = setup();
+    saver.update([file("a", "one")], ui);
+    await tick();
+    expect(store.uis).toHaveLength(1);
+    store.puts[0].fail(SIGNED_OUT);
+    await tick();
+    expect(signedOut()).toBe(1);
+    expect(trouble()).toBe(false);
+
+    await new Promise((r) => setTimeout(r, 1_100));
+    expect(store.puts).toHaveLength(1);
+
+    // The page is on its way to login: a keystroke, a switch of file and the
+    // flush on the way out all find nothing to send to.
+    saver.update([file("a", "two")], { activeFileId: "a", order: ["a"] });
+    saver.flush(() => {});
+    await tick();
+    expect(store.puts).toHaveLength(1);
+    expect(store.uis).toHaveLength(1);
+    expect(signedOut()).toBe(1);
   });
 
   test("a document that has gone is removed, after its save if one is out", async () => {

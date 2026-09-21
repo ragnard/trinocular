@@ -1,4 +1,5 @@
-import Trino, { HttpError } from "$lib/trino";
+import Trino from "$lib/trino";
+import { signedOut } from "$lib/signedOut";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryData, QueryError, QueryStats, Retry, SessionDelta } from "$lib/trino";
 import { describeIgnored } from "$lib/trino/session";
@@ -53,14 +54,6 @@ const HEARTBEAT_MS = 30_000;
 export const MAX_HOLD_MS = 10 * 60_000;
 
 type Resume = "more" | "all" | "stop";
-
-/** A 401 from the proxy means the session is gone; every request a result
- *  makes answers it the same way. True when it was one, so a caller can stop. */
-function signedOut(e: unknown): boolean {
-  if (!(e instanceof HttpError && e.status === 401)) return false;
-  window.location.href = "/auth/login";
-  return true;
-}
 
 export type State =
   | "QUEUED"
@@ -708,6 +701,7 @@ export class Workspace {
       onTrouble: (failing) => {
         if (this.saveFailed !== failing) this.saveFailed = failing;
       },
+      signedOut,
       report: (message) => console.error(`trinocular: ${message}`)
     });
     this.#connectionIds = new Set(connections.map((c) => c.id));

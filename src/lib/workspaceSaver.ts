@@ -11,7 +11,11 @@
  * flight at most: a change that lands while its save is out is sent once the
  * save returns, rather than racing it for the version. A save that fails is
  * retried with backoff and the document stays dirty; one the store refuses is
- * reported and dropped, since asking again would not change the answer.
+ * reported and dropped, since asking again would not change the answer. And
+ * one the store answers with "signed out" stops the queue for good: the page
+ * is on its way to login, and every further request would be refused the
+ * same way — it used to be retried like a network failure, which put `Not
+ * saved` on a session that had simply expired, with no way out but a query.
  */
 
 import type { FileRecord, StoredFile, StoredUi } from "./workspaceRecord";
@@ -32,6 +36,9 @@ export interface SaverHooks {
   applyRemoved(fileId: string): void;
   /** Whether any save is waiting on a retry. */
   onTrouble(failing: boolean): void;
+  /** Whether a failure means the session is gone. The hook is what sends the
+   *  page to login; the saver's part is to stop, and to stay stopped. */
+  signedOut(e: unknown): boolean;
   report(message: string): void;
 }
 
@@ -63,6 +70,9 @@ export class WorkspaceSaver {
   #lastUi = "";
   #uiPending: Pending = fresh();
   #keepalive = false;
+  /** The session is gone: nothing further is sent, and a retry timer that
+   *  fires finds nothing to do. */
+  #stopped = false;
 
   constructor(store: WorkspaceStore, hooks: SaverHooks) {
     this.#store = store;
@@ -156,7 +166,16 @@ export class WorkspaceSaver {
     }, delay);
   }
 
+  /** Whether a failure is the session being gone, after which nothing more
+   *  goes out: a request already in flight when the first 401 came back is
+   *  judged the same way without asking the hook again. */
+  #signedOut(e: unknown): boolean {
+    if (!this.#stopped && this.#hooks.signedOut(e)) this.#stopped = true;
+    return this.#stopped;
+  }
+
   #send(fileId: string) {
+    if (this.#stopped) return;
     let pending = this.#pending.get(fileId);
     if (!pending) {
       pending = fresh();
@@ -199,15 +218,17 @@ export class WorkspaceSaver {
           this.#resolve(fileId, outcome.current, pending);
           break;
       }
-    } catch {
+    } catch (e) {
       if (this.#pending.get(fileId) !== pending) return;
-      failed = true;
+      failed = !this.#signedOut(e);
     } finally {
       pending.inFlight = false;
       this.#inFlight.delete(fileId);
     }
 
-    if (failed || pending.conflicts >= CONFLICT_LIMIT) {
+    if (this.#stopped) {
+      this.#pending.delete(fileId);
+    } else if (failed || pending.conflicts >= CONFLICT_LIMIT) {
       pending.dirty = true;
       pending.conflicts = 0;
       this.#retryLater(pending, () => {
@@ -243,6 +264,7 @@ export class WorkspaceSaver {
   }
 
   #sendRemoval(fileId: string) {
+    if (this.#stopped) return;
     let pending = this.#removals.get(fileId);
     if (!pending) {
       pending = fresh();
@@ -259,8 +281,8 @@ export class WorkspaceSaver {
       await this.#inFlight.get(fileId)?.catch(() => {});
       await this.#store.remove(fileId, { keepalive: this.#keepalive });
       this.#removals.delete(fileId);
-    } catch {
-      failed = true;
+    } catch (e) {
+      failed = !this.#signedOut(e);
     } finally {
       pending.inFlight = false;
     }
@@ -269,6 +291,7 @@ export class WorkspaceSaver {
   }
 
   #sendUi() {
+    if (this.#stopped) return;
     const pending = this.#uiPending;
     pending.dirty = true;
     if (pending.inFlight || pending.timer) return;
@@ -287,15 +310,15 @@ export class WorkspaceSaver {
     try {
       await this.#store.putUi(ui, { keepalive: this.#keepalive });
       pending.attempt = 0;
-    } catch {
-      failed = true;
+    } catch (e) {
+      failed = !this.#signedOut(e);
     } finally {
       pending.inFlight = false;
     }
     if (failed) {
       pending.dirty = true;
       this.#retryLater(pending, () => this.#sendUi());
-    } else if (pending.dirty) {
+    } else if (pending.dirty && !this.#stopped) {
       void this.#putUi(pending);
     }
     this.#noteTrouble();
