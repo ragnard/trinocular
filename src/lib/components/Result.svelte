@@ -122,6 +122,18 @@
       <span title={`${rows.toLocaleString()} rows`}>{formatCount(rows)} rows</span>
       <span class="muted">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
+      {#if result.reconnecting}
+        <!-- A poll failed and is being retried (see `Trino.nextChunk`): the
+             query is still on the cluster, and the stall would otherwise look
+             like a slow query. The failure and the count are on hover. -->
+        <span class="muted">&middot;</span>
+        <span
+          class="warn"
+          title={`${result.reconnecting.message} (attempt ${result.reconnecting.attempts})`}
+        >
+          Reconnecting…
+        </span>
+      {/if}
     {:else}
       <span class="soft">No result</span>
     {/if}

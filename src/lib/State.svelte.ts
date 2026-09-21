@@ -1,6 +1,6 @@
 import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
-import type { Columns, QueryData, QueryError, QueryStats, SessionDelta } from "$lib/trino";
+import type { Columns, QueryData, QueryError, QueryStats, Retry, SessionDelta } from "$lib/trino";
 import { describeIgnored } from "$lib/trino/session";
 import { fileLineMessage } from "$lib/trino/errors";
 import { TrinoSession } from "$lib/trino/TrinoSession.svelte";
@@ -42,6 +42,9 @@ export type ResultCeiling = ResultsConfig;
 
 /** Why a result stopped short of the cluster's last row. */
 export type Stopped = "user" | "expired" | "max-rows" | "max-bytes";
+
+/** A poll being retried; see `Result.reconnecting`. */
+export type Reconnecting = { attempts: number; message: string };
 
 /** Must stay under Trino's `query.client.timeout`, five minutes by default. */
 const HEARTBEAT_MS = 30_000;
@@ -140,6 +143,13 @@ export class Result {
   #lastSampledState?: string;
   /** A cancel has been asked for; the query has not settled on it yet. */
   cancelRequested: boolean = $state(false);
+  /**
+   * The last poll failed transiently and the client is retrying it; what it
+   * failed with, and how many times so far. Null once a chunk arrives again
+   * or the run settles, so a stall is never silent and a recovery leaves no
+   * trace.
+   */
+  reconnecting: Reconnecting | null = $state(null);
   #cancelSent = false;
   /** The result was dropped from its file; nothing will read further chunks. */
   #discarded = false;
@@ -217,6 +227,8 @@ export class Result {
     try {
       const res = await this.client.query(this.sql);
       for await (const chunk of res) {
+        // A chunk is the cluster answering again.
+        this.reconnecting = null;
         if (chunk.id) {
           this.queryId = chunk.id;
           // A cancel asked for before Trino handed back an id is sent now.
@@ -254,9 +266,25 @@ export class Result {
         }
       }
     } catch (e) {
+      this.reconnecting = null;
       if (signedOut(e)) return;
       this.fail(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * The client's `onRetry`: a poll failed transiently and will be tried
+   * again (see `Trino.nextChunk`). Declined once a cancel or a discard has
+   * been asked for — the DELETE may or may not have reached the cluster, but
+   * either way nobody is waiting for the page, and two minutes of polling
+   * for a query the reader gave up on would only keep `Cancelling…` on
+   * screen for that long. Declined, the failure settles the result as any
+   * other would.
+   */
+  retry({ attempts, error }: Retry): boolean {
+    if (this.#discarded || this.cancelRequested) return false;
+    this.reconnecting = { attempts, message: error.message };
+    return true;
   }
 
   /** Something the run has to say that is not an error; see `notices`. */
@@ -704,7 +732,11 @@ export class Workspace {
    * `onIgnored`, so the statement that asked for it does not read as having
    * worked.
    */
-  #createSessionClient(connectionId: string, onIgnored: (notices: string[]) => void): Trino {
+  #createSessionClient(
+    connectionId: string,
+    onIgnored: (notices: string[]) => void,
+    onRetry: (retry: Retry) => boolean
+  ): Trino {
     const session = this.sessionFor(connectionId);
     return Trino.create({
       server: `/api/trino/${connectionId}`,
@@ -712,7 +744,8 @@ export class Workspace {
       onSessionChange: (delta: SessionDelta) => {
         session.apply(delta);
         if (delta.ignored.length > 0) onIgnored(delta.ignored.map(describeIgnored));
-      }
+      },
+      onRetry
     });
   }
 
@@ -870,10 +903,14 @@ export class Workspace {
     // folds each response's session changes into its own headers as it goes,
     // which is not safe to share across concurrent runs, so what outlives the
     // run is the session and not the client.
-    // `result` is read by the callback only once a response is in, long after
-    // the assignment below.
+    // `result` is read by the callbacks only once a response is in, long
+    // after the assignment below.
     const result: Result = new Result(
-      this.#createSessionClient(this.connectionId, (notices) => result.notify(notices)),
+      this.#createSessionClient(
+        this.connectionId,
+        (notices) => result.notify(notices),
+        (retry) => result.retry(retry)
+      ),
       sql,
       startLine,
       anchorId,
