@@ -17,6 +17,8 @@
   import DocumentHeader from "./DocumentHeader.svelte";
   import FileSwitcher from "./FileSwitcher.svelte";
   import SchemaBrowser from "./SchemaBrowser.svelte";
+  import Shortcuts from "./Shortcuts.svelte";
+  import { isTyping, type Pane } from "$lib/shortcuts";
   import { page } from "$app/state";
 
   let { workspace }: { workspace: Workspace } = $props();
@@ -24,6 +26,8 @@
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
   let recordOpen = $state(false);
+  let shortcutsOpen = $state(false);
+  let shortcutsPane: Pane | undefined = $state();
   let editorRef: ReturnType<typeof Editor> | undefined = $state();
   let resultRef: ReturnType<typeof Result> | undefined = $state();
   let recordDialog: ReturnType<typeof Dialog> | undefined = $state();
@@ -130,6 +134,16 @@
     recordOpen = true;
   }
 
+  // The card tints the section for the pane that had focus, which is read
+  // off the `data-pane` wrapper around whatever holds it — the account menu
+  // opens it from no pane at all, and nothing is tinted.
+  function openShortcuts() {
+    if (shortcutsOpen) return;
+    const pane = document.activeElement?.closest<HTMLElement>("[data-pane]")?.dataset.pane;
+    shortcutsPane = pane as Pane | undefined;
+    shortcutsOpen = true;
+  }
+
   let saveTimer: ReturnType<typeof setTimeout>;
   function handleEditorChange() {
     clearTimeout(saveTimer);
@@ -138,7 +152,9 @@
 </script>
 
 {#snippet browser()}
-  <SchemaBrowser {workspace} oninsert={(sql) => editorRef?.insert(sql)} />
+  <div class="surface" data-pane="browser">
+    <SchemaBrowser {workspace} oninsert={(sql) => editorRef?.insert(sql)} />
+  </div>
 {/snippet}
 
 {#snippet viewer(expanded: boolean)}
@@ -159,19 +175,21 @@
     How a field is drawn is a property of the document, so it travels with the
     file rather than with the result being inspected.
   -->
-  <DataViewer
-    {selection}
-    rowCount={activeResult?.data?.length}
-    formats={workspace.activeFile?.viewFormats ?? {}}
-    onpick={(path, formatId) => {
-      const file = workspace.activeFile;
-      if (file) workspace.setViewFormat(file, path, formatId);
-    }}
-    onstep={(delta, extend, reveal) => resultRef?.step(delta, extend, reveal)}
-    {expanded}
-    onexpand={expanded ? undefined : openRecord}
-    onclose={expanded ? () => recordDialog?.close() : undefined}
-  />
+  <div class="surface" data-pane="inspector">
+    <DataViewer
+      {selection}
+      rowCount={activeResult?.data?.length}
+      formats={workspace.activeFile?.viewFormats ?? {}}
+      onpick={(path, formatId) => {
+        const file = workspace.activeFile;
+        if (file) workspace.setViewFormat(file, path, formatId);
+      }}
+      onstep={(delta, extend, reveal) => resultRef?.step(delta, extend, reveal)}
+      {expanded}
+      onexpand={expanded ? undefined : openRecord}
+      onclose={expanded ? () => recordDialog?.close() : undefined}
+    />
+  </div>
 {/snippet}
 
 {#snippet inspector()}
@@ -179,32 +197,37 @@
 {/snippet}
 
 {#snippet editor()}
-  <Editor
-    bind:this={editorRef}
-    file={workspace.activeFile}
-    files={workspace.files}
-    {metadataProvider}
-    markers={editorMarkers}
-    onexecutesql={(sql, startLine, anchorId, replacesId) =>
-      workspace.run(sql, startLine, anchorId, replacesId)}
-    onshowresult={(result) => workspace.showResult(result)}
-    oncancelresult={(result) => void result.cancel()}
-    onchange={handleEditorChange}
-    onquickopen={() => (switcherOpen = true)}
-    theme={palette}
-  />
+  <div class="surface" data-pane="editor">
+    <Editor
+      bind:this={editorRef}
+      file={workspace.activeFile}
+      files={workspace.files}
+      {metadataProvider}
+      markers={editorMarkers}
+      onexecutesql={(sql, startLine, anchorId, replacesId) =>
+        workspace.run(sql, startLine, anchorId, replacesId)}
+      onshowresult={(result) => workspace.showResult(result)}
+      oncancelresult={(result) => void result.cancel()}
+      onchange={handleEditorChange}
+      onquickopen={() => (switcherOpen = true)}
+      onshortcuts={openShortcuts}
+      theme={palette}
+    />
+  </div>
 {/snippet}
 
 {#snippet results()}
-  <Result
-    bind:this={resultRef}
-    result={activeResult}
-    bind:selection
-    bind:rowLimit={workspace.rowLimit}
-    bind:limitRows={workspace.limitRows}
-    ceiling={workspace.ceiling}
-    onopen={openRecord}
-  />
+  <div class="surface" data-pane="results">
+    <Result
+      bind:this={resultRef}
+      result={activeResult}
+      bind:selection
+      bind:rowLimit={workspace.rowLimit}
+      bind:limitRows={workspace.limitRows}
+      ceiling={workspace.ceiling}
+      onopen={openRecord}
+    />
+  </div>
 {/snippet}
 
 {#snippet doc()}
@@ -216,20 +239,26 @@
   </div>
 {/snippet}
 
-<!-- Monaco owns this chord while the editor has focus and handles it there;
-     this catches it everywhere else, and keeps the browser's print dialog out
-     of Cmd+P either way. -->
+<!-- Monaco owns Cmd+P while the editor has focus and handles it there; this
+     catches it everywhere else, and keeps the browser's print dialog out of
+     it either way. `?` is a character wherever text is typed — monaco's
+     textarea, a filter box — and opens the shortcuts card everywhere else;
+     the editor has its own chord for it. -->
 <svelte:window
   onkeydown={(e) => {
-    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-    if (e.key.toLowerCase() !== "p") return;
-    e.preventDefault();
-    switcherOpen = true;
+    if (e.altKey) return;
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      switcherOpen = true;
+    } else if (!(e.metaKey || e.ctrlKey) && e.key === "?" && !isTyping(e.target)) {
+      e.preventDefault();
+      openShortcuts();
+    }
   }}
 />
 
 <main>
-  <TopBar {branding} {userId} {logoutPath} />
+  <TopBar {branding} {userId} {logoutPath} onshortcuts={openShortcuts} />
   <div class="workspace">
     <SplitPane type="horizontal" panes={[browser, doc, inspector]} bind:layout={workspaceLayout} />
   </div>
@@ -251,6 +280,12 @@
       {@render viewer(true)}
     </Dialog>
   {/if}
+
+  {#if shortcutsOpen}
+    <Dialog fit onclose={() => (shortcutsOpen = false)}>
+      <Shortcuts current={shortcutsPane} onclose={() => (shortcutsOpen = false)} />
+    </Dialog>
+  {/if}
 </main>
 
 <style>
@@ -266,6 +301,14 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
+  }
+
+  /* Names the pane a key press landed in, for the shortcuts card; a split
+     pane sizes its direct child, so the wrapper passes that on. */
+  .surface,
+  .surface > :global(*) {
+    width: 100%;
+    height: 100%;
   }
 
   .document {

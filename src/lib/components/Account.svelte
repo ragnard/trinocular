@@ -9,8 +9,12 @@
    *
    * Signing out has nowhere else to be. Until this, the only `Sign out` in the
    * app was on `/auth/forbidden`, which meant everyone allowed in was stuck.
+   *
+   * The shortcuts card is here because `?` is a thing you have to know, and
+   * this menu is the one place in the chrome that is about the app rather
+   * than a document.
    */
-  import { Monitor, Moon, Sun, UserRound } from "@lucide/svelte";
+  import { Keyboard, Monitor, Moon, Sun, UserRound } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
   import { theme, type ThemeChoice } from "$lib/theme.svelte";
   import { BUILD, commitUrl, shortCommit } from "$lib/build";
@@ -19,9 +23,10 @@
     userId?: string;
     /** Absent when there is no provider to sign out of (`authn: none`). */
     logoutPath?: string;
+    onshortcuts: () => void;
   }
 
-  let { userId, logoutPath }: Props = $props();
+  let { userId, logoutPath, onshortcuts }: Props = $props();
 
   /**
    * The chip wears the part of an id that tells one person from another — the
@@ -54,6 +59,13 @@
       </button>
     {/each}
 
+    <div class="separator"></div>
+    <button onclick={onshortcuts}>
+      <Keyboard size={14} />
+      Shortcuts
+      <kbd class="hint">?</kbd>
+    </button>
+
     {#if logoutPath}
       <div class="separator"></div>
       <!-- A POST, like the forbidden page's: signing out revokes the refresh
@@ -81,6 +93,10 @@
     max-width: 22em;
     margin: 0;
     padding: 2px 12px 6px;
+  }
+
+  .hint {
+    margin-left: auto;
   }
 
   .build {

@@ -2,6 +2,7 @@
   import type { SqlFile, Workspace } from "$lib/State.svelte";
   import { CloudOff, FileText } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
+  import { formatKeys } from "$lib/shortcuts";
 
   interface Props {
     workspace: Workspace;
@@ -53,7 +54,7 @@
   {/if}
 
   <button class="chip" onclick={onquickopen}>
-    <kbd>&#8984;P</kbd>
+    <kbd>{formatKeys("Mod+P")}</kbd>
     Switch file
   </button>
 </div>
