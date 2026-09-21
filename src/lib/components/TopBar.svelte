@@ -15,16 +15,16 @@
 </script>
 
 <header class="rail topbar">
-  <!-- The icon and the message are the operator's HTML, from the config
+  <!-- The logo and the message are the operator's HTML, from the config
        file. The CSP keeps a script in them from running; nothing else about
        them is checked. -->
   <span class="wordmark" title={describeBuild(BUILD)}>
-    {#if branding.icon !== ""}
+    {#if branding.logo !== ""}
       <span class="logo">
-        {#if branding.icon === undefined}
+        {#if branding.logo === undefined}
           <img src={logo} alt="" />
         {:else}
-          {@html branding.icon}
+          {@html branding.logo}
         {/if}
       </span>
     {/if}
