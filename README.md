@@ -125,11 +125,12 @@ Other commands: `bun run build` (production build), `bun run preview`, `bun run 
 ### Performance checks
 
 `bun run perf` drives the app in a headless Chromium through a set of scenarios — streaming a
-large result, selecting rows into the inspector, typing in a big file, filtering the schema
-browser, re-running a statement to watch the heap — and reports main-thread time per page, per
-key or per selection, long tasks with the function behind them, and a few structural checks
-(no request on a keystroke, the heap coming back after a result is dropped). It needs a
-running Trinocular with a `tpch` catalog on its default connection, and a Chromium:
+large result, selecting rows into the inspector, stepping the full-window inspector through a
+wide result, typing in a big file, filtering the schema browser, re-running a statement to
+watch the heap — and reports main-thread time per page, per key, per selection or per row,
+long tasks with the function behind them, and a few structural checks (no request on a
+keystroke, the heap coming back after a result is dropped). It needs a running Trinocular with
+a `tpch` catalog on its default connection, and a Chromium:
 
 ```bash
 TRINO_URL=http://localhost:8080 bun run dev      # or the build, for memory numbers
