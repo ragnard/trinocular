@@ -1,6 +1,8 @@
 import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
-import type { Columns, QueryData, QueryError, QueryStats } from "$lib/trino";
+import type { Columns, QueryData, QueryError, QueryStats, SessionDelta } from "$lib/trino";
+import { describeIgnored } from "$lib/trino/session";
+import { TrinoSession } from "$lib/trino/TrinoSession.svelte";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import type { ClientConnection } from "$lib/server/connectionAuthz";
 import { underPath } from "$lib/viewFormats";
@@ -110,6 +112,8 @@ export class Result {
   stats?: QueryStats = $state.raw();
   warnings?: string[] = $state.raw();
   error?: QueryError = $state.raw();
+  /** Things the run itself has to say — a session change that was not carried. */
+  notices: string[] = $state.raw([]);
   /** Split counts over time; see `ProgressSample`. */
   progress: ProgressSample[] = $state.raw([]);
   #sampleInterval = MIN_SAMPLE_INTERVAL_MS;
@@ -210,6 +214,11 @@ export class Result {
       if (signedOut(e)) return;
       this.fail(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /** Something the run has to say that is not an error; see `notices`. */
+  notify(messages: string[]) {
+    this.notices = [...this.notices, ...messages];
   }
 
   /** Settles the result on a failure of ours rather than the cluster's. */
@@ -538,6 +547,16 @@ export class Workspace {
    * touches the network until something asks it to.
    */
   #catalogs = new Map<string, CatalogCache>();
+  /**
+   * The session each connection's statements run in — catalog, schema,
+   * session properties, prepared statements — kept here so that it outlives
+   * the run that changed it: `USE tpch.tiny` is a statement whose whole
+   * effect is on the *next* statement. One per connection, for the reason the
+   * caches are, and built alongside them, for the reason they are built here.
+   * The metadata clients the caches hold deliberately do not carry it: a
+   * `SHOW TABLES` is fully qualified already.
+   */
+  #sessions = new Map<string, TrinoSession>();
 
   #store: WorkspaceStore;
   /**
@@ -582,6 +601,7 @@ export class Workspace {
     // the one entry that keeps the degenerate case a lookup too.
     for (const id of [...this.#connectionIds, this.defaultConnectionId]) {
       this.#catalogs.set(id, new CatalogCache(this.#createClient(id)));
+      this.#sessions.set(id, new TrinoSession());
     }
     this.connectionId = this.#knownConnection(loaded.connectionId);
     this.#restoreFiles(loaded);
@@ -593,8 +613,38 @@ export class Workspace {
       : this.defaultConnectionId;
   }
 
+  /** A client for metadata: no session, and nothing to report back. */
   #createClient(connectionId: string): Trino {
     return Trino.create({ server: `/api/trino/${connectionId}` });
+  }
+
+  /**
+   * A client for a statement: starts from the connection's session and folds
+   * what its responses change back into it, so the next statement starts
+   * from there. A change the client will not carry is reported through
+   * `onIgnored`, so the statement that asked for it does not read as having
+   * worked.
+   */
+  #createSessionClient(connectionId: string, onIgnored: (notices: string[]) => void): Trino {
+    const session = this.sessionFor(connectionId);
+    return Trino.create({
+      server: `/api/trino/${connectionId}`,
+      session: session.state,
+      onSessionChange: (delta: SessionDelta) => {
+        session.apply(delta);
+        if (delta.ignored.length > 0) onIgnored(delta.ignored.map(describeIgnored));
+      }
+    });
+  }
+
+  /** The session a connection's statements run in; see `#sessions`. */
+  sessionFor(connectionId: string): TrinoSession {
+    return this.#sessions.get(this.#knownConnection(connectionId))!;
+  }
+
+  /** The session of the current connection. */
+  get session(): TrinoSession {
+    return this.sessionFor(this.connectionId);
   }
 
   /**
@@ -737,10 +787,14 @@ export class Workspace {
   run(sql: string, startLine: number, anchorId: string, replacesId?: string) {
     const file = this.activeFile;
     if (!file) return;
-    // One client per run: the Trino client keeps mutable session header state
-    // (prepared statements), which is not safe to share across concurrent runs.
-    const result = new Result(
-      this.#createClient(this.connectionId),
+    // One client per run, seeded from the connection's session: the client
+    // folds each response's session changes into its own headers as it goes,
+    // which is not safe to share across concurrent runs, so what outlives the
+    // run is the session and not the client.
+    // `result` is read by the callback only once a response is in, long after
+    // the assignment below.
+    const result: Result = new Result(
+      this.#createSessionClient(this.connectionId, (notices) => result.notify(notices)),
       sql,
       startLine,
       anchorId,

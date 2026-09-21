@@ -85,6 +85,8 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "x-trino-source",
   "x-trino-catalog",
   "x-trino-schema",
+  "x-trino-path",
+  "x-trino-time-zone",
   "x-trino-session",
   "x-trino-prepared-statement"
 ]);
