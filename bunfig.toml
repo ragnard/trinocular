@@ -1,0 +1,6 @@
+# Run package.json scripts under bun's own runtime, as `bun run --bun` would,
+# rather than under node: the server reads YAML config through `Bun.YAML` and
+# opens sqlite through `bun:sqlite`, neither of which node has. Without this,
+# `bun run dev` starts vite under node and a YAML config fails to load.
+[run]
+bun = true
