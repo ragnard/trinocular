@@ -116,8 +116,10 @@
        butt together. This is the shoulder that split was missing. -->
   <div class="rail">
     {#if result}
+      {@const rows = result.released ?? result.rowCount ?? 0}
       <span class="dot" class:failed={!!result.error} class:running={result.running}></span>
-      <span>{result.released ?? result.rowCount ?? 0} rows</span>
+      <!-- formatCount compacts past five digits, so the exact figure is on hover. -->
+      <span title={`${rows.toLocaleString()} rows`}>{formatCount(rows)} rows</span>
       <span class="muted">&middot;</span>
       <span class="soft">{result.elapsedTimeSeconds} s</span>
     {:else}
