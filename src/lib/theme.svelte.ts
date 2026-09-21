@@ -10,19 +10,17 @@
  * The choice is remembered, because a menu reading "Dark" over a window that
  * came up light would make the choice look like it had never been taken. Only
  * an explicit one is written down: "system" is the absence of a preference, so
- * it is stored as the absence of a key.
+ * it is stored as the absence of a key. It is a browser preference (`prefs.ts`),
+ * like the pane layout: a property of this screen and not of the workspace.
  */
-import { browser } from "$app/environment";
+import { readPref, writePref } from "./prefs";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
-const KEY = "trinocular:theme";
+const PREF = "theme";
 
-function stored(): ThemeChoice {
-  if (!browser) return "system";
-  const value = localStorage.getItem(KEY);
-  return value === "light" || value === "dark" ? value : "system";
-}
+const stored = (): ThemeChoice =>
+  readPref(PREF, (v) => (v === "light" || v === "dark" ? v : undefined)) ?? "system";
 
 class Theme {
   choice: ThemeChoice = $state(stored());
@@ -37,9 +35,7 @@ class Theme {
 
   pick(choice: ThemeChoice) {
     this.choice = choice;
-    if (!browser) return;
-    if (choice === "system") localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, choice);
+    writePref(PREF, choice === "system" ? undefined : choice);
   }
 
   /**
