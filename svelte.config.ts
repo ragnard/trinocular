@@ -32,14 +32,6 @@ const config = {
         // run as whoever is signed in.
         "frame-ancestors": ["none"]
       }
-    },
-    experimental: {
-      remoteFunctions: true
-    }
-  },
-  compilerOptions: {
-    experimental: {
-      async: true
     }
   },
   vitePlugin: {
