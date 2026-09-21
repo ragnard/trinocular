@@ -424,16 +424,18 @@
       expanded={open}
       loading={status.loading}
       errors={status.errors}
+      label="Schema"
       ontoggle={handleToggle}
       onreload={handleReload}
     >
-      {#snippet actions(node)}
+      {#snippet actions(node, tabindex)}
         {#if meta.get(node.id)?.kind === "table"}
           <button
             popovertarget={menuId}
             aria-pressed={menuOpen && target?.id === node.id}
             aria-haspopup="true"
             title="SQL for {node.label}"
+            {tabindex}
             onclick={(e) => startAction(node, e.currentTarget)}
           >
             <Ellipsis size={14} />
