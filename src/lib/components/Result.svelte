@@ -32,8 +32,8 @@
   let table: ReturnType<typeof Table> | undefined = $state();
 
   /** Moves the table's selection by `delta` rows; see `Table.step`. */
-  export function step(delta: number, extend = false) {
-    table?.step(delta, extend);
+  export function step(delta: number, extend = false, reveal = true) {
+    table?.step(delta, extend, reveal);
   }
 
   /** Collapses the selection to the active cell's whole row; see `Table.selectRow`. */

@@ -132,7 +132,7 @@
       const file = workspace.activeFile;
       if (file) workspace.setViewFormat(file, path, formatId);
     }}
-    onstep={(delta, extend) => resultRef?.step(delta, extend)}
+    onstep={(delta, extend, reveal) => resultRef?.step(delta, extend, reveal)}
     {expanded}
     onexpand={expanded ? undefined : openRecord}
     onclose={expanded ? () => recordDialog?.close() : undefined}

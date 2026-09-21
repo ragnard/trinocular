@@ -284,7 +284,7 @@
 
   const clamp = (n: number, max: number) => Math.min(Math.max(0, n), Math.max(0, max));
 
-  function move(rows: number, cols: number, extend: boolean) {
+  function move(rows: number, cols: number, extend: boolean, reveal = true) {
     if (!active) return;
     const next: CellCoord = {
       row: clamp(active.row + rows, totalRows - 1),
@@ -292,14 +292,19 @@
     };
     active = next;
     if (!extend) anchor = next;
-    scrollActiveIntoView();
+    if (reveal) scrollActiveIntoView();
   }
 
   /** Moves the selection `delta` rows (±Infinity for either end); with
    *  `extend`, the anchor stays put. What the inspector's navigator drives,
-   *  so the selection keeps one owner. */
-  export function step(delta: number, extend = false) {
-    move(delta, 0, extend);
+   *  so the selection keeps one owner. With `reveal` off the grid is not
+   *  scrolled to the row: reading `scrollTop` forces a layout of whatever is
+   *  dirty, and under the full-window dialog that was the dialog's own
+   *  freshly built document, laid out once for the read and again for the
+   *  frame — for a grid nobody could see. `focus()` on close scrolls to
+   *  wherever the stepping ended. */
+  export function step(delta: number, extend = false, reveal = true) {
+    move(delta, 0, extend, reveal);
   }
 
   /** Focuses the grid, with the selection in view. */
