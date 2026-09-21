@@ -204,6 +204,14 @@ html {
   background: var(--s3);
 }
 
+/* A row that is there to be read, not pressed: nothing to reset, no
+   connections to choose from. */
+.menu button:disabled {
+  color: var(--fg-3);
+  background: transparent;
+  cursor: default;
+}
+
 .menu .separator {
   height: 1px;
   margin: 4px 0;

@@ -177,6 +177,15 @@
       </p>
     </div>
   {:else if schema}
+    <!-- A statement that asked for a session change the client does not carry
+         (`SET ROLE`) succeeded as far as the cluster is concerned, and the
+         next statement will not see it; saying so here is what keeps it from
+         reading as having worked. -->
+    {#each result.notices as notice (notice)}
+      <div class="notice">
+        <span class="fill">{notice}</span>
+      </div>
+    {/each}
     {#if result.held}
       <!-- In place of the progress strip: nothing is polled while held, so
            the stats it would draw from stop moving. -->

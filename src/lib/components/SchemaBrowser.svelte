@@ -25,6 +25,22 @@
    */
   let connectionId = $derived(workspace.connectionId);
   let connectionName = $derived(workspace.connectionName(connectionId));
+  /**
+   * The chip is the answer to "where will this run", and after `USE` that
+   * answer has a second half: the catalog and schema an unqualified name
+   * resolves against. The rest of the session — properties, prepared
+   * statements — is on hover, being rarer and longer.
+   */
+  let session = $derived(workspace.sessionFor(connectionId));
+  let connectionLabel = $derived(
+    session.location ? `${connectionName} · ${session.location}` : connectionName
+  );
+  let connectionTitle = $derived(
+    session.empty
+      ? "The Trino cluster every document runs against"
+      : "The Trino cluster every document runs against, and its session:\n" +
+          session.summary.join("\n")
+  );
 
   let filter = $state("");
   let filtering = $derived(filter.trim().length > 0);
@@ -369,12 +385,7 @@
 
 <div class="browser">
   <div class="rail">
-    <Dropdown
-      icon={HardDrive}
-      label={connectionName}
-      strong
-      title="The Trino cluster every document runs against"
-    >
+    <Dropdown icon={HardDrive} label={connectionLabel} strong title={connectionTitle}>
       {#snippet menu()}
         {#each workspace.connections as connection (connection.id)}
           <button
@@ -386,6 +397,19 @@
         {:else}
           <button disabled>No connections configured</button>
         {/each}
+        {#if workspace.hasConnections}
+          <div class="separator"></div>
+          <!-- Back to no catalog, no schema, no properties: what a fresh page
+               starts from. Greyed rather than hidden, so the session being
+               something that can be reset is always on show. -->
+          <button
+            disabled={session.empty}
+            onclick={() => session.reset()}
+            title="Forget the catalog, schema, session properties and prepared statements set by earlier statements"
+          >
+            Reset session
+          </button>
+        {/if}
       {/snippet}
     </Dropdown>
   </div>

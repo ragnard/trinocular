@@ -20,6 +20,17 @@
  * own proxy, which attaches identity itself.
  */
 
+import {
+  EMPTY_SESSION,
+  applyDelta,
+  sessionDelta,
+  sessionHeaders,
+  type SessionDelta,
+  type SessionState
+} from "./session";
+
+export type { SessionDelta, SessionState } from "./session";
+
 export class HttpError extends Error {
   status: number;
   constructor(status: number, statusText: string) {
@@ -36,24 +47,7 @@ const TRINO_HEADER_PREFIX = "X-Trino-";
 
 export const isTrinoHeader = (name: string): boolean =>
   name.toLowerCase().startsWith(TRINO_HEADER_PREFIX.toLowerCase());
-const TRINO_PREPARED_STATEMENT_HEADER = TRINO_HEADER_PREFIX + "Prepared-Statement";
-const TRINO_ADDED_PREPARE_HEADER = TRINO_HEADER_PREFIX + "Added-Prepare";
 const TRINO_SOURCE_HEADER = TRINO_HEADER_PREFIX + "Source";
-const TRINO_CATALOG_HEADER = TRINO_HEADER_PREFIX + "Catalog";
-const TRINO_SCHEMA_HEADER = TRINO_HEADER_PREFIX + "Schema";
-const TRINO_SESSION_HEADER = TRINO_HEADER_PREFIX + "Session";
-const TRINO_SET_CATALOG_HEADER = TRINO_HEADER_PREFIX + "Set-Catalog";
-const TRINO_SET_SCHEMA_HEADER = TRINO_HEADER_PREFIX + "Set-Schema";
-const TRINO_SET_SESSION_HEADER = TRINO_HEADER_PREFIX + "Set-Session";
-const TRINO_CLEAR_SESSION_HEADER = TRINO_HEADER_PREFIX + "Clear-Session";
-
-export type Session = { [key: string]: string };
-
-const encodeAsString = (obj: { [key: string]: string }) => {
-  return Object.entries(obj)
-    .map(([key, value]) => `${key}=${value}`)
-    .join(",");
-};
 
 export type RequestHeaders = {
   [key: string]: string;
@@ -63,9 +57,14 @@ export type ConnectionOptions = {
   /** Always this app's own proxy: `/api/trino/<connectionId>`. */
   readonly server: string;
   readonly source?: string;
-  readonly catalog?: string;
-  readonly schema?: string;
-  readonly session?: Session;
+  /** The session the first request starts from. Absent is an empty one. */
+  readonly session?: SessionState;
+  /**
+   * Told what each response changed in the session — `USE`, `SET SESSION`,
+   * `PREPARE` — so that whoever hands out clients can carry it to the next
+   * one. The client has already folded the delta into its own state.
+   */
+  readonly onSessionChange?: (delta: SessionDelta) => void;
   readonly extraHeaders?: RequestHeaders;
 };
 
@@ -159,9 +158,6 @@ export type QueryResult = {
 
 export type Query = {
   query: string;
-  catalog?: string;
-  schema?: string;
-  session?: Session;
   extraHeaders?: RequestHeaders;
 };
 
@@ -173,49 +169,46 @@ type FetchRequestConfig = {
 };
 
 /**
- * It takes a headers object and returns a new object with only the truthy values.
- * @param {RequestHeaders} headers - The headers object to be sanitized.
- * @returns An object with the key-value pairs of the headers object, but only if the value is truthy.
- */
-const cleanHeaders = (headers: RequestHeaders) => {
-  const sanitizedHeaders: RequestHeaders = {};
-  for (const [key, value] of Object.entries(headers)) {
-    if (value) {
-      sanitizedHeaders[key] = value;
-    }
-  }
-  return sanitizedHeaders;
-};
-
-/**
- * A fetch wrapper that keeps Trino's session headers in step across the
- * requests of one query.
+ * A fetch wrapper that keeps Trino's session in step across the requests of
+ * one query — and hands what changed back out, so that it can be kept across
+ * queries too.
  *
- * One instance per query, and not safe to share: the session headers are
- * mutable state that each response can rewrite (Set-Catalog, Set-Session, the
- * prepared statements it accumulates), so two concurrent queries on one
- * instance would rewrite each other's session.
+ * Trino has no session of its own: the catalog, the schema, the session
+ * properties and the prepared statements are headers the client sends, and a
+ * statement that changes them (`USE`, `SET SESSION`, `PREPARE`) answers with
+ * `Set-*`/`Clear-*`/`Added-Prepare` headers that the client is expected to
+ * fold in. `session.ts` is that fold; this class applies it after every
+ * response and reports the delta through `onSessionChange`.
+ *
+ * One instance per query, and not safe to share: two concurrent queries on
+ * one instance would fold each other's changes into a request already on its
+ * way. Sharing across *sequential* queries is what `onSessionChange` and the
+ * `session` option are for, without sharing the instance.
  */
 export default class Trino {
+  private session: SessionState;
+
   private constructor(
     private readonly baseURL: string,
-    private headers: RequestHeaders,
     private readonly options: ConnectionOptions
-  ) {}
+  ) {
+    this.session = options.session ?? EMPTY_SESSION;
+  }
 
   // Who the query runs as is not the browser's to say: the proxy sets
   // X-Trino-User from the identity the access gate established, and refuses to
   // forward any header the client sends that would name somebody else.
   static create(options: ConnectionOptions): Trino {
-    const headers: RequestHeaders = {
-      [TRINO_SOURCE_HEADER]: options.source ?? DEFAULT_SOURCE,
-      [TRINO_CATALOG_HEADER]: options.catalog ?? "",
-      [TRINO_SCHEMA_HEADER]: options.schema ?? "",
-      [TRINO_SESSION_HEADER]: encodeAsString(options.session ?? {}),
-      ...(options.extraHeaders ?? {})
-    };
+    return new Trino(options.server, options);
+  }
 
-    return new Trino(options.server, cleanHeaders(headers), options);
+  /** The headers this request starts from: the session, and what is fixed. */
+  private baseHeaders(): RequestHeaders {
+    return {
+      [TRINO_SOURCE_HEADER]: this.options.source ?? DEFAULT_SOURCE,
+      ...sessionHeaders(this.session),
+      ...(this.options.extraHeaders ?? {})
+    };
   }
 
   /**
@@ -226,14 +219,9 @@ export default class Trino {
   async request<T>(cfg: FetchRequestConfig): Promise<T> {
     const url = cfg.url?.startsWith("http") ? cfg.url : `${this.baseURL}${cfg.url ?? ""}`;
 
-    const mergedHeaders: RequestHeaders = {
-      ...this.headers,
-      ...(cfg.headers ?? {})
-    };
-
     const init: globalThis.RequestInit = {
       method: cfg.method ?? "GET",
-      headers: mergedHeaders
+      headers: { ...this.baseHeaders(), ...(cfg.headers ?? {}) }
     };
 
     if (cfg.data !== undefined) {
@@ -246,44 +234,11 @@ export default class Trino {
       throw new HttpError(response.status, response.statusText);
     }
 
-    const respHeaders = response.headers;
-
-    const setCatalog = respHeaders.get(TRINO_SET_CATALOG_HEADER);
-    if (setCatalog) {
-      this.headers[TRINO_CATALOG_HEADER] = setCatalog;
-    } else if (!this.headers[TRINO_CATALOG_HEADER]) {
-      if (this.options.catalog) {
-        this.headers[TRINO_CATALOG_HEADER] = this.options.catalog;
-      }
+    const delta = sessionDelta(response.headers);
+    if (delta) {
+      this.session = applyDelta(this.session, delta);
+      this.options.onSessionChange?.(delta);
     }
-
-    const setSchema = respHeaders.get(TRINO_SET_SCHEMA_HEADER);
-    if (setSchema) {
-      this.headers[TRINO_SCHEMA_HEADER] = setSchema;
-    } else if (!this.headers[TRINO_SCHEMA_HEADER]) {
-      if (this.options.schema) {
-        this.headers[TRINO_SCHEMA_HEADER] = this.options.schema;
-      }
-    }
-
-    const setSession = respHeaders.get(TRINO_SET_SESSION_HEADER);
-    if (setSession) {
-      this.headers[TRINO_SESSION_HEADER] = setSession;
-    } else if (!this.headers[TRINO_SESSION_HEADER]) {
-      this.headers[TRINO_SESSION_HEADER] = encodeAsString(this.options.session ?? {});
-    }
-
-    if (respHeaders.has(TRINO_CLEAR_SESSION_HEADER)) {
-      delete this.headers[TRINO_SESSION_HEADER];
-    }
-
-    if (respHeaders.has(TRINO_ADDED_PREPARE_HEADER)) {
-      const prep = this.headers[TRINO_PREPARED_STATEMENT_HEADER];
-      const added = respHeaders.get(TRINO_ADDED_PREPARE_HEADER)!;
-      this.headers[TRINO_PREPARED_STATEMENT_HEADER] = (prep ? prep + "," : "") + added;
-    }
-
-    this.headers = cleanHeaders(this.headers);
 
     // Cancelling a query answers 204 with an empty body, and a HEAD has none
     // by definition — json() throws on either.
@@ -301,17 +256,11 @@ export default class Trino {
    */
   async query(query: Query | string): Promise<QueryIterator> {
     const req = typeof query === "string" ? { query } : query;
-    const headers: RequestHeaders = {
-      [TRINO_CATALOG_HEADER]: req.catalog ?? "",
-      [TRINO_SCHEMA_HEADER]: req.schema ?? "",
-      [TRINO_SESSION_HEADER]: encodeAsString(req.session ?? {}),
-      ...(req.extraHeaders ?? {})
-    };
     const requestConfig: FetchRequestConfig = {
       method: "POST",
       url: "/v1/statement",
       data: req.query,
-      headers: cleanHeaders(headers)
+      headers: req.extraHeaders ?? {}
     };
     return this.request<QueryResult>(requestConfig).then(
       (result) => new QueryIterator(this, result)
