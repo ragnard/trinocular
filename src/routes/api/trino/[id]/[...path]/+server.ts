@@ -108,7 +108,8 @@ const FORWARDED_REQUEST_HEADERS = new Set([
 function createUpstreamHeaders(
   event: RequestEvent,
   identity: Identity,
-  target: Connection
+  target: Connection,
+  accessToken: string | undefined
 ): Record<string, string> | "unauthenticated" {
   const headers: Record<string, string> = {
     accept: "application/json"
@@ -119,9 +120,56 @@ function createUpstreamHeaders(
     }
   });
   headers["x-trino-user"] = identity.userId;
-  const auth = upstreamAuthHeaders(target.auth, event.locals.accessToken);
+  const auth = upstreamAuthHeaders(target.auth, accessToken);
   if (auth === "unauthenticated") return auth;
   return { ...headers, ...auth };
+}
+
+/**
+ * The token a `user-token` connection sends: the user's own, or — with
+ * `exchange` — the one the provider issues for this cluster in return for it.
+ *
+ * The exchange happens here, on the first request to the connection that the
+ * exchanger's cache does not answer, and not at login: a token minted at
+ * login for a cluster first queried an hour later would be long expired, and
+ * a user with three connections may only ever touch one. After the first
+ * statement on a cold replica pays the one round-trip, every poll is a cache
+ * hit.
+ *
+ * The two failures get different statuses because the client's poll retry
+ * treats 502 as transient. A provider that could not be reached *is*
+ * transient, so retrying is right; a provider that answered with an OAuth
+ * error has decided, and a 403 says "not this connection" without being
+ * retried for two minutes — and without being the 401 that would sign the
+ * user out over something that is not about their session.
+ */
+async function resolveAccessToken(
+  event: RequestEvent,
+  target: Connection,
+  id: string
+): Promise<string | undefined | Response> {
+  const token = event.locals.accessToken;
+  if (target.auth.kind !== "user-token" || !target.auth.exchange) return token;
+  const exchanger = event.locals.tokenExchanger;
+  // Not reachable under `authn: oidc`, which sets both beside the identity;
+  // the config check keeps `exchange` off any other authn.
+  if (!token || !exchanger) return refuse(401, "unauthorized");
+  const outcome = await exchanger.token(token, id, target.auth.exchange);
+  switch (outcome.kind) {
+    case "token":
+      return outcome.token;
+    case "refused":
+      event.locals.logger.warn(
+        { connection: id, error: outcome.error, description: outcome.description },
+        "token exchange refused"
+      );
+      return refuse(403, "token exchange refused");
+    case "unavailable":
+      error(event.locals.logger, 502, "Token exchange failed", "token exchange unavailable", {
+        connection: id,
+        message: outcome.message
+      });
+  }
 }
 
 /**
@@ -192,7 +240,9 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   event.locals.logger.debug({ id }, "proxying request");
 
   const url = toTargetUrl(event, target);
-  const headers = createUpstreamHeaders(event, identity, target);
+  const accessToken = await resolveAccessToken(event, target, id);
+  if (accessToken instanceof Response) return accessToken;
+  const headers = createUpstreamHeaders(event, identity, target, accessToken);
   // A `user-token` connection with no token to send. Not reachable through the
   // OIDC handler, which sets both together; answered as signed out, which the
   // client turns into a trip to the login page, rather than sent on bare.

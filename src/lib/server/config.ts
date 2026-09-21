@@ -318,12 +318,29 @@ export type AuthzConfig = z.infer<typeof AuthzSchema>;
  *  - `user-token`: the user's own OIDC access token as a bearer. Only under
  *    `authn: oidc` (checked on the whole config, below), and only on a
  *    connection that says so, since a token is not something to send to every
- *    host in the file. */
+ *    host in the file. With `exchange`, the token is first traded at the
+ *    provider for one issued for the cluster (below). */
+
+/** RFC 8693 token exchange: the user's token, re-issued by the provider for
+ *  the cluster's audience. What the cluster gets is then a token for the
+ *  cluster and nothing else — not the application's token with every audience
+ *  and role it carries — and one the application's own client need never be
+ *  able to mint directly. `audience` is what the cluster's OAuth2 authenticator
+ *  is client-id'd as; `scope` is for a provider that hands out the audience
+ *  through an optional scope (Keycloak), where the parameter adds it and the
+ *  audience then filters the result down to it. */
+const TokenExchangeSchema = z.object({
+  audience: z.string().min(1),
+  scope: z.string().min(1).optional()
+});
+
+export type TokenExchangeConfig = z.infer<typeof TokenExchangeSchema>;
+
 const ConnectionAuthSchema = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("none") }),
     z.object({ kind: z.literal("basic"), username: z.string().min(1), password: z.string() }),
-    z.object({ kind: z.literal("user-token") })
+    z.object({ kind: z.literal("user-token"), exchange: TokenExchangeSchema.optional() })
   ])
   .default({ kind: "none" });
 

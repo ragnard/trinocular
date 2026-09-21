@@ -48,7 +48,10 @@ const authnHandler = async (config: Config) => {
         scope: authn.scope,
         userIdClaim: authn.userIdClaim,
         claimsFrom: authn.claimsFrom,
-        paths: authn.paths
+        paths: authn.paths,
+        tokenExchange: Object.values(config.connections ?? {}).some(
+          (c) => c.auth.kind === "user-token" && c.auth.exchange !== undefined
+        )
       });
   }
 };
@@ -73,7 +76,11 @@ const createHandle = async () => {
       connections: Object.fromEntries(
         Object.entries(config.connections ?? {}).map(([id, c]) => [
           id,
-          c.auth.kind === "basic" ? `basic as ${c.auth.username}` : c.auth.kind
+          c.auth.kind === "basic"
+            ? `basic as ${c.auth.username}`
+            : c.auth.kind === "user-token" && c.auth.exchange
+              ? `user-token exchanged for ${c.auth.exchange.audience}`
+              : c.auth.kind
         ])
       )
     },

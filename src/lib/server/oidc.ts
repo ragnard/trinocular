@@ -7,6 +7,7 @@ import { safeReturnTo } from "./authz";
 import { error } from "./errors";
 import { logger } from "./logging";
 import type { Claims } from "./identity";
+import { TokenExchanger, type Exchange, type ExchangeOutcome } from "./tokenExchange";
 
 interface OIDCOptions {
   issuer: URL;
@@ -15,6 +16,9 @@ interface OIDCOptions {
   scope: string;
   userIdClaim: string;
   claimsFrom: "id_token" | "access_token";
+  /** Whether any connection asks for token exchange — only to say at startup
+   *  if the provider does not advertise the grant. */
+  tokenExchange: boolean;
   paths: {
     prefix: string;
     callback: string;
@@ -147,6 +151,44 @@ class TokenRefreshCoalescer {
   }
 }
 
+const TOKEN_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange";
+const ACCESS_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token";
+
+/** One RFC 8693 exchange at the token endpoint, as this application's client
+ *  (which the provider has to have allowed to exchange — in Keycloak, the
+ *  client's "Standard token exchange" switch). No refresh token is asked for:
+ *  the subject token's own refresh is what keeps a session alive, and the
+ *  exchanged token is re-derived from it. What the provider answers is sorted
+ *  into the three outcomes the proxy answers differently: a token; an OAuth
+ *  error, which is the provider's decision and will not change on a retry; or
+ *  a failure to get an answer at all. */
+const tokenExchange =
+  (config: client.Configuration): Exchange =>
+  async ({ subjectToken, audience, scope }): Promise<ExchangeOutcome> => {
+    const parameters: Record<string, string> = {
+      subject_token: subjectToken,
+      subject_token_type: ACCESS_TOKEN_TYPE,
+      requested_token_type: ACCESS_TOKEN_TYPE,
+      audience
+    };
+    if (scope) parameters.scope = scope;
+    try {
+      const response = await client.genericGrantRequest(config, TOKEN_EXCHANGE_GRANT, parameters);
+      return {
+        kind: "token",
+        token: response.access_token,
+        expiresIn: response.expires_in ?? 0
+      };
+    } catch (e) {
+      // An OAuth error body with a 4xx is the provider's answer; a 5xx wearing
+      // one is still an outage.
+      if (e instanceof client.ResponseBodyError && e.status < 500) {
+        return { kind: "refused", error: e.error, description: e.error_description };
+      }
+      return { kind: "unavailable", message: e instanceof Error ? e.message : String(e) };
+    }
+  };
+
 export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   if (!env.ORIGIN) {
     throw new Error("ORIGIN environment variable is required for OIDC");
@@ -159,6 +201,19 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
   );
 
   const coalescer = new TokenRefreshCoalescer(config, opts.claimsFrom);
+
+  // A hint and not a verdict: the metadata field is optional, so a provider
+  // that omits it may still answer the grant — and one that lists other
+  // grants without this one is worth a line in the log before the first
+  // query finds out.
+  const grants = config.serverMetadata().grant_types_supported;
+  if (opts.tokenExchange && grants && !grants.includes(TOKEN_EXCHANGE_GRANT)) {
+    logger.warn(
+      { grant_types_supported: grants },
+      "a connection asks for token exchange, but the provider does not advertise the grant"
+    );
+  }
+  const exchanger = new TokenExchanger(tokenExchange(config));
 
   const callbackPath = opts.paths.prefix + "/" + opts.paths.callback;
   const logoutPath = opts.paths.prefix + "/" + opts.paths.logout;
@@ -330,6 +385,7 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
       if (oidcData) {
         event.locals.accessToken = oidcData.accessToken;
+        event.locals.tokenExchanger = exchanger;
         event.locals.identity = {
           userId: oidcData.claims![opts.userIdClaim] as string,
           claims: oidcData.claims!

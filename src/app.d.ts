@@ -5,6 +5,7 @@ import type { Session } from "$lib/server/session";
 import type { Identity } from "$lib/server/identity";
 import type { Branding } from "$lib/server/config";
 import type { ClientConnection } from "$lib/server/connectionAuthz";
+import type { TokenExchanger } from "$lib/server/tokenExchange";
 
 declare global {
   namespace App {
@@ -20,6 +21,9 @@ declare global {
       /** Set by the authn handler; absent means nobody is signed in. */
       identity: Identity | undefined;
       accessToken: string;
+      /** Set by the OIDC handler beside the token: how a connection with
+       *  `exchange` trades that token for one issued for its cluster. */
+      tokenExchanger?: TokenExchanger;
     }
     /** What the root layout's load hands every page; see +layout.server.ts. */
     interface PageData {

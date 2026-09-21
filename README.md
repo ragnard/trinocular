@@ -146,7 +146,7 @@ swaps in, with its trade-offs, commented out and ready. In outline:
 | `results` | The most one query may bring into the browser, in rows and in bytes; past it the run is stopped and keeps what it has. |
 | `authn` | Who the user is: `none` (everybody is one named user), `password` (users and passwords in the config) or `oidc`. |
 | `authz` | Who is allowed in: `allow` (the default), a `cel` expression over the user's claims, or `require-keycloak-client-role`. |
-| `connections` | The Trino clusters: how the server authenticates to each (`none`, a `basic` service account, or the user's own OIDC `user-token`), and an optional `authz` rule of its own that can only narrow the one above. |
+| `connections` | The Trino clusters: how the server authenticates to each (`none`, a `basic` service account, or the user's own OIDC `user-token`, optionally exchanged for one issued for the cluster), and an optional `authz` rule of its own that can only narrow the one above. |
 
 The SQLite stores are for a single copy of Trinocular — the file is opened for this process
 alone, and a second copy pointed at it refuses to start — which on Kubernetes is one
