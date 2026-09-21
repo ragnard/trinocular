@@ -94,6 +94,8 @@
     onchange?: (content: string) => void;
     /** Cmd/Ctrl+P, forwarded from inside the editor where it is swallowed. */
     onquickopen?: () => void;
+    /** The shortcuts card: `?` is a character here, so the editor has a chord. */
+    onshortcuts?: () => void;
     theme?: "light" | "dark";
   }
 
@@ -108,6 +110,7 @@
     oncancelresult,
     onchange,
     onquickopen,
+    onshortcuts,
     theme = "light"
   }: Props = $props();
 
@@ -742,6 +745,19 @@
       label: "Switch File",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
       run: () => onquickopen?.()
+    });
+
+    // VS Code's own chord for its keyboard shortcuts, and in F1's list.
+    editor.addAction({
+      id: "trino.showShortcuts",
+      label: "Keyboard Shortcuts",
+      keybindings: [
+        monaco.KeyMod.chord(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK,
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS
+        )
+      ],
+      run: () => onshortcuts?.()
     });
 
     editor.addAction({

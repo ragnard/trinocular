@@ -9,9 +9,11 @@
     userId?: string;
     /** Absent when there is no provider to sign out of (`authn: none`). */
     logoutPath?: string;
+    /** Opens the keyboard shortcuts card, from the account menu. */
+    onshortcuts: () => void;
   }
 
-  let { branding, userId, logoutPath }: Props = $props();
+  let { branding, userId, logoutPath, onshortcuts }: Props = $props();
 </script>
 
 <header class="rail topbar">
@@ -28,7 +30,7 @@
     {#if branding.message}{@html branding.message}{/if}
   </div>
   <div class="account">
-    <Account {userId} {logoutPath} />
+    <Account {userId} {logoutPath} {onshortcuts} />
   </div>
 </header>
 
