@@ -226,7 +226,9 @@ const ConnectionSchema = z.object({
 });
 
 const BrandingSchema = z.object({
-  name: z.string().min(1).default("trinocular"),
+  name: z.string().min(1).default("Trinocular"),
+  // HTML, shown before the name in place of the bundled logo; "" for none.
+  logo: z.string().optional(),
   // HTML, shown in the middle of the top bar. It is the operator's, from the
   // same file as the security policy, and is rendered as written.
   message: z.string().optional()

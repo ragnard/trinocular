@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The wordmark stands where the logo will go.
   import Account from "./Account.svelte";
+  import logo from "$lib/assets/logo.svg?raw";
   import { BUILD, describeBuild } from "$lib/build";
   import type { Branding } from "$lib/server/config";
 
@@ -15,9 +15,15 @@
 </script>
 
 <header class="rail topbar">
-  <span class="wordmark" title={describeBuild(BUILD)}>{branding.name}</span>
-  <!-- The operator's HTML, from the config file. The CSP keeps a script in
-       it from running; nothing else about it is checked. -->
+  <!-- The logo and the message are the operator's HTML, from the config
+       file. The CSP keeps a script in them from running; nothing else about
+       them is checked. -->
+  <span class="wordmark" title={describeBuild(BUILD)}>
+    {#if branding.logo !== ""}
+      <span class="logo">{@html branding.logo ?? logo}</span>
+    {/if}
+    {branding.name}
+  </span>
   <div class="message ell">
     {#if branding.message}{@html branding.message}{/if}
   </div>
@@ -40,10 +46,31 @@
   }
 
   .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
     letter-spacing: 0.01em;
     color: var(--fg);
     user-select: none;
+  }
+
+  /* Whatever the operator put in the box is held to the box: CSS outranks
+     an svg's own width/height attributes, and overflow catches the rest.
+     The bundled logo is filled with currentColor, so this is its colour. */
+  .logo {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    overflow: hidden;
+    color: #e83e8c;
+  }
+
+  .logo > :global(svg),
+  .logo > :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   .message {
