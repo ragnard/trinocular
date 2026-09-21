@@ -196,17 +196,16 @@ const AllowAuthzSchema = z.object({
   kind: z.literal("allow")
 });
 
-const RequireRoleAuthzSchema = z.object({
-  kind: z.literal("require-role"),
+// Sugar for the `cel` rule `"<role>" in claims.resource_access.<client>.roles`,
+// kept as a kind of its own because it knows this application's clientId and
+// an expression cannot name it.
+const RequireKeycloakClientRoleAuthzSchema = z.object({
+  kind: z.literal("require-keycloak-client-role"),
   role: z.string(),
   // The OIDC client whose roles are consulted. Defaults to this application's
   // own clientId, which is what "the role I granted Trinocular in Keycloak"
   // means; name another client to reuse its roles.
-  client: z.string().optional(),
-  // Escape hatch for a provider that does not lay roles out the way Keycloak
-  // does: a dotted claim path to a list of strings, e.g. `realm_access.roles`
-  // for realm-wide Keycloak roles, or plain `groups`. Overrides `client`.
-  claim: z.string().optional()
+  client: z.string().optional()
 });
 
 const CelAuthzSchema = z.object({
@@ -230,7 +229,11 @@ const AuthzSchema = z.preprocess(
     value && typeof value === "object" && !Array.isArray(value) && !("kind" in value)
       ? { kind: "cel", ...value }
       : value,
-  z.discriminatedUnion("kind", [AllowAuthzSchema, RequireRoleAuthzSchema, CelAuthzSchema])
+  z.discriminatedUnion("kind", [
+    AllowAuthzSchema,
+    RequireKeycloakClientRoleAuthzSchema,
+    CelAuthzSchema
+  ])
 );
 
 export type AuthzConfig = z.infer<typeof AuthzSchema>;

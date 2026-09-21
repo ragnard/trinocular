@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { CelAuthorizer, ExpressionError } from "./celAuthz";
+import { CelAuthorizer, ExpressionError, RequireKeycloakClientRole } from "./celAuthz";
 import type { Identity } from "./identity";
 
 const alice: Identity = {
@@ -84,5 +84,36 @@ describe("CelAuthorizer", () => {
 
   test("the name is the expression, for the startup log", () => {
     expect(CelAuthorizer("userId == 'alice'").name).toBe("cel(userId == 'alice')");
+  });
+});
+
+describe("RequireKeycloakClientRole", () => {
+  test("is the expression it is sugar for, name and all", () => {
+    const rule = RequireKeycloakClientRole({ role: "user", client: "trinocular" });
+    expect(rule.name).toBe(`cel("user" in claims.resource_access.trinocular.roles)`);
+    expect(rule.authorize(alice).allowed).toBe(true);
+    expect(
+      RequireKeycloakClientRole({ role: "admin", client: "trinocular" }).authorize(alice)
+    ).toEqual({ allowed: false, reason: "expression evaluated to false" });
+  });
+
+  test("a client id that is not identifier-shaped is indexed, not selected", () => {
+    const rule = RequireKeycloakClientRole({ role: "analyst", client: "com.example.finance" });
+    expect(rule.name).toBe(`cel("analyst" in claims.resource_access["com.example.finance"].roles)`);
+    expect(rule.authorize(alice).allowed).toBe(true);
+  });
+
+  test("a user with no roles for the client is refused", () => {
+    const refused = RequireKeycloakClientRole({ role: "user", client: "trinocular" }).authorize(
+      bob
+    );
+    expect(refused.allowed).toBe(false);
+    if (!refused.allowed) expect(refused.reason).toMatch(/No such key/);
+  });
+
+  test("a quote in a role or client cannot break out of the literal", () => {
+    const rule = RequireKeycloakClientRole({ role: `us"er`, client: `tri"no` });
+    expect(rule.name).toBe(`cel("us\\"er" in claims.resource_access["tri\\"no"].roles)`);
+    expect(rule.authorize(alice).allowed).toBe(false);
   });
 });

@@ -7,8 +7,8 @@ import type { Identity } from "./identity";
  * Who may use which cluster.
  *
  * A connection's `authz` is the same vocabulary as the application-wide one —
- * `allow`, `require-role`, the same claim paths — because a policy is a policy
- * and there was no reason to invent a second way of writing one. What differs
+ * `allow`, an expression, the Keycloak role sugar — because a policy is a
+ * policy and there was no reason to invent a second way of writing one. What differs
  * is only what it governs.
  *
  * It **narrows, never widens**. The application-wide rule has already run in
