@@ -23,8 +23,16 @@ export interface ExportFormat {
    * `Uint8Array` so a cell can show its bytes), and every one of those
    * decisions is the wrong one for a file: base64 is what a varbinary column
    * arrived as and what any reader on the other side will expect back.
+   *
+   * The file is yielded as *lines*, each carrying its own terminator, and
+   * never joined into one string: V8 caps a string at 2^29 − 24 characters
+   * (~512 MB), which a "fetch all" on a few million rows overruns, and the
+   * join threw `RangeError: Invalid string length` inside the click handler.
+   * A `Blob` takes an array of parts and has no such cap, so the parts go to
+   * it as they are — the same memory as the lines array the join was built
+   * from, and no second copy of the whole file.
    */
-  serialize(fields: Field[], rows: Iterable<readonly unknown[]>): string;
+  serialize(fields: Field[], rows: Iterable<readonly unknown[]>): Iterable<string>;
 }
 
 /**
@@ -109,13 +117,12 @@ function csvRow(fields: Field[], row: readonly unknown[]): string {
   return fields.map((field, i) => csvField(csvValue(row[i], field.dataType))).join(",");
 }
 
-function serializeCsv(fields: Field[], rows: Iterable<readonly unknown[]>): string {
-  const lines = [fields.map((field) => csvField(field.name)).join(",")];
-  for (const row of rows) {
-    lines.push(csvRow(fields, row));
-  }
+function* serializeCsv(fields: Field[], rows: Iterable<readonly unknown[]>): Iterable<string> {
   // CRLF, per RFC 4180. Readers that do not care accept it anyway.
-  return lines.join("\r\n") + "\r\n";
+  yield fields.map((field) => csvField(field.name)).join(",") + "\r\n";
+  for (const row of rows) {
+    yield csvRow(fields, row) + "\r\n";
+  }
 }
 
 /**
@@ -141,18 +148,16 @@ export function clipboardText(fields: Field[], rows: readonly (readonly unknown[
  * object cannot hold both. Trino allows it; JSON does not; CSV is the format
  * that can carry it.
  */
-function serializeNdjson(fields: Field[], rows: Iterable<readonly unknown[]>): string {
-  const lines: string[] = [];
+function* serializeNdjson(fields: Field[], rows: Iterable<readonly unknown[]>): Iterable<string> {
   for (const row of rows) {
     const object: Record<string, unknown> = {};
     fields.forEach((field, i) => {
       object[field.name] = toJson(row[i], field.dataType);
     });
-    lines.push(JSON.stringify(object));
+    // Every line is terminated, so appending to the file or `cat`ing two of
+    // them together cannot fuse two records into one.
+    yield JSON.stringify(object) + "\n";
   }
-  // Trailing newline: every line is terminated, so appending to the file or
-  // `cat`ing two of them together cannot fuse two records into one.
-  return lines.length ? lines.join("\n") + "\n" : "";
 }
 
 export const EXPORT_FORMATS: ExportFormat[] = [
@@ -172,9 +177,13 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   }
 ];
 
-/** Hands the browser a file it did not fetch. */
-export function downloadText(filename: string, mimeType: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+/**
+ * Hands the browser a file it did not fetch. `parts` are concatenated by the
+ * `Blob`, which is what lets a file bigger than any one string can be reach
+ * the disk — see `ExportFormat.serialize`.
+ */
+export function downloadText(filename: string, mimeType: string, parts: Iterable<string>) {
+  const url = URL.createObjectURL(new Blob(Array.from(parts), { type: mimeType }));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
