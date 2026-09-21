@@ -37,9 +37,10 @@ jobs:
           annotations: true
 
   # `bun test` runs the store contracts against every implementation, and the
-  # Valkey suites are skipped unless TRINOCULAR_TEST_VALKEY names a server, so
-  # without the service here a third of the suite would silently not run. The
-  # Dockerfile's builder stage runs `check` and `build`, and neither of these.
+  # Valkey and Postgres suites are skipped unless TRINOCULAR_TEST_VALKEY and
+  # TRINOCULAR_TEST_POSTGRES name a server, so without the services here half
+  # the suite would silently not run. The Dockerfile's builder stage runs
+  # `check` and `build`, and neither of these.
   test:
     runs-on: ubuntu-latest
 
@@ -51,9 +52,23 @@ jobs:
         image: valkey/valkey:9-alpine
         ports:
           - 6379:6379
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # The runner waits for a healthy container before the steps start;
+        # without this the first test could beat the server's startup.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
 
     env:
       TRINOCULAR_TEST_VALKEY: localhost:6379
+      TRINOCULAR_TEST_POSTGRES: postgres://postgres:postgres@localhost:5432/postgres
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

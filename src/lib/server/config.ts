@@ -26,13 +26,16 @@ const ValkeyNodeSchema = (defaultPort: number) =>
     port: z.number().int().positive().default(defaultPort)
   });
 
-const ValkeyTlsSchema = z.union([
+// Shared by every store that talks over the network.
+const TlsSchema = z.union([
   z.boolean(),
   z.object({
     // Path to a PEM bundle for a private CA. `true` alone trusts the system's.
     ca: z.string().optional()
   })
 ]);
+
+export type TlsConfig = z.infer<typeof TlsSchema>;
 
 const SecretSchema = z
   .string()
@@ -43,7 +46,7 @@ const SecretSchema = z
 const ValkeyConnection = {
   username: z.string().optional(),
   password: z.string().optional(),
-  tls: ValkeyTlsSchema.default(false),
+  tls: TlsSchema.default(false),
   connectTimeoutMs: z.number().int().positive().default(10_000),
   commandTimeoutMs: z.number().int().positive().default(5_000)
 };
@@ -101,17 +104,43 @@ const SqliteSessionStoreSchema = z.object({
   secret: SecretSchema
 });
 
+// How to reach a Postgres: one URL, which is what every provider hands out
+// (CloudNativePG's `<cluster>-app` secret carries it as `uri`), and a schema
+// for the tables. `tls` is optional rather than defaulting to off because the
+// URL can already say (`sslmode=`), and a default here would silently override
+// it; set, it wins.
+const PostgresConnection = {
+  url: z.url({ protocol: /^postgres(ql)?$/ }),
+  schema: z.string().min(1).default("public"),
+  tls: TlsSchema.optional(),
+  poolSize: z.number().int().positive().default(4),
+  connectTimeoutMs: z.number().int().positive().default(10_000),
+  statementTimeoutMs: z.number().int().positive().default(5_000)
+};
+
+export type PostgresConnectionConfig = z.infer<z.ZodObject<typeof PostgresConnection>>;
+
+// Sealed like Valkey and sqlite, for the same reason: the database is what
+// gets backed up and replicated.
+const PostgresSessionStoreSchema = z.object({
+  ...PostgresConnection,
+  kind: z.literal("postgres"),
+  secret: SecretSchema
+});
+
 const StoreSchema = z
   .discriminatedUnion("kind", [
     MemoryStoreSchema,
     ValkeySessionStoreSchema,
-    SqliteSessionStoreSchema
+    SqliteSessionStoreSchema,
+    PostgresSessionStoreSchema
   ])
   .default({ kind: "memory" });
 
 export type StoreConfig = z.infer<typeof StoreSchema>;
 export type ValkeySessionStoreConfig = z.infer<typeof ValkeySessionStoreSchema>;
 export type SqliteSessionStoreConfig = z.infer<typeof SqliteSessionStoreSchema>;
+export type PostgresSessionStoreConfig = z.infer<typeof PostgresSessionStoreSchema>;
 
 const SessionSchema = z
   .object({
@@ -127,19 +156,21 @@ const SessionSchema = z
 // Where users' query files live. `browser` is this browser's localStorage,
 // which is where they have always been; the others are the server's, keyed
 // by the signed-in user, so a file follows the person and not the machine.
-// No secret for Valkey here: files are not sealed, in any store.
+// No secret for Valkey or Postgres here: files are not sealed, in any store.
 const FileStoreSchema = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("browser") }),
     z.object({ kind: z.literal("memory") }),
     z.object({ kind: z.literal("sqlite"), path: z.string().min(1) }),
-    valkeyStore({ kind: z.literal("valkey"), keyPrefix: z.string().default("trinocular:files:") })
+    valkeyStore({ kind: z.literal("valkey"), keyPrefix: z.string().default("trinocular:files:") }),
+    z.object({ ...PostgresConnection, kind: z.literal("postgres") })
   ])
   .default({ kind: "browser" });
 
 export type FileStoreConfig = z.infer<typeof FileStoreSchema>;
 export type SqliteFileStoreConfig = Extract<FileStoreConfig, { kind: "sqlite" }>;
 export type ValkeyFileStoreConfig = Extract<FileStoreConfig, { kind: "valkey" }>;
+export type PostgresFileStoreConfig = Extract<FileStoreConfig, { kind: "postgres" }>;
 
 const FilesSchema = z
   .object({

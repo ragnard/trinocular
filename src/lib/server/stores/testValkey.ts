@@ -22,4 +22,4 @@ export const testValkey = (): { connection: ValkeyConnectionConfig; keyPrefix: s
   };
 };
 
-export const silent: Log = { info: () => {}, warn: () => {} } as unknown as Log;
+export const silent: Log = { debug: () => {}, info: () => {}, warn: () => {} } as unknown as Log;

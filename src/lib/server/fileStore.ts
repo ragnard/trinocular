@@ -68,6 +68,22 @@ export const createFileStore = async (cfg: FileStoreConfig): Promise<FileStore |
         process.exit(1);
       }
     }
+    case "postgres": {
+      const { PostgresFileStore } = await import("./stores/postgres/fileStore");
+      const { describe } = await import("./stores/postgres/client");
+      const where = describe(cfg);
+      try {
+        const store = await PostgresFileStore.create(
+          cfg,
+          logger.child({ component: "postgres-file-store" })
+        );
+        logger.info({ store: "postgres", ...where }, "file store configured");
+        return store;
+      } catch (err) {
+        logger.error({ err, ...where }, "failed to connect to the file store");
+        process.exit(1);
+      }
+    }
   }
 };
 
