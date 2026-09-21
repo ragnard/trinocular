@@ -310,7 +310,27 @@ authz:
 #               Starburst Galaxy.
 #   user-token  The user's own OIDC access token, as a bearer. Needs
 #               authn: oidc, and a cluster whose OAuth2 or JWT authenticator
-#               accepts tokens from the same issuer for this audience.
+#               accepts tokens from the same issuer for this audience. The
+#               cluster reads its principal from the token's `sub` unless
+#               told otherwise, and in Keycloak that is a UUID while the
+#               app's userIdClaim is preferred_username; unless the two
+#               agree the cluster sees a principal other than X-Trino-User
+#               and applies its impersonation rules — so set
+#               http-server.authentication.oauth2.principal-field (or a
+#               user-mapping) to the claim userIdClaim names.
+#
+#               With `exchange`, the token is first traded at the provider
+#               (RFC 8693) for one issued for the cluster's audience, so
+#               what the cluster gets is a token for the cluster alone and
+#               not the app's with everything it carries. The app's client
+#               has to be allowed to exchange — in Keycloak the client's
+#               "Standard token exchange" switch; the audience has to be one
+#               the provider will issue for the app's client, which in
+#               Keycloak is an Audience mapper in a client scope the app's
+#               client holds, optional so that only the exchange asks for
+#               it (`scope`). The exchange happens on the first query to the
+#               connection and is repeated as the tokens expire; nothing
+#               about it is stored.
 #
 # A connection's authz is the same vocabulary as above, applied on top: it
 # can keep people out of this cluster, but never let anyone past the front
@@ -343,3 +363,12 @@ connections:
 #     uri: https://trino.example:8443
 #     auth:
 #       kind: user-token                       # Only with authn: oidc
+#
+#   warehouse:
+#     name: Warehouse
+#     uri: https://trino.example:8443
+#     auth:
+#       kind: user-token
+#       exchange:                              # Optional: trade the token for the cluster's
+#         audience: trino                      # Required: the cluster's OAuth2 client-id
+#         scope: trino                         # Optional: client scopes to ask for with it
