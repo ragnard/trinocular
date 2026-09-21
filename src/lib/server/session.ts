@@ -13,8 +13,20 @@ export interface SessionOptions {
   maxLifetimeSeconds: number;
 }
 
+/** The browser's half of the session: what `Session` writes when its id
+ *  changes or it is destroyed. It writes *at that moment* and not after the
+ *  response, because SvelteKit refuses `cookies.set` once a route has produced
+ *  its response — and a login that rotates the session from a form action is
+ *  exactly a route doing so. A handler that rotates before calling `resolve`,
+ *  as the OIDC callback does, never noticed the difference. */
+export interface SessionCookie {
+  set(sessionId: SessionID): Promise<void>;
+  delete(): void;
+}
+
 export class Session {
   #store: SessionStore;
+  #cookie: SessionCookie;
   #sessionId: SessionID;
   #previousSessionId: SessionID | null = null;
   #data: SessionData | null = null;
@@ -23,8 +35,14 @@ export class Session {
   #destroyed = false;
   #maxLifetimeSeconds: number;
 
-  constructor(store: SessionStore, sessionId: SessionID, maxLifetimeSeconds: number) {
+  constructor(
+    store: SessionStore,
+    cookie: SessionCookie,
+    sessionId: SessionID,
+    maxLifetimeSeconds: number
+  ) {
     this.#store = store;
+    this.#cookie = cookie;
     this.#sessionId = sessionId;
     this.#maxLifetimeSeconds = maxLifetimeSeconds;
   }
@@ -69,11 +87,15 @@ export class Session {
     return value;
   }
 
-  rotate(): void {
+  /** A fresh id for the same data, on login: an id handed out before it —
+   *  planted in this browser, say — then names nothing. The old record is
+   *  removed when the new one is committed. */
+  async rotate(): Promise<void> {
     if (!this.#previousSessionId) {
       this.#previousSessionId = this.#sessionId;
     }
     this.#sessionId = crypto.randomUUID();
+    await this.#cookie.set(this.#sessionId);
   }
 
   async destroy(): Promise<void> {
@@ -84,6 +106,7 @@ export class Session {
     this.#data = {};
     this.#dirty = false;
     this.#destroyed = true;
+    this.#cookie.delete();
   }
 
   async commit(): Promise<void> {
@@ -117,26 +140,27 @@ export const SessionHandler: HandlerFactory = async (store, opts) => {
       await cookie.setValue(event, sessionId, opts.cookieOptions);
     }
 
-    const session = new Session(store, sessionId, opts.maxLifetimeSeconds);
+    const session = new Session(
+      store,
+      {
+        set: (id) => cookie.setValue(event, id, opts.cookieOptions),
+        delete: () => event.cookies.delete(opts.cookieName, { path: opts.cookieOptions.path })
+      },
+      sessionId,
+      opts.maxLifetimeSeconds
+    );
     event.locals.session = session;
 
-    let res: Response;
     try {
-      res = await resolve(event);
+      return await resolve(event);
     } finally {
+      // The store's half only: the cookie was written when the id changed,
+      // while a response could still take it.
       try {
         await session.commit();
       } catch (e) {
         logger.error({ error: e }, "failed to commit session");
       }
-
-      if (session.destroyed) {
-        event.cookies.delete(opts.cookieName, { path: opts.cookieOptions.path });
-      } else if (session.sessionId !== sessionId) {
-        await cookie.setValue(event, session.sessionId, opts.cookieOptions);
-      }
     }
-
-    return res;
   };
 };

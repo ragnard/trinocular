@@ -1,12 +1,20 @@
 import { type Handle, type HandleServerError } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
-import { config, forbiddenPath, isAuthPath, loginPath, type Config } from "$lib/server/config";
+import {
+  config,
+  forbiddenPath,
+  isAuthPath,
+  loginPath,
+  logoutPath,
+  type Config
+} from "$lib/server/config";
 import { env } from "$env/dynamic/private";
 import { SessionHandler } from "$lib/server/session";
 import { createSessionStore } from "$lib/server/sessionStore";
 import { fileStore } from "$lib/server/fileStore";
 import { OIDCHandler } from "$lib/server/oidc";
+import { PasswordAuthnHandler } from "$lib/server/passwordAuthn";
 import { LoggingHandler } from "$lib/server/logging";
 import { SecurityHeadersHandler } from "$lib/server/securityHeaders";
 import { ProbeHandler } from "$lib/server/probes";
@@ -28,6 +36,10 @@ const authnHandler = async (config: Config) => {
   switch (authn.kind) {
     case "none":
       return NoAuthnHandler({ user: authn.user, claims: authn.claims });
+    case "password":
+      // logoutPath is a string whenever the kind is password; the type does
+      // not narrow across modules.
+      return PasswordAuthnHandler({ users: authn.users, logoutPath: logoutPath! });
     case "oidc":
       return await OIDCHandler({
         issuer: new URL(authn.issuer),

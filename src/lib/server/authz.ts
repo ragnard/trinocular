@@ -100,6 +100,12 @@ const returnTo = (event: RequestEvent): string => {
   return pathname + (query ? `?${query}` : "");
 };
 
+/** The `returnTo` a login may follow once it has succeeded: a path on this
+ *  origin, or `/`. A scheme or a `//host` would make the login page an open
+ *  redirect, and it is the one page a phishing link would most like to end on. */
+export const safeReturnTo = (url: string | null | undefined): string =>
+  url && url.startsWith("/") && !url.startsWith("//") ? url : "/";
+
 /** A refusal a program can read. Thrown SvelteKit errors render the fallback
  *  HTML error page even for a JSON caller, which the Trino client would meet as
  *  a parse failure rather than a status. The proxy's own refusals use it too. */

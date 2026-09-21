@@ -39,8 +39,32 @@
     user-select: all;
   }
 
+  /* The login form: fields stacked and left-aligned under the centred
+     heading, the button back on the page's centre line. */
+  .auth :global(form) {
+    display: grid;
+    gap: 12px;
+    text-align: left;
+  }
+
+  .auth :global(label) {
+    display: grid;
+    gap: 4px;
+    color: var(--fg-2);
+  }
+
+  .auth :global(.textbox) {
+    width: 100%;
+    color: var(--fg);
+  }
+
+  .auth :global(form p) {
+    margin: 0;
+  }
+
   .auth :global(.button) {
     display: inline-block;
+    justify-self: center;
     margin-top: 16px;
     padding: 8px 24px;
     border: none;

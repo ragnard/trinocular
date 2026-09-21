@@ -3,6 +3,7 @@ import * as client from "openid-client";
 import type { Session } from "./session";
 
 import { env } from "$env/dynamic/private";
+import { safeReturnTo } from "./authz";
 import { error } from "./errors";
 import { logger } from "./logging";
 import type { Claims } from "./identity";
@@ -100,10 +101,6 @@ const nearExpiry = (timestampInSeconds: number, thresholdSeconds: number): boole
 };
 
 const expired = (timestampInSeconds: number): boolean => nearExpiry(timestampInSeconds, 0);
-
-const isSafeReturnUrl = (url: string): boolean => {
-  return url.startsWith("/") && !url.startsWith("//");
-};
 
 /** Checks that the session has claims with a usable userId. The library
  *  already validates aud/iss/sub/exp/nonce at token exchange time. */
@@ -255,10 +252,10 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
       );
     }
 
-    session.rotate();
+    await session.rotate();
     await session.set<OIDCSessionData>("oidc", sessionData);
 
-    const returnTo = isSafeReturnUrl(callbackData.returnToUrl) ? callbackData.returnToUrl : "/";
+    const returnTo = safeReturnTo(callbackData.returnToUrl);
     redirect(303, returnTo);
   };
 
@@ -293,9 +290,10 @@ export const OIDCHandler = async (opts: OIDCOptions): Promise<Handle> => {
 
     // is this a login request?
     if (event.url.pathname === loginPath && event.request.method === "GET") {
-      const returnTo = event.url.searchParams.get("returnTo") ?? "/";
-      const returnToUrl = isSafeReturnUrl(returnTo) ? returnTo : "/";
-      return await redirectToProvider(session, returnToUrl);
+      return await redirectToProvider(
+        session,
+        safeReturnTo(event.url.searchParams.get("returnTo"))
+      );
     }
 
     // allow unauthenticated access to auth pages (login, error)
