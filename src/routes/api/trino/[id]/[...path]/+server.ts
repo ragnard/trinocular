@@ -5,6 +5,7 @@ import { error } from "$lib/server/errors";
 import type { Identity } from "$lib/server/identity";
 import { isTrinoHeader } from "$lib/trino";
 import { mayUseConnection, connectionDenialReason } from "$lib/server/connectionAuthz";
+import { upstreamAuthHeaders } from "$lib/server/connectionAuth";
 import { refuse } from "$lib/server/authz";
 
 const ALLOWED_PATH_PREFIXES = ["/v1/statement", "/v1/query/"];
@@ -91,7 +92,24 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "x-trino-prepared-statement"
 ]);
 
-function createUpstreamHeaders(event: RequestEvent, identity: Identity) {
+/**
+ * What the request carries upstream: the session headers the browser sent,
+ * then who the query runs as, then the credential the cluster authenticates.
+ *
+ * The two identity halves are decided by different things on purpose.
+ * `X-Trino-User` is the gate's identity, always, never a client claim and
+ * never configurable — a cluster that sees a different user than the one who
+ * signed in here would be one whose audit log lies. The credential is the
+ * connection's `auth`: nothing, a service account the cluster then lets
+ * impersonate that user, or the user's own token. It used to be the token
+ * whenever there was one, to every connection alike, which sent a bearer to
+ * clusters that were never going to check it.
+ */
+function createUpstreamHeaders(
+  event: RequestEvent,
+  identity: Identity,
+  target: Connection
+): Record<string, string> | "unauthenticated" {
   const headers: Record<string, string> = {
     accept: "application/json"
   };
@@ -100,12 +118,10 @@ function createUpstreamHeaders(event: RequestEvent, identity: Identity) {
       headers[name] = value;
     }
   });
-  // Server-side auth: the identity the gate established, never a client claim.
   headers["x-trino-user"] = identity.userId;
-  if (event.locals.accessToken) {
-    headers["authorization"] = "bearer " + event.locals.accessToken;
-  }
-  return headers;
+  const auth = upstreamAuthHeaders(target.auth, event.locals.accessToken);
+  if (auth === "unauthenticated") return auth;
+  return { ...headers, ...auth };
 }
 
 /**
@@ -176,7 +192,11 @@ async function proxy(event: RequestEvent, target: Connection, id: string) {
   event.locals.logger.debug({ id }, "proxying request");
 
   const url = toTargetUrl(event, target);
-  const headers = createUpstreamHeaders(event, identity);
+  const headers = createUpstreamHeaders(event, identity, target);
+  // A `user-token` connection with no token to send. Not reachable through the
+  // OIDC handler, which sets both together; answered as signed out, which the
+  // client turns into a trip to the login page, rather than sent on bare.
+  if (headers === "unauthenticated") return refuse(401, "unauthorized");
 
   const requestBody = event.request.body ? await event.request.blob() : null;
 

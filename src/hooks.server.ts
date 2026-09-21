@@ -66,6 +66,19 @@ const createHandle = async () => {
     where: "authz"
   });
   logger.info({ authn: config.authn.kind, authz: authz.name }, "auth configured");
+  // How the proxy authenticates to each cluster: the kind and, for a service
+  // account, its name — never the password.
+  logger.info(
+    {
+      connections: Object.fromEntries(
+        Object.entries(config.connections ?? {}).map(([id, c]) => [
+          id,
+          c.auth.kind === "basic" ? `basic as ${c.auth.username}` : c.auth.kind
+        ])
+      )
+    },
+    "connection auth configured"
+  );
   // Also builds the per-connection authorizers, so a policy that cannot be
   // built exits here rather than on whichever request first reaches it.
   logConnectionAuthz();
