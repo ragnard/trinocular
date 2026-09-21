@@ -244,15 +244,18 @@
           for {MAX_HOLD_MS / 60_000} minutes; run it again to fetch more.
         </span>
       </div>
-    {:else if result.stopped === "max-rows" || result.stopped === "max-bytes"}
-      <!-- The ceiling is the one stop with nothing to offer after it, so this
-           says where the rest of the result can be had instead. -->
+    {:else if result.stopped === "max-rows"}
       <div class="notice">
         <span class="fill">
-          Showing the first {formatCount(result.rowCount)} rows{#if result.stopped === "max-bytes"},
-            {formatBytes(result.size)} of results{/if} — the most a result may bring into the browser.
-          The query was stopped there; for more, narrow it, or run it from a Trino client that writes
-          to a file.
+          Max result rows reached ({formatCount(result.ceiling.maxRows)}): showing the first
+          {formatCount(result.rowCount)} rows
+        </span>
+      </div>
+    {:else if result.stopped === "max-bytes"}
+      <div class="notice">
+        <span class="fill">
+          Max result size reached ({formatBytes(result.ceiling.maxBytes)}): showing the first
+          {formatCount(result.rowCount)} rows
         </span>
       </div>
     {:else if result.running}
