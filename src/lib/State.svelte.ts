@@ -2,6 +2,7 @@ import Trino, { HttpError } from "$lib/trino";
 import { Rows } from "$lib/Rows";
 import type { Columns, QueryData, QueryError, QueryStats, SessionDelta } from "$lib/trino";
 import { describeIgnored } from "$lib/trino/session";
+import { fileLineMessage } from "$lib/trino/errors";
 import { TrinoSession } from "$lib/trino/TrinoSession.svelte";
 import { CatalogCache } from "$lib/catalog/CatalogCache.svelte";
 import type { ClientConnection } from "$lib/server/connectionAuthz";
@@ -197,6 +198,14 @@ export class Result {
   cancelling?: boolean = $derived(this.cancelRequested && !this.completed);
   /** Trino reports a killed query as a USER_CANCELED failure. */
   canceled?: boolean = $derived(this.error?.errorName === "USER_CANCELED");
+  /**
+   * `error.message` with its `line N:M:` moved to the file's lines, the way
+   * the editor marker already is — what the pane, the marker and the copy
+   * button all show, so nobody is sent to the statement's line 1.
+   */
+  errorMessage?: string = $derived.by(
+    () => this.error && fileLineMessage(this.error.message, this.startLine)
+  );
 
   /** Always a string, always one decimal. It renders straight into the results
    *  rail as `{elapsedTimeSeconds} s`, and returning the number 0 before Trino

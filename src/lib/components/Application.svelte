@@ -118,7 +118,7 @@
         startColumn: result.error.errorLocation.columnNumber,
         endLineNumber: result.error.errorLocation.lineNumber + result.startLine - 1,
         endColumn: result.error.errorLocation.columnNumber + 1,
-        message: result.error.message,
+        message: result.errorMessage ?? result.error.message,
         severity: monaco.MarkerSeverity.Error
       }
     ];

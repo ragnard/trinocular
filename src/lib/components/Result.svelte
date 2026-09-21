@@ -72,13 +72,13 @@
   const ERROR_LIMIT = 1_000;
   let expanded: ResultModel | null = $state.raw(null);
   let errorText = $derived.by(() => {
-    const message = result?.error?.message ?? "";
+    const message = result?.errorMessage ?? "";
     if (message.length <= ERROR_LIMIT || expanded === result) return { text: message };
     return { text: message.slice(0, ERROR_LIMIT) + "…", total: message.length };
   });
 
   function copyError() {
-    if (result?.error) void navigator.clipboard.writeText(result.error.message);
+    if (result?.errorMessage) void navigator.clipboard.writeText(result.errorMessage);
   }
 
   const valueConverter: ValueConverter = (value, field) => convertValue(value, field.dataType);
