@@ -65,7 +65,7 @@ instead; see [Configuration](#configuration).
 
 ## Running locally
 
-Requires [bun](https://bun.sh) — as the runtime, not only the package manager: the server
+Requires [bun](https://bun.sh) 1.4 or later — as the runtime, not only the package manager: the server
 reads YAML config and opens SQLite through bun's own APIs. `bunfig.toml` makes every
 `bun run` script run under bun rather than node, so no `--bun` flag is needed.
 

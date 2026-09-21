@@ -16,7 +16,7 @@ WORKDIR /build
 # is build output and belongs in a layer, where `cache-from: type=gha` can
 # actually restore it. Cache mounts are not exported by any cache backend, so
 # mounting node_modules meant CI reinstalled from scratch on every single build.
-COPY package.json bun.lock .npmrc ./
+COPY package.json bun.lock ./
 COPY packages/monaco-language-trino/package.json packages/monaco-language-trino/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \

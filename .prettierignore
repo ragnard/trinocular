@@ -7,6 +7,5 @@ packages/monaco-language-trino/dist/
 .svelte-kit/
 build/
 bun.lock
-package-lock.json
 # Laid out by hand too: the notes on its settings are aligned in a column.
 config.example.yaml
