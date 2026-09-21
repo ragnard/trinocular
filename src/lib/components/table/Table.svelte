@@ -10,6 +10,7 @@
     ValueConverter
   } from "./types";
   import { defaultCell, formatCell } from "./snippets.svelte";
+  import { offsetOf, pageAt, pageAtThumb, scrollSpace } from "./scrollSpace";
   import { textMeasurer } from "$lib/textWidth";
 
   /** `--h-row` and `--h-rail` in style.css: the virtual scroll needs the
@@ -29,7 +30,12 @@
   /** The caller's header puts a 14px type icon and a 6px gap beside the name. */
   const HEADER_EXTRA = 20;
   const DEFAULT_SPACER_MIN_WIDTH = 100;
-  const ROW_NUMBER_WIDTH = 52;
+  /** The gutter is sized from the row count (`rowNumberWidth`): this is its
+   *  width until there is an element to measure in, and the fewest digits it
+   *  is sized for, so a short result's gutter is no narrower than the fixed
+   *  52px one it replaces. */
+  const DEFAULT_ROW_NUMBER_WIDTH = 52;
+  const ROW_NUMBER_MIN_DIGITS = 4;
 
   const identity: ValueConverter = (value) => value;
 
@@ -71,7 +77,12 @@
   }: Props = $props();
 
   let scrollContainer: HTMLDivElement | undefined = $state();
+  let rowNumberHeader: HTMLTableCellElement | undefined = $state();
+  /** The container's scroll position — scroll space, see `scrollSpace.ts`. */
   let scrollTop = $state(0);
+  /** Row space minus scroll space for the page on screen: a multiple of
+   *  `rowHeight`, and zero until the rows outgrow `MAX_SCROLL_HEIGHT`. */
+  let scrollOffset = $state(0);
   let containerHeight = $state(0);
   let containerWidth = $state(0);
   /** Content widths measured from the first rows; `pinned` is where a column
@@ -86,6 +97,22 @@
   let fieldCount = $derived(schema?.fields?.length ?? 0);
   let colCount = $derived(fieldCount + 2);
 
+  /** Wide enough for the row count's digits, measured as zeros in the
+   *  gutter's own font — it draws tabular figures, so every digit is a zero's
+   *  width — plus the cell padding. A fixed width ellipsised past six digits,
+   *  which with a million rows made every row number read `11…`, exactly
+   *  where it was needed. It changes only when the count crosses a power of
+   *  ten, so it moves under a reader no more than the columns do. The header
+   *  cell is measured in because it is there before any row is, and wears
+   *  the gutter's class so its font is the gutter's. */
+  let gutterMeasure: ((text: string) => number) | null = null;
+  let rowNumberWidth = $derived.by(() => {
+    if (!rowNumberHeader) return DEFAULT_ROW_NUMBER_WIDTH;
+    gutterMeasure ??= textMeasurer(rowNumberHeader);
+    const digits = Math.max(ROW_NUMBER_MIN_DIGITS, String(totalRows).length);
+    return Math.ceil(gutterMeasure("0".repeat(digits))) + CELL_PADDING;
+  });
+
   let layout = $derived.by(() => {
     const widths = Array.from(
       { length: fieldCount },
@@ -93,7 +120,7 @@
     );
     const flex = widths.flatMap((_, i) => (pinned[i] == null ? [i] : []));
     const flexTotal = flex.reduce((sum, i) => sum + widths[i], 0);
-    const slack = containerWidth - ROW_NUMBER_WIDTH - widths.reduce((sum, w) => sum + w, 0);
+    const slack = containerWidth - rowNumberWidth - widths.reduce((sum, w) => sum + w, 0);
     if (slack <= 0 || flexTotal === 0) return { widths, filled: false };
     let given = 0;
     for (const i of flex) {
@@ -105,7 +132,7 @@
     return { widths, filled: true };
   });
   let columnWidths = $derived(layout.widths);
-  let columnsWidth = $derived(ROW_NUMBER_WIDTH + columnWidths.reduce((sum, w) => sum + w, 0));
+  let columnsWidth = $derived(rowNumberWidth + columnWidths.reduce((sum, w) => sum + w, 0));
 
   const defaultCellRenderer: CellRendererLookup = () => defaultCell;
   let cellRenderer = $derived(cellRendererProp ?? defaultCellRenderer);
@@ -113,13 +140,62 @@
   // Every numeric Trino type maps to "integer" (see trino/table.ts).
   let numeric = $derived(schema?.fields?.map((f) => f.dataType === "integer") ?? []);
 
-  let startIndex = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows));
+  // The virtual scroll. Row space and scroll space are the same thing until
+  // the rows outgrow what a browser lets an element be, after which row space
+  // is paged through a capped scroll space: `scrollSpace.ts` has the whole
+  // account. Here, `rowSpaceTop` is the row-space position at the top of the
+  // container, and the spacers place the rendered rows where scroll space
+  // wants them — the top one at the first row's row-space position less the
+  // page's offset, which is never negative because no row above the offset
+  // is rendered; the bottom one whatever fills scroll space out.
+  let space = $derived(scrollSpace(totalRows, rowHeight));
+  let rowSpaceTop = $derived(scrollTop + scrollOffset);
+  let startIndex = $derived(
+    Math.max(scrollOffset / rowHeight, Math.floor(rowSpaceTop / rowHeight) - bufferRows)
+  );
   let endIndex = $derived(
-    Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / rowHeight) + bufferRows)
+    Math.min(totalRows, Math.ceil((rowSpaceTop + containerHeight) / rowHeight) + bufferRows)
   );
   let visibleRows = $derived(rows?.slice(startIndex, endIndex) ?? []);
-  let offsetY = $derived(startIndex * rowHeight);
-  let bottomSpacerHeight = $derived((totalRows - endIndex) * rowHeight);
+  let offsetY = $derived(startIndex * rowHeight - scrollOffset);
+  let bottomSpacerHeight = $derived(
+    Math.max(0, space.height - offsetY - visibleRows.length * rowHeight)
+  );
+
+  /** What the container was last known to be scrolled to, kept outside the
+   *  runes so that a position this component set itself is not mistaken for
+   *  a jump when its scroll event arrives. */
+  let lastScrollTop = 0;
+
+  /** Scrolls to `y` in row space: the page that holds it becomes the one on
+   *  screen, and the container goes to where that page draws it. */
+  function scrollToRowSpace(y: number) {
+    y = Math.max(0, Math.min(y, space.rowsHeight + HEADER_HEIGHT - containerHeight));
+    scrollOffset = offsetOf(space, pageAt(space, y));
+    const top = y - scrollOffset;
+    scrollTop = top;
+    if (scrollContainer && scrollContainer.scrollTop !== top) {
+      lastScrollTop = top;
+      scrollContainer.scrollTop = top;
+    }
+  }
+
+  function handleScroll() {
+    if (!scrollContainer) return;
+    const top = scrollContainer.scrollTop;
+    const distance = Math.abs(top - lastScrollTop);
+    if (distance === 0) return;
+    lastScrollTop = top;
+    if (distance < containerHeight || space.pages === 1) {
+      // The wheel or the keys: rows one for one, on whichever page the
+      // position now falls in — a boundary crossed re-bases the container.
+      scrollToRowSpace(top + scrollOffset);
+    } else {
+      // The thumb: a fraction of the whole, and the page that fraction is on.
+      scrollOffset = offsetOf(space, pageAtThumb(space, top, containerHeight));
+      scrollTop = top;
+    }
+  }
 
   // --- Cell selection state ---
   interface CellCoord {
@@ -338,25 +414,28 @@
 
     const headerHeight = HEADER_HEIGHT;
 
+    // In row space: the container's own position, plus the page's offset.
+    // Row space starts under the sticky header, so the window a row has to
+    // be inside is the container less the header's height.
     const rowTop = active.row * rowHeight;
     const rowBottom = rowTop + rowHeight;
-    const viewTop = scrollContainer.scrollTop + headerHeight;
-    const viewBottom = scrollContainer.scrollTop + containerHeight;
+    const viewTop = scrollContainer.scrollTop + scrollOffset;
+    const viewBottom = viewTop + containerHeight - headerHeight;
 
     if (rowTop < viewTop) {
-      scrollContainer.scrollTop = rowTop - headerHeight;
+      scrollToRowSpace(rowTop);
     } else if (rowBottom > viewBottom) {
-      scrollContainer.scrollTop = rowBottom - containerHeight + headerHeight;
+      scrollToRowSpace(rowBottom - containerHeight + headerHeight);
     }
 
-    let colLeft = ROW_NUMBER_WIDTH;
+    let colLeft = rowNumberWidth;
     for (let i = 0; i < active.col; i++) colLeft += columnWidths[i];
     const colRight = colLeft + columnWidths[active.col];
-    const viewLeft = scrollContainer.scrollLeft + ROW_NUMBER_WIDTH;
+    const viewLeft = scrollContainer.scrollLeft + rowNumberWidth;
     const viewRight = scrollContainer.scrollLeft + scrollContainer.clientWidth;
 
     if (colLeft < viewLeft) {
-      scrollContainer.scrollLeft = colLeft - ROW_NUMBER_WIDTH;
+      scrollContainer.scrollLeft = colLeft - rowNumberWidth;
     } else if (colRight > viewRight) {
       scrollContainer.scrollLeft = colRight - scrollContainer.clientWidth;
     }
@@ -438,6 +517,7 @@
     measured = [];
     pinned = Array(schema?.fields?.length ?? 0).fill(null);
     sampled = -1;
+    scrollOffset = 0;
   });
 
   // Measure from the header alone until the first rows land, then once from
@@ -499,14 +579,14 @@
     tabindex="0"
     onkeydown={handleKeydown}
     onmousedown={handleMousedown}
-    onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}
+    onscroll={handleScroll}
   >
     <table
       style:width="100%"
       style:min-width="{columnsWidth + (layout.filled ? 0 : spacerMinWidth)}px"
     >
       <colgroup>
-        <col style:width="{ROW_NUMBER_WIDTH}px" />
+        <col style:width="{rowNumberWidth}px" />
         {#each columnWidths as w}
           <col style:width="{w}px" />
         {/each}
@@ -514,7 +594,7 @@
       </colgroup>
       <thead>
         <tr style:height="{HEADER_HEIGHT}px">
-          <th class="row-num"></th>
+          <th class="row-num meta" bind:this={rowNumberHeader}></th>
           {#each schema.fields as field, colIdx}
             <th class:numeric={numeric[colIdx]}>
               {#if header}
