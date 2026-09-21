@@ -186,6 +186,7 @@
       void result.cancelling;
       void result.canceled;
       void result.held;
+      void result.reconnecting;
       void result.infoUri;
     }
     syncToolbars();
@@ -337,6 +338,9 @@
     if (result.error) return { icon: TriangleAlert, text: "Error", spin: false };
     if (result.cancelling) return { icon: LoaderCircle, text: "Cancelling…", spin: true };
     if (result.held) return { icon: Pause, text: "Paused", spin: false };
+    // A poll being retried; the query is still on the cluster, and the strip
+    // saying so is what keeps the stall from reading as a slow query.
+    if (result.reconnecting) return { icon: LoaderCircle, text: "Reconnecting…", spin: true };
     if (result.running) return { icon: LoaderCircle, text: "Running…", spin: true };
     // Just the word. The row count and the elapsed time are already on the
     // results rail, and repeating them here only made the strip above every
@@ -345,6 +349,10 @@
   }
 
   function resultTooltip(result: Result): string | undefined {
+    if (result.reconnecting) {
+      const { message, attempts } = result.reconnecting;
+      return `${message} (attempt ${attempts})`;
+    }
     if (!result.error) return undefined;
     const { errorName, message } = result.error;
     return errorName ? `${errorName}: ${message}` : message;

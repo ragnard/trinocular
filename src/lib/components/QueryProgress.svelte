@@ -56,6 +56,7 @@
     if (result.canceled) return "Canceled";
     if (result.cancelling) return "Cancelling";
     if (result.error) return "Failed";
+    if (result.reconnecting) return "Reconnecting";
     const state = stats?.state;
     if (!state) return "Submitting";
     return state.charAt(0) + state.slice(1).toLowerCase().replace(/_/g, " ");

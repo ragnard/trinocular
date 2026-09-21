@@ -99,7 +99,68 @@ export type ConnectionOptions = {
    */
   readonly onSessionChange?: (delta: SessionDelta) => void;
   readonly extraHeaders?: RequestHeaders;
+  /**
+   * Asked before each retry of a poll that failed transiently (see
+   * `nextChunk`). Returning `false` declines it, and the failure is thrown as
+   * it is: a result that has been cancelled or discarded has nothing to
+   * reconnect for. It is also how a stall gets a `Reconnecting…` on screen.
+   */
+  readonly onRetry?: (retry: Retry) => boolean | void;
+  /** How long and how often to retry; the default is `DEFAULT_RETRY`. */
+  readonly retry?: RetryPolicy;
 };
+
+/** One retry, announced before its delay. */
+export type Retry = {
+  /** The failures so far; one on the first retry. */
+  readonly attempts: number;
+  /** What the last attempt failed with. */
+  readonly error: Error;
+  /** How long until the next attempt. */
+  readonly delayMs: number;
+};
+
+export type RetryPolicy = {
+  /** The first delay; each is twice the last up to `maxDelayMs`. */
+  readonly initialDelayMs: number;
+  readonly maxDelayMs: number;
+  /** Retried for this long after the first failure, then given up. */
+  readonly windowMs: number;
+};
+
+/**
+ * Two minutes, which is Trino's own default (`--client-request-timeout` in
+ * the CLI, the JDBC driver's `timeout` property). It has to stay under the
+ * cluster's `query.client.timeout`, five minutes by default: a query is not
+ * lost while the coordinator has it, and every failed poll is time in which
+ * the coordinator has heard nothing from the client.
+ */
+export const DEFAULT_RETRY: RetryPolicy = {
+  initialDelayMs: 100,
+  maxDelayMs: 2_000,
+  windowMs: 120_000
+};
+
+/**
+ * Whether a failure says nothing about the query: 502, 503 and 504 are what
+ * a load balancer answers while the coordinator restarts and what the proxy
+ * answers when it cannot reach the cluster (`HttpStatusCodes.shouldRetry` in
+ * Trino's client is the same three), and a `TypeError` is `fetch` for a
+ * dropped connection. A 4xx is an answer — a 401 has to reach the sign-out
+ * check untouched — and a 500 is a bug somewhere that a retry would only
+ * meet again.
+ */
+export function isTransient(e: unknown): boolean {
+  if (e instanceof HttpError) return e.status === 502 || e.status === 503 || e.status === 504;
+  return e instanceof TypeError;
+}
+
+/** The delay before retry number `attempts`, doubling from the first. */
+export function retryDelay(attempts: number, policy: RetryPolicy): number {
+  return Math.min(policy.maxDelayMs, policy.initialDelayMs * 2 ** (attempts - 1));
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export type QueryStage = {
   stageId: string;
@@ -206,6 +267,8 @@ type FetchRequestConfig = {
   url?: string;
   data?: unknown;
   headers?: RequestHeaders;
+  /** Retried on a transient failure; only for a request that is safe to repeat. */
+  retry?: boolean;
 };
 
 /**
@@ -272,8 +335,39 @@ export default class Trino {
   /**
    * The response body as text, so that a caller can measure it before it is
    * parsed; `json()` makes the same string and keeps it to itself.
+   *
+   * With `retry` set, a transient failure (`isTransient`) is tried again
+   * after a doubling delay until the policy's window has passed since the
+   * first, the way `StatementClientV1.executeRequest` does; what is finally
+   * thrown is the last failure, with how long was spent on it. Anything else
+   * is thrown straight away, whatever `retry` says.
    */
   private async requestText(cfg: FetchRequestConfig): Promise<string | undefined> {
+    const policy = this.options.retry ?? DEFAULT_RETRY;
+    let started: number | undefined;
+    for (let attempts = 1; ; attempts++) {
+      try {
+        return await this.requestOnce(cfg);
+      } catch (e) {
+        if (!cfg.retry || !isTransient(e)) throw e;
+        const error = e as Error;
+        started ??= Date.now();
+        const delayMs = retryDelay(attempts, policy);
+        const spent = Date.now() - started;
+        if (spent + delayMs > policy.windowMs) {
+          throw new Error(
+            `${error.message} — gave up after ${attempts} attempts over ${Math.round(spent / 1000)} s`,
+            { cause: error }
+          );
+        }
+        if (this.options.onRetry?.({ attempts, error, delayMs }) === false) throw error;
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  /** One attempt at `requestText`. */
+  private async requestOnce(cfg: FetchRequestConfig): Promise<string | undefined> {
     const url = cfg.url?.startsWith("http") ? cfg.url : `${this.baseURL}${cfg.url ?? ""}`;
 
     const init: globalThis.RequestInit = {
@@ -322,9 +416,17 @@ export default class Trino {
     return this.requestChunk(requestConfig).then((result) => new QueryIterator(this, result));
   }
 
-  /** The page at `nextUri`, sized; what `QueryIterator` walks with. */
+  /**
+   * The page at `nextUri`, sized; what `QueryIterator` walks with. This is
+   * the one request that is retried: a GET of a page the coordinator has not
+   * yet handed over is safe to repeat, and a query that has been running for
+   * an hour should not be lost to one 503 from a load balancer. The POST
+   * that starts a query is not, though Trino's own client retries it too: an
+   * answer that never arrived may still have started the query, and a second
+   * `INSERT` is worse than a lost one.
+   */
   async nextChunk(nextUri: string): Promise<QueryResult> {
-    return this.requestChunk({ url: nextUri });
+    return this.requestChunk({ url: nextUri, retry: true });
   }
 
   /**
