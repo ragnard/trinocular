@@ -4,7 +4,7 @@
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
   import { selectStatement, terminated, type TableRef } from "$lib/trino/statements";
-  import { Box, Database, HardDrive, Menu as MenuIcon, Table, X } from "@lucide/svelte";
+  import { Box, Database, Ellipsis, HardDrive, Table, X } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
   import FilterBox from "./FilterBox.svelte";
   import Menu from "./Menu.svelte";
@@ -412,7 +412,7 @@
             title="SQL for {node.label}"
             onclick={(e) => startAction(node, e.currentTarget)}
           >
-            <MenuIcon size={14} />
+            <Ellipsis size={14} />
           </button>
         {/if}
       {/snippet}
