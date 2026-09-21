@@ -7,8 +7,7 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 ## Features
 
 - Web application for querying and interacting with Trino clusters
-  - Write and execute SQL statements; `USE`, `SET SESSION` and `PREPARE` carry over to the
-    statements you run after them
+  - Write and execute SQL statements
   - Browse and inspect results
   - Explore catalogs, schemas and tables
   - Multi-cluster support
@@ -20,33 +19,44 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 
 ## Trying it
 
-Nothing to clone: [`demo/compose.yaml`](demo/compose.yaml) runs Trinocular with nothing to
-configure, and a recent Docker Compose can read it straight out of this repository. If you
-have no Trino, it starts one:
+You can use [`demo/compose.yaml`](demo/compose.yaml) to start Trinocular and a Trino instance:
 
 ```bash
 docker compose -f "https://github.com/ragnard/trinocular.git#main:demo/compose.yaml" up
 ```
 
-If you have one, name it and no second Trino is started:
+Trinocular is on [http://localhost:3000](http://localhost:3000). There
+is no login — everyone is `alice` — and nothing survives the
+containers. The bundled Trino is a large image that wants a couple of
+gigabytes of memory, and it comes with the `tpch`, `tpcds`, `memory`
+and `jmx` catalogs, so there is something to run straight away:
+
+```sql
+SELECT * FROM tpch.tiny.nation
+```
+
+
+### Existing Trino instance
+
+If you have an existing Trino instance, name it using `TRINO_URL`:
 
 ```bash
 TRINO_URL=http://host.docker.internal:8080 \
   docker compose -f "https://github.com/ragnard/trinocular.git#main:demo/compose.yaml" up
 ```
 
-A Compose too old for the `.git#ref:path` form can be handed the file instead —
-`curl -fsSL https://raw.githubusercontent.com/ragnard/trinocular/main/demo/compose.yaml | docker compose -f - up`
-— and from a clone, `docker compose up` in `demo/` is the same thing.
+This assumes the Trino instance is not using any authentication.
 
-Either way, Trinocular is on [http://localhost:3000](http://localhost:3000). There is no
-login — everyone is `alice` — and nothing survives the containers. The bundled Trino is a
-large image that wants a couple of gigabytes of memory, and it comes with the `tpch`,
-`tpcds`, `memory` and `jmx` catalogs, so there is something to run straight away:
 
-```sql
-SELECT * FROM tpch.tiny.nation
+### Older Docker Compose
+
+If your version of Docker Compose does not support the the `.git#ref:path`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ragnard/trinocular/main/demo/compose.yaml | docker compose -f - up
 ```
+
+### Plain Docker
 
 Without compose, the same thing is one `docker run`:
 
