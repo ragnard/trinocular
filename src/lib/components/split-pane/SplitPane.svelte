@@ -195,7 +195,9 @@
     max-height: var(--max);
   }
 
-  .pane > :global(*) {
+  /* The pane's content, meaning what is in its flow: a popover child is in
+     the top layer, where a percentage is a percentage of the window. */
+  .pane > :global(*:not([popover])) {
     width: 100%;
     height: 100%;
     overflow: hidden;
