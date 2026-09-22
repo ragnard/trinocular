@@ -9,7 +9,8 @@
     RowSource,
     ValueConverter
   } from "./types";
-  import { defaultCell, formatCell } from "./snippets.svelte";
+  import { formatCell } from "./format";
+  import { defaultCell } from "./snippets.svelte";
   import { offsetOf, pageAt, pageAtThumb, scrollSpace } from "./scrollSpace";
   import { textMeasurer } from "$lib/textWidth";
 
