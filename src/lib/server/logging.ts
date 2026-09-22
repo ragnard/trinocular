@@ -1,4 +1,4 @@
-import { isHttpError, isRedirect, type Handle } from "@sveltejs/kit";
+import { isHttpError, isRedirect, type Handle, type RequestEvent } from "@sveltejs/kit";
 import { pino, type Logger } from "pino";
 
 import { env } from "$env/dynamic/private";
@@ -43,6 +43,27 @@ export const logger = pino({
 // whatever the configured level happens to be.
 logger.info({ version: BUILD.version, commit: BUILD.commit, logLevel: level }, "starting");
 
+/**
+ * Who the request turned out to be, spread into a log line.
+ *
+ * It cannot be a binding on the child logger the way `request_id` is:
+ * `LoggingHandler` sits above the authn handler in the sequence, so at the
+ * point the child is made nobody has been identified yet, and a pino child's
+ * bindings are fixed once it exists. Every line that carries this is written
+ * after `resolve` has returned or thrown, by which time authn has run and
+ * `locals.identity` has settled — so the id is read at the moment it is
+ * logged, not when the handler was entered.
+ *
+ * Spread rather than set, because an absent identity should leave no key at
+ * all: pino would drop a `user_id: undefined` anyway, and a field that is
+ * simply missing on anonymous traffic is the one thing every log query already
+ * knows how to ask about.
+ */
+export const userId = (event: RequestEvent): { user_id?: string } => {
+  const id = event.locals.identity?.userId;
+  return id ? { user_id: id } : {};
+};
+
 export const LoggingHandler = (): Handle => {
   return async ({ event, resolve }) => {
     const requestId = crypto.randomUUID();
@@ -71,7 +92,8 @@ export const LoggingHandler = (): Handle => {
         {
           method: event.request.method,
           url: event.request.url,
-          status: res?.status
+          status: res?.status,
+          ...userId(event)
         },
         "request completed"
       );
@@ -83,7 +105,8 @@ export const LoggingHandler = (): Handle => {
           {
             method: event.request.method,
             url: event.request.url,
-            err: err
+            err: err,
+            ...userId(event)
           },
           "request error"
         );
@@ -93,7 +116,8 @@ export const LoggingHandler = (): Handle => {
             method: event.request.method,
             url: event.request.url,
             status: err.status,
-            location: err.location
+            location: err.location,
+            ...userId(event)
           },
           "redirect"
         );
@@ -108,7 +132,8 @@ export const LoggingHandler = (): Handle => {
           {
             method: event.request.method,
             url: event.request.url,
-            err: err
+            err: err,
+            ...userId(event)
           },
           "unhandled error"
         );
