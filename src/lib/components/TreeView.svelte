@@ -92,9 +92,17 @@
      * tab stop, and only the row holding it lets Tab reach its buttons.
      */
     actions?: Snippet<[TreeNode, number]>;
-    /** Recursion only: how deep this instance sits, and where the tab stop is. */
+    /**
+     * What a copy puts on the clipboard for the row that has focus, by id.
+     * The tree does not know what its rows name, the same way `Table` does not
+     * know what a Trino value is: the caller answers. Without it the browser's
+     * own copy stands, which for rows that are `user-select: none` is nothing.
+     */
+    clipboardText?: (id: string) => string | undefined;
+    /** Recursion only: how deep this instance sits, where the tab stop is, and which row is current. */
     depth?: number;
     tabbable?: string;
+    selected?: string | null;
     onfocusrow?: (id: string) => void;
   }
 
@@ -109,8 +117,10 @@
     onreload,
     icon,
     actions,
+    clipboardText,
     depth = 0,
     tabbable: nestedTabbable,
+    selected: nestedSelected,
     onfocusrow: nestedFocusRow
   }: Props = $props();
 
@@ -128,10 +138,78 @@
   let tabbable = $derived(
     depth > 0 ? nestedTabbable : current !== null && ids.includes(current) ? current : ids[0]
   );
+  /**
+   * The current row: the one a copy takes and the one an arrow key moves from.
+   * It is `current` and not `tabbable`, which falls back to the first row so
+   * that Tab always has somewhere to land — drawing *that* as chosen would
+   * have the tree open with its first catalog selected by nobody.
+   */
+  let selected = $derived(depth > 0 ? (nestedSelected ?? null) : current);
+
   function onfocusrow(id: string) {
     if (depth > 0) nestedFocusRow?.(id);
     else current = id;
   }
+
+  /**
+   * Focus arriving in a row, including on its own reload and action buttons —
+   * which is why this is `focusin` rather than `focus`. It bubbles, so a row
+   * nested under this one would otherwise claim it: the row a target belongs
+   * to is the nearest `treeitem` above it, and that has to be this one.
+   */
+  function handleFocusIn(e: FocusEvent, node: TreeNode) {
+    if (!(e.target instanceof HTMLElement)) return;
+    if (e.target.closest('[role="treeitem"]') !== e.currentTarget) return;
+    onfocusrow(node.id);
+  }
+
+  /**
+   * A click on a row: the treeitem takes focus, and then the click does what
+   * it always did. Browsers do focus the nearest focusable ancestor of a
+   * mousedown themselves, but which row is current — and so what a copy takes
+   * — would be resting on a behaviour nothing here states.
+   */
+  function handleRowClick(e: MouseEvent, node: TreeNode) {
+    (e.currentTarget as HTMLElement).closest<HTMLElement>('[role="treeitem"]')?.focus();
+    activate(node);
+  }
+
+  /** The root `ul`, for telling this tree's rows from another tree's. */
+  let root: HTMLElement | undefined = $state();
+
+  /**
+   * A copy — Ctrl/⌘C, the Edit menu, the context menu — while a row has focus.
+   * Answered on the *document* and not on the tree because Chromium fires
+   * `copy` at the focused element while Firefox fires it at the text
+   * selection's node, `<body>` when there is none. There never is one here:
+   * the rows are `user-select: none`, so nothing of the browser's own is being
+   * overridden either. `Table` answers the event in the same place, and was
+   * where the Firefox half of this was found.
+   *
+   * Listened for by the root instance alone, and in an effect rather than
+   * through `<svelte:document>`, which every instance in the recursion would
+   * register: a tree with a few hundred branches open is a few hundred
+   * instances, and all but one of them would have nothing to say. The root is
+   * also the only one that could answer — its `current` is where every row's
+   * focus is reported to.
+   */
+  function handleCopy(event: ClipboardEvent) {
+    if (!clipboardText || !event.clipboardData || selected === null) return;
+    // The row, or a button inside it: focus on either is what the current row
+    // is drawn from, so it is what a copy follows.
+    const row = document.activeElement?.closest('[role="treeitem"]');
+    if (!row || !root?.contains(row)) return;
+    const text = clipboardText(selected);
+    if (text === undefined) return;
+    event.clipboardData.setData("text/plain", text);
+    event.preventDefault();
+  }
+
+  $effect(() => {
+    if (depth > 0) return;
+    document.addEventListener("copy", handleCopy);
+    return () => document.removeEventListener("copy", handleCopy);
+  });
 
   function activate(node: TreeNode) {
     if (node.children === undefined) onclick?.(node);
@@ -183,13 +261,20 @@
   }
 </script>
 
-<ul class="tree" class:nested={depth > 0} role={depth > 0 ? "group" : "tree"} aria-label={label}>
+<ul
+  class="tree"
+  class:nested={depth > 0}
+  bind:this={root}
+  role={depth > 0 ? "group" : "tree"}
+  aria-label={label}
+>
   {#each nodes as node, i (node.id)}
     {@const isLeaf = node.children === undefined}
     {@const isOpen = expanded.has(node.id)}
     {@const isLoading = loading.has(node.id)}
     {@const error = errors.get(node.id)}
     {@const isCurrent = node.id === tabbable}
+    {@const isSelected = node.id === selected}
     {@const rowId = `${uid}-${i}`}
     <!-- Named by the label alone: a treeitem's name is otherwise computed
          from everything inside it, which for an open catalog is every
@@ -198,15 +283,16 @@
     <li
       class="node"
       class:leaf={isLeaf}
+      class:current={isSelected}
       role="treeitem"
-      aria-selected={isCurrent}
+      aria-selected={isSelected}
       aria-labelledby="{rowId}-label"
       aria-describedby={isOpen && error ? `${rowId}-error` : undefined}
       aria-expanded={isLeaf ? undefined : isOpen}
       aria-level={depth + 1}
       aria-busy={isLoading}
       tabindex={isCurrent ? 0 : -1}
-      onfocus={() => onfocusrow?.(node.id)}
+      onfocusin={(e) => handleFocusIn(e, node)}
       onkeydown={(e) => handleKeydown(e, node)}
     >
       <div class="row">
@@ -214,7 +300,12 @@
              Not a button: the row that holds focus is the treeitem, and a
              second focusable thing inside it would be a second tab stop. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="label" id="{rowId}-label" title={node.hint} onclick={() => activate(node)}>
+        <div
+          class="label"
+          id="{rowId}-label"
+          title={node.hint}
+          onclick={(e) => handleRowClick(e, node)}
+        >
           {#if isLeaf}
             <ChevronRight size={12} style="visibility: hidden;" />
           {:else if isLoading}
@@ -260,6 +351,7 @@
           {actions}
           depth={depth + 1}
           {tabbable}
+          {selected}
           {onfocusrow}
         />
       {/if}
@@ -303,6 +395,21 @@
 
   .row:hover {
     background: var(--s2);
+  }
+
+  /* The current row: what a copy takes, and where Tab comes back to. Accent
+     while the tree holds focus, since that is when it is the copy's subject —
+     the ground the table draws a selected cell on. A quiet step up the ramp
+     otherwise, so a tree you have left still shows where you are parked
+     without claiming a selection the keyboard would not act on. Both outrank
+     the hover above on specificity, which is what keeps hovering the current
+     row from washing it back down to `--s2`. */
+  .node.current > .row {
+    background: var(--s3);
+  }
+
+  .tree:focus-within .node.current > .row {
+    background: var(--accent-bg);
   }
 
   .label {
