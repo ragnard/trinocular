@@ -525,7 +525,7 @@ export class Result {
 
 /** What a new document may start out as; everything is optional, and a plain
  *  `createFile()` is still the empty one the `New file` menu item makes. */
-export type NewFile = { content?: string; name?: string; fromLink?: boolean };
+export type NewFile = { content?: string; name?: string };
 
 export class SqlFile {
   id: string;
@@ -549,18 +549,6 @@ export class SqlFile {
   viewFormats: Record<string, string> = $state({});
   results: Result[] = $state([]);
   activeResult: Result | null = $state.raw(null);
-  /**
-   * This document's text arrived in a link (`?sql=`) rather than being typed
-   * here, and the reader has not acknowledged that yet. Drawn as one line
-   * above the editor, because the statements are about to run as whoever
-   * clicked the link and a link is something anybody can send: what the
-   * notice buys is that the query is read before it is run.
-   *
-   * Session-only and deliberately not in `#record` — where the text came from
-   * is a fact about this visit, not a property of the document, and a notice
-   * that came back on every reload for the life of the file would be noise.
-   */
-  fromLink: boolean = $state(false);
 
   constructor(
     id: string,
@@ -885,7 +873,6 @@ export class Workspace {
     let n = 1;
     while (names.has(`query-${n}.sql`)) n++;
     const file = new SqlFile(crypto.randomUUID(), opts.name || `query-${n}.sql`, opts.content);
-    file.fromLink = opts.fromLink ?? false;
     this.files.unshift(file);
     this.activeFile = file;
     this.persist();
@@ -899,7 +886,7 @@ export class Workspace {
    * something to read first. It is never run — see `openLink.ts`.
    */
   openLinkedFile(sql: string, name: string | null) {
-    return this.createFile({ content: sql, name: name ?? undefined, fromLink: true });
+    return this.createFile({ content: sql, name: name ?? undefined });
   }
 
   deleteFile(file: SqlFile) {

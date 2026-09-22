@@ -8,9 +8,9 @@
  * deliberately no parameter that would: a link is something anyone can send,
  * the statements it carries run as whoever clicked it, and the one thing
  * standing between a link and somebody's warehouse is that a person has to
- * read the query and press Run. So the document it opens says where its text
- * came from (`SqlFile.fromLink`), and it is always a *new* document: a link
- * must never be able to append to or replace what somebody is editing.
+ * read the query and press Run. It is always a *new* document for the same
+ * reason: a link must never be able to append to or replace what somebody is
+ * editing.
  *
  * A query param rather than a `#sql=` fragment, although a fragment would keep
  * the SQL off the server entirely: the fragment does not survive the OIDC

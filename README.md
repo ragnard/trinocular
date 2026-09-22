@@ -243,9 +243,8 @@ https://trinocular.example/?sql=SELECT%20*%20FROM%20tpch.tiny.nation&name=nation
 ```
 
 Following the link opens the SQL as a **new file** and stops there. Nothing runs: there is no
-parameter that would run it, the file is always a new one rather than the one already open, and
-the document says its text came from a link until it is read. Running it is the reader's, one
-statement at a time, as for anything else they might be sent.
+parameter that would run it, and the file is always a new one rather than the one already open.
+Running it is the reader's, one statement at a time, as for anything else they might be sent.
 
 Someone not signed in is sent to log in and arrives at the query afterwards. The query string is
 never written to the server's log. Keep the query under a few kilobytes: the whole URL travels in

@@ -20,7 +20,7 @@
   import Shortcuts from "./Shortcuts.svelte";
   import { isTyping, type Pane } from "$lib/shortcuts";
   import { page } from "$app/state";
-  import { Link2, TriangleAlert } from "@lucide/svelte";
+  import { TriangleAlert } from "@lucide/svelte";
 
   interface Props {
     workspace: Workspace;
@@ -33,7 +33,6 @@
   // Dismissed here rather than by clearing the prop: the refusal is a fact
   // about how this page was opened, and the page does not get opened twice.
   let refusalDismissed = $state(false);
-  let linkedFile = $derived(workspace.activeFile?.fromLink ? workspace.activeFile : null);
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
@@ -245,18 +244,9 @@
 {#snippet doc()}
   <div class="document">
     <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
-    <!-- Where the text came from, for as long as it is news. The statements
-         below are about to run as whoever followed the link, and a link is
-         something anyone can send, so the one thing worth buying here is that
-         the query gets read before it gets run. Nothing is ever run for you:
-         there is no parameter that would, by design. -->
-    {#if linkedFile}
-      <div class="notice">
-        <Link2 size={14} />
-        <span class="fill">This query was opened from a link. Read it before you run it.</span>
-        <button class="chip" onclick={() => (linkedFile!.fromLink = false)}>Dismiss</button>
-      </div>
-    {:else if linkRefusal && !refusalDismissed}
+    <!-- A `?sql=` link that opened nothing says so: the alternative is an
+         empty editor that reads as a link that worked. -->
+    {#if linkRefusal && !refusalDismissed}
       <div class="notice">
         <TriangleAlert size={14} />
         <span class="fill">{linkRefusal}</span>
