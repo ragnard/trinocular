@@ -3,6 +3,7 @@ import { pino, type Logger } from "pino";
 
 import { env } from "$env/dynamic/private";
 import { BUILD } from "$lib/build";
+import { logPath } from "./logPath";
 
 const LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"];
 
@@ -91,7 +92,7 @@ export const LoggingHandler = (): Handle => {
       log(
         {
           method: event.request.method,
-          url: event.request.url,
+          url: logPath(event.request.url),
           status: res?.status,
           ...userId(event)
         },
@@ -104,7 +105,7 @@ export const LoggingHandler = (): Handle => {
         requestIdLogger.info(
           {
             method: event.request.method,
-            url: event.request.url,
+            url: logPath(event.request.url),
             err: err,
             ...userId(event)
           },
@@ -114,9 +115,9 @@ export const LoggingHandler = (): Handle => {
         requestIdLogger.info(
           {
             method: event.request.method,
-            url: event.request.url,
+            url: logPath(event.request.url),
             status: err.status,
-            location: err.location,
+            location: logPath(err.location),
             ...userId(event)
           },
           "redirect"
@@ -131,7 +132,7 @@ export const LoggingHandler = (): Handle => {
         requestIdLogger.error(
           {
             method: event.request.method,
-            url: event.request.url,
+            url: logPath(event.request.url),
             err: err,
             ...userId(event)
           },

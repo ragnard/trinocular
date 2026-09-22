@@ -523,6 +523,10 @@ export class Result {
   }
 }
 
+/** What a new document may start out as; everything is optional, and a plain
+ *  `createFile()` is still the empty one the `New file` menu item makes. */
+export type NewFile = { content?: string; name?: string };
+
 export class SqlFile {
   id: string;
   name: string = $state("");
@@ -864,15 +868,25 @@ export class Workspace {
     this.persist();
   }
 
-  createFile() {
+  createFile(opts: NewFile = {}) {
     const names = new Set(this.files.map((f) => f.name));
     let n = 1;
     while (names.has(`query-${n}.sql`)) n++;
-    const file = new SqlFile(crypto.randomUUID(), `query-${n}.sql`);
+    const file = new SqlFile(crypto.randomUUID(), opts.name || `query-${n}.sql`, opts.content);
     this.files.unshift(file);
     this.activeFile = file;
     this.persist();
     return file;
+  }
+
+  /**
+   * Opens SQL that arrived in a link. Always a *new* document: a link must
+   * never be able to append to or replace what somebody is editing, which is
+   * the one thing that would make following one dangerous rather than merely
+   * something to read first. It is never run — see `openLink.ts`.
+   */
+  openLinkedFile(sql: string, name: string | null) {
+    return this.createFile({ content: sql, name: name ?? undefined });
   }
 
   deleteFile(file: SqlFile) {
