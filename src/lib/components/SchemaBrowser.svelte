@@ -4,6 +4,7 @@
   import type { TypeCategory } from "$lib/trino/typeString";
   import { abbreviateType, typeCategory, typeChildren } from "$lib/trino/typeString";
   import { selectStatement, terminated, type TableRef } from "$lib/trino/statements";
+  import { qualifiedName, quoteIdentifier } from "monaco-language-trino";
   import { Box, Database, Ellipsis, HardDrive, Table, X } from "@lucide/svelte";
   import Dropdown from "./Dropdown.svelte";
   import FilterBox from "./FilterBox.svelte";
@@ -82,6 +83,19 @@
     key?: string;
     /** The parts of a table's name, for the statements written about it. */
     table?: TableRef;
+    /**
+     * What a copy of this row puts on the clipboard. Written here, where the
+     * node is built and every part of its name is already in hand: a node's id
+     * joins its path with a unit separator, but a nested field's segment is
+     * its *position*, so a name could not be read back out of one afterwards —
+     * the same reason the node's kind is not.
+     *
+     * Qualified from the catalog down to a table, since that is the name you
+     * would type to reach one and the name a `FROM` wants. A column is named
+     * by the `FROM` the query already has, so it copies its own name, quoted
+     * the way `selectStatement` quotes it.
+     */
+    name: string;
   }
 
   /**
@@ -114,7 +128,13 @@
         // Keyed by position: two fields of a row cannot share one, and there is
         // nothing else about them that they are guaranteed not to share.
         const id = `${prefix}${SEP}${i}`;
-        meta.set(id, { kind: typeCategory(field.type) });
+        // Verbatim, and not quoted or joined onto the column's name: below a
+        // column the labels are as often positions as identifiers — a row's
+        // anonymous fields are `[1]`, a map's are `key` and `value` — and an
+        // array collapses to its element's fields, so there is no dotted path
+        // through here that is reliably an expression. What the row says is
+        // the one thing that is certainly true of it.
+        meta.set(id, { kind: typeCategory(field.type), name: field.name });
         return {
           id,
           label: field.name,
@@ -130,6 +150,7 @@
     const nodes = cache.catalogs.map((catalog) => {
       meta.set(catalog, {
         kind: "catalog",
+        name: quoteIdentifier(catalog),
         load: (fresh) => cache.loadSchemas(catalog, fresh),
         key: `schemas:${catalog}`
       });
@@ -141,6 +162,7 @@
           const schemaId = `${catalog}${SEP}${schema}`;
           meta.set(schemaId, {
             kind: "schema",
+            name: qualifiedName(catalog, schema),
             load: (fresh) => cache.loadTables(catalog, schema, fresh),
             key: `tables:${catalog}.${schema}`
           });
@@ -152,6 +174,7 @@
               const tableId = `${schemaId}${SEP}${table}`;
               meta.set(tableId, {
                 kind: "table",
+                name: qualifiedName(catalog, schema, table),
                 load: (fresh) => cache.loadColumns(catalog, schema, table, fresh),
                 key: `columns:${catalog}.${schema}.${table}`,
                 table: { catalog, schema, table }
@@ -162,7 +185,10 @@
                 reloadable: true,
                 children: cache.getColumns(catalog, schema, table).map((col) => {
                   const colId = `${tableId}${SEP}${col.name}`;
-                  meta.set(colId, { kind: typeCategory(col.type) });
+                  meta.set(colId, {
+                    kind: typeCategory(col.type),
+                    name: quoteIdentifier(col.name)
+                  });
                   return {
                     id: colId,
                     label: col.name,
@@ -427,6 +453,7 @@
       label="Schema"
       ontoggle={handleToggle}
       onreload={handleReload}
+      clipboardText={(id) => meta.get(id)?.name}
     >
       {#snippet actions(node, tabindex)}
         {#if meta.get(node.id)?.kind === "table"}

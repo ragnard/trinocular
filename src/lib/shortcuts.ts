@@ -74,6 +74,7 @@ export const SHORTCUTS: ShortcutSection[] = [
       { keys: ["←"], label: "Close a branch, then step out" },
       { keys: ["Home", "End"], label: "First / last row" },
       { keys: ["↵", "Space"], label: "Expand / collapse" },
+      { keys: ["Mod+C"], label: "Copy the name" },
       { keys: ["Tab"], label: "The row's own buttons" },
       { keys: ["Esc"], label: "Clear the filter" }
     ]
