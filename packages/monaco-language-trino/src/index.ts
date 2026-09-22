@@ -15,7 +15,7 @@ export { DocumentParseService } from "./editor/documentParseService";
 export type { StatementParseResult, CollectedError } from "./editor/documentParseService";
 
 // Metadata interface for custom completion sources
-export type { MetadataProvider } from "./editor/metadataProvider";
+export type { MetadataProvider, FunctionInfo, FunctionKind } from "./editor/metadataProvider";
 export { StaticMetadataProvider } from "./editor/metadataProvider";
 
 // Utilities

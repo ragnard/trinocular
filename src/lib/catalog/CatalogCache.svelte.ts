@@ -1,6 +1,7 @@
 import type Trino from "$lib/trino";
 import type { QueryError } from "$lib/trino";
-import { qualifiedName } from "monaco-language-trino";
+import { qualifiedName, type FunctionInfo } from "monaco-language-trino";
+import { toFunctionInfos } from "./functions";
 
 export type ColumnInfo = { name: string; type: string };
 
@@ -61,6 +62,8 @@ export class CatalogCache {
   #schemas: Map<string, string[]> = $state.raw(new Map());
   #tables: Map<string, string[]> = $state.raw(new Map());
   #columns: Map<string, ColumnInfo[]> = $state.raw(new Map());
+  #functions: FunctionInfo[] | undefined = $state.raw(undefined);
+  #schemaFunctions: Map<string, FunctionInfo[]> = $state.raw(new Map());
 
   #inflight = new Map<string, Promise<any>>();
   loading: Set<string> = $state.raw(new Set());
@@ -167,6 +170,58 @@ export class CatalogCache {
         return columns;
       },
       () => (this.#columns = without(this.#columns, key))
+    );
+  }
+
+  /**
+   * Every function a bare name can resolve to: the built-ins, plus whatever the
+   * session path adds. One query for the whole cluster — 870 rows and ~85 KB on
+   * a stock Trino 480 — kept for the session like everything else here, since
+   * the set only moves when somebody deploys a plugin. Nothing draws it; it is
+   * here because completion needs it and this is where a connection's metadata
+   * lives.
+   */
+  async loadFunctions(fresh = false): Promise<FunctionInfo[]> {
+    if (this.#functions && !fresh) return this.#functions;
+    return this.#dedupe(
+      "functions",
+      async () => {
+        const rows = await collectRows(this.#client, "SHOW FUNCTIONS");
+        const functions = toFunctionInfos(rows);
+        this.#functions = functions;
+        return functions;
+      },
+      () => (this.#functions = undefined)
+    );
+  }
+
+  /**
+   * The functions stored in one schema, which is where a connector keeps the
+   * SQL routines somebody wrote with `CREATE FUNCTION`. Most connectors have
+   * none and answer with an empty list rather than an error — as does a catalog
+   * that does not exist at all, so this can confirm nothing and is only ever
+   * asked about a catalog and schema some other list already held.
+   */
+  async loadSchemaFunctions(
+    catalog: string,
+    schema: string,
+    fresh = false
+  ): Promise<FunctionInfo[]> {
+    const key = `${catalog}.${schema}`;
+    const cached = this.#schemaFunctions.get(key);
+    if (cached && !fresh) return cached;
+    return this.#dedupe(
+      `functions:${key}`,
+      async () => {
+        const rows = await collectRows(
+          this.#client,
+          `SHOW FUNCTIONS FROM ${qualifiedName(catalog, schema)}`
+        );
+        const functions = toFunctionInfos(rows);
+        this.#schemaFunctions = new Map(this.#schemaFunctions).set(key, functions);
+        return functions;
+      },
+      () => (this.#schemaFunctions = without(this.#schemaFunctions, key))
     );
   }
 
