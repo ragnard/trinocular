@@ -26,4 +26,12 @@ export class DelegatingMetadataProvider implements MetadataProvider {
   getTables(catalog: string, schema: string) {
     return this.delegate.getTables(catalog, schema);
   }
+
+  getFunctions() {
+    return this.delegate.getFunctions();
+  }
+
+  getSchemaFunctions(catalog: string, schema: string) {
+    return this.delegate.getSchemaFunctions(catalog, schema);
+  }
 }

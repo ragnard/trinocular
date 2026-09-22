@@ -1,4 +1,4 @@
-import type { MetadataProvider } from "monaco-language-trino";
+import type { FunctionInfo, MetadataProvider } from "monaco-language-trino";
 import type { CatalogCache } from "./CatalogCache.svelte";
 
 export class TrinoMetadataProvider implements MetadataProvider {
@@ -27,6 +27,14 @@ export class TrinoMetadataProvider implements MetadataProvider {
   async getTables(catalog: string, schema: string): Promise<string[]> {
     return this.#cache.loadTables(catalog, schema);
   }
+
+  async getFunctions(): Promise<FunctionInfo[]> {
+    return this.#cache.loadFunctions();
+  }
+
+  async getSchemaFunctions(catalog: string, schema: string): Promise<FunctionInfo[]> {
+    return this.#cache.loadSchemaFunctions(catalog, schema);
+  }
 }
 
 /** For a workspace with no connections: completion has no cluster to ask, and
@@ -36,5 +44,7 @@ export const NOTHING_TO_DESCRIBE: MetadataProvider = {
   getDefaultSchema: async () => undefined,
   getCatalogs: async () => [],
   getSchemas: async () => [],
-  getTables: async () => []
+  getTables: async () => [],
+  getFunctions: async () => [],
+  getSchemaFunctions: async () => []
 };

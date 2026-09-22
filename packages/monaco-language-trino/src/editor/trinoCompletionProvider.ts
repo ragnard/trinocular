@@ -1,10 +1,8 @@
 import * as monaco from "monaco-editor";
-import { CharStream, CommonTokenStream, Token } from "antlr4ng";
-import { CodeCompletionCore } from "antlr4-c3";
-import { SqlBaseLexer } from "../parser/SqlBaseLexer";
 import { SqlBaseParser } from "../parser/SqlBaseParser";
 import { keywordMap } from "./trinoKeywordMap";
-import type { MetadataProvider } from "./metadataProvider";
+import { collectContext, dottedParts, functionKindsAt } from "./completionContext";
+import type { FunctionInfo, FunctionKind, MetadataProvider } from "./metadataProvider";
 import type { DocumentParseService } from "./documentParseService";
 
 // Built-in Trino type names. These are parsed as identifiers (not keywords)
@@ -29,8 +27,6 @@ const TRINO_TYPES = [
   "VARCHAR"
 ];
 
-const DOT_TOKEN = SqlBaseLexer.T__0; // '.'
-
 const RETRIGGER_COMMAND: monaco.languages.Command = {
   id: "editor.action.triggerSuggest",
   title: "Re-trigger"
@@ -42,7 +38,9 @@ function makeSuggestion(
   range: monaco.IRange,
   options?: {
     detail?: string;
+    documentation?: string;
     insertText?: string;
+    insertTextRules?: monaco.languages.CompletionItemInsertTextRule;
     command?: monaco.languages.Command;
   }
 ): monaco.languages.CompletionItem {
@@ -52,8 +50,33 @@ function makeSuggestion(
     insertText: options?.insertText ?? label,
     range,
     ...(options?.detail && { detail: options.detail }),
+    ...(options?.documentation && { documentation: options.documentation }),
+    ...(options?.insertTextRules && { insertTextRules: options.insertTextRules }),
     ...(options?.command && { command: options.command })
   };
+}
+
+/**
+ * What monaco shows beside the name. Overloads are folded into a count rather
+ * than listed, since `abs` has seven and a menu row has one line; the kind is
+ * written only when it is not `scalar`, because an aggregate is the thing worth
+ * warning of — it will want a `GROUP BY` — and a scalar is what everybody
+ * already assumes.
+ */
+function functionDetail(fn: FunctionInfo): string {
+  const shape = fn.signatures.length === 1 ? fn.signatures[0] : `${fn.signatures.length} overloads`;
+  return fn.kind === "scalar" ? shape : `${fn.kind} · ${shape}`;
+}
+
+/**
+ * A dotted part is only asked about if a list already holds it. Most of what
+ * precedes a dot in SQL is a table alias, and `t.` used to send
+ * `SHOW SCHEMAS FROM "t"` to the cluster on every keystroke — a query that
+ * fails there and is recorded as a failure here. Unquoted names are lowercased
+ * by Trino, so `TPCH.` still finds `tpch`.
+ */
+function known(names: string[], name: string): boolean {
+  return names.includes(name) || names.includes(name.toLowerCase());
 }
 
 export class TrinoCompletionProvider implements monaco.languages.CompletionItemProvider {
@@ -82,51 +105,11 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
       ? fullText.substring(currentStmt.startOffset, cursorOffset)
       : fullText.substring(0, cursorOffset);
 
-    // Lex the current statement
-    const input = CharStream.fromString(statementText);
-    const lexer = new SqlBaseLexer(input);
-    lexer.removeErrorListeners();
-    const tokenStream = new CommonTokenStream(lexer);
-    tokenStream.fill();
-
     // Get prefix using Monaco's word detection
     const wordInfo = model.getWordUntilPosition(position);
     const prefix = wordInfo.word.toUpperCase();
 
-    // Find caret token index (must be a raw token stream index, since
-    // c3 compares token.tokenIndex against caretTokenIndex).
-    const allTokens = tokenStream.getTokens();
-    const onChannelTokens = allTokens.filter((t) => t.channel === 0 && t.type !== Token.EOF);
-
-    // Default: caret is past all tokens — use EOF's tokenIndex so c3
-    // collects what's valid at the end of the input.
-    const eofToken = allTokens.find((t) => t.type === Token.EOF);
-    let caretTokenIndex = eofToken?.tokenIndex ?? allTokens.length;
-
-    // If the last on-channel token is an IDENTIFIER whose text matches the prefix,
-    // use its tokenIndex so c3 computes what's valid *at* that position
-    if (prefix.length > 0 && onChannelTokens.length > 0) {
-      const lastToken = onChannelTokens[onChannelTokens.length - 1];
-      if (lastToken.type === SqlBaseLexer.IDENTIFIER && lastToken.text?.toUpperCase() === prefix) {
-        caretTokenIndex = lastToken.tokenIndex;
-      }
-    }
-
-    // Run CodeCompletionCore
-    const parser = new SqlBaseParser(tokenStream);
-    parser.removeErrorListeners();
-    const core = new CodeCompletionCore(parser);
-    core.ignoredTokens = new Set([
-      SqlBaseLexer.WS,
-      SqlBaseLexer.SIMPLE_COMMENT,
-      SqlBaseLexer.BRACKETED_COMMENT,
-      SqlBaseLexer.UNRECOGNIZED
-    ]);
-    core.preferredRules = new Set([
-      SqlBaseParser.RULE_qualifiedName,
-      SqlBaseParser.RULE_identifier
-    ]);
-    const candidates = core.collectCandidates(caretTokenIndex);
+    const { candidates, onChannelTokens } = collectContext(statementText, prefix);
 
     // Convert candidates to completion items
     const wordRange = new monaco.Range(
@@ -161,92 +144,85 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
       candidates.rules.has(SqlBaseParser.RULE_qualifiedName) ||
       candidates.rules.has(SqlBaseParser.RULE_identifier)
     ) {
-      const metaSuggestions = await this.getMetadataCompletions(onChannelTokens, prefix, wordRange);
-      suggestions.push(...metaSuggestions);
+      const parts = dottedParts(onChannelTokens, prefix);
+      const kinds = functionKindsAt(candidates);
+      const [metaSuggestions, fnSuggestions] = await Promise.all([
+        this.getMetadataCompletions(parts, prefix, wordRange),
+        kinds ? this.getFunctionCompletions(parts, kinds, prefix, wordRange) : []
+      ]);
+      suggestions.push(...metaSuggestions, ...fnSuggestions);
     }
 
     return { suggestions };
   }
 
   /**
-   * Parse dot-separated parts from tokens before cursor, then suggest
-   * catalogs/schemas/tables based on how many parts have been typed.
+   * The functions that can be called where the caret is. Only two shapes are
+   * asked about: a bare name, which the cluster resolves against the built-ins
+   * and the session path, and a fully qualified `catalog.schema.name`, which is
+   * where a connector's stored functions live. A single part before the dot is
+   * left alone on purpose — in an expression it is nearly always a table alias,
+   * and `t.` must not send `SHOW FUNCTIONS FROM t` on every keystroke.
    */
-  private async getMetadataCompletions(
-    onChannelTokens: Token[],
+  private async getFunctionCompletions(
+    parts: string[],
+    kinds: ReadonlySet<FunctionKind>,
     prefix: string,
     wordRange: monaco.IRange
   ): Promise<monaco.languages.CompletionItem[]> {
-    // Walk backwards from the end of on-channel tokens to collect
-    // the dot-separated qualified name parts before the cursor.
-    // Pattern: IDENTIFIER DOT IDENTIFIER DOT ... (right to left)
-    const completedParts: string[] = [];
-    let i = onChannelTokens.length - 1;
+    const mp = this.metadataProvider;
+    const filterPrefix = prefix.toLowerCase();
 
-    // If last token is an IDENTIFIER matching prefix, skip it (it's what the user is typing)
-    if (
-      i >= 0 &&
-      onChannelTokens[i].type === SqlBaseLexer.IDENTIFIER &&
-      onChannelTokens[i].text?.toUpperCase() === prefix &&
-      prefix.length > 0
-    ) {
-      i--;
-    }
-
-    // Now collect DOT IDENTIFIER pairs going backwards
-    while (i >= 1) {
-      if (
-        onChannelTokens[i].type === DOT_TOKEN &&
-        (onChannelTokens[i - 1].type === SqlBaseLexer.IDENTIFIER ||
-          keywordMap.has(onChannelTokens[i - 1].type))
-      ) {
-        completedParts.unshift(onChannelTokens[i - 1].text ?? "");
-        i -= 2;
+    try {
+      let functions: FunctionInfo[];
+      if (parts.length === 0) {
+        functions = await mp.getFunctions();
+      } else if (parts.length === 2) {
+        const [catalog, schema] = parts;
+        if (!known(await mp.getCatalogs(), catalog)) return [];
+        if (!known(await mp.getSchemas(catalog), schema)) return [];
+        functions = await mp.getSchemaFunctions(catalog, schema);
       } else {
-        break;
+        return [];
       }
-    }
 
-    // Also check if last token IS a dot (user just typed "catalog.")
-    // In that case the prefix is empty and we need to check if the token
-    // right before our walk is a dot
-    const lastOnChannel = onChannelTokens[onChannelTokens.length - 1];
-    if (lastOnChannel?.type === DOT_TOKEN && prefix.length === 0) {
-      // The dot is consumed; collect IDENTIFIER before it
-      let j = onChannelTokens.length - 2;
-      completedParts.length = 0; // reset
-      while (j >= 0) {
-        if (
-          onChannelTokens[j].type === SqlBaseLexer.IDENTIFIER ||
-          keywordMap.has(onChannelTokens[j].type)
-        ) {
-          completedParts.unshift(onChannelTokens[j].text ?? "");
-          j--;
-          if (j >= 0 && onChannelTokens[j].type === DOT_TOKEN) {
-            j--;
-          } else {
-            break;
-          }
-        } else {
-          break;
-        }
-      }
+      return functions
+        .filter((fn) => kinds.has(fn.kind))
+        .filter((fn) => fn.name.toLowerCase().startsWith(filterPrefix))
+        .map((fn) =>
+          makeSuggestion(fn.name, monaco.languages.CompletionItemKind.Function, wordRange, {
+            detail: functionDetail(fn),
+            documentation: fn.description,
+            // The caret lands between the parentheses, which is where the next
+            // thing to type goes. `$0` and not `$1`, so nothing is left holding
+            // a snippet session open over a single stop.
+            insertText: `${fn.name}($0)`,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+          })
+        );
+    } catch (e) {
+      console.error("Function completion failed:", e);
+      return [];
     }
+  }
 
+  /**
+   * Suggest catalogs/schemas/tables from how many dot-separated parts have
+   * already been typed. A dotted name is a relation in `FROM` and a column
+   * reference in an expression — Trino accepts `catalog.schema.table.column`
+   * there — so the same three levels are worth offering in both.
+   */
+  private async getMetadataCompletions(
+    completedParts: string[],
+    prefix: string,
+    wordRange: monaco.IRange
+  ): Promise<monaco.languages.CompletionItem[]> {
     const mp = this.metadataProvider;
     const suggestions: monaco.languages.CompletionItem[] = [];
 
     const filterPrefix = prefix.toLowerCase();
     const matches = (name: string) =>
       filterPrefix.length === 0 || name.toLowerCase().startsWith(filterPrefix);
-
-    // A dotted part is only asked about if a list already holds it. Most of
-    // what precedes a dot in SQL is a table alias, and `t.` used to send
-    // `SHOW SCHEMAS FROM "t"` to the cluster on every keystroke — a query
-    // that fails there and is recorded as a failure here. Unquoted names are
-    // lowercased by Trino, so `TPCH.` still finds `tpch`.
-    const known = (names: string[], name: string) =>
-      names.includes(name) || names.includes(name.toLowerCase());
 
     try {
       if (completedParts.length === 0) {

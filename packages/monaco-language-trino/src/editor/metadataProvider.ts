@@ -1,9 +1,36 @@
+/**
+ * What a function is, as far as completion is concerned. This is Trino's own
+ * `Function Type` from `SHOW FUNCTIONS`, and it is what decides *where* a name
+ * may be offered: a table function is only ever written inside `TABLE(...)`,
+ * and the other three only ever inside an expression.
+ */
+export type FunctionKind = "scalar" | "aggregate" | "window" | "table";
+
+/**
+ * One function *name*, with its overloads folded together — `abs` is seven rows
+ * of `SHOW FUNCTIONS` and one thing to offer. `signatures` keeps the order the
+ * cluster listed them in and is never empty: a name with no signature would not
+ * be a function.
+ */
+export interface FunctionInfo {
+  name: string;
+  kind: FunctionKind;
+  /** `(bigint, double) → bigint`, one per overload. */
+  signatures: string[];
+  /** The first non-empty description among the overloads; often empty. */
+  description: string;
+}
+
 export interface MetadataProvider {
   getDefaultCatalog(): Promise<string | undefined>;
   getDefaultSchema(): Promise<string | undefined>;
   getCatalogs(): Promise<string[]>;
   getSchemas(catalog: string): Promise<string[]>;
   getTables(catalog: string, schema: string): Promise<string[]>;
+  /** What a bare name can resolve to: the built-ins, plus the session path. */
+  getFunctions(): Promise<FunctionInfo[]>;
+  /** The functions stored in one schema, which only some connectors have. */
+  getSchemaFunctions(catalog: string, schema: string): Promise<FunctionInfo[]>;
 }
 
 export class StaticMetadataProvider implements MetadataProvider {
@@ -36,6 +63,24 @@ export class StaticMetadataProvider implements MetadataProvider {
     ]
   };
 
+  private readonly functions: FunctionInfo[] = [
+    {
+      name: "abs",
+      kind: "scalar",
+      signatures: ["(bigint) → bigint", "(double) → double"],
+      description: "Absolute value"
+    },
+    { name: "count", kind: "aggregate", signatures: ["() → bigint"], description: "" },
+    { name: "lower", kind: "scalar", signatures: ["(varchar) → varchar"], description: "" },
+    { name: "row_number", kind: "window", signatures: ["() → bigint"], description: "" },
+    {
+      name: "sequence",
+      kind: "table",
+      signatures: ["(bigint, bigint) → table"],
+      description: ""
+    }
+  ];
+
   async getDefaultCatalog(): Promise<string | undefined> {
     return "tpch";
   }
@@ -54,5 +99,13 @@ export class StaticMetadataProvider implements MetadataProvider {
 
   async getTables(catalog: string, schema: string): Promise<string[]> {
     return this.tables[`${catalog}.${schema}`] ?? [];
+  }
+
+  async getFunctions(): Promise<FunctionInfo[]> {
+    return this.functions;
+  }
+
+  async getSchemaFunctions(): Promise<FunctionInfo[]> {
+    return [];
   }
 }
