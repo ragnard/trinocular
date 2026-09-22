@@ -54,6 +54,13 @@ describe("functionKindsAt", () => {
   test("still offers expression functions once inside a table function's arguments", () => {
     expect(kindsAt("SELECT * FROM TABLE(sequence(ab")).toEqual(EXPRESSION);
   });
+
+  test("offers table functions to a qualified name, which is how a connector's are written", () => {
+    // `postgresql.system.query(...)`, `iceberg.system.table_changes(...)`.
+    expect(kindsAt("SELECT * FROM TABLE(pg.system.qu")).toEqual(["table"]);
+    expect(kindsAt("SELECT * FROM TABLE(pg.system.")).toEqual(["table"]);
+    expect(kindsAt("SELECT * FROM TABLE(pg.")).toEqual(["table"]);
+  });
 });
 
 describe("dottedParts", () => {
@@ -71,6 +78,11 @@ describe("dottedParts", () => {
 
   test("reads them in an expression too", () => {
     expect(at("SELECT tpch.tiny.fo").parts).toEqual(["tpch", "tiny"]);
+  });
+
+  test("reads them inside TABLE(...), which is where a connector's functions are named", () => {
+    expect(at("SELECT * FROM TABLE(pg.system.qu").parts).toEqual(["pg", "system"]);
+    expect(at("SELECT * FROM TABLE(pg.system.").parts).toEqual(["pg", "system"]);
   });
 
   test("keeps the name as written, since Trino lowercases it and this does not", () => {
