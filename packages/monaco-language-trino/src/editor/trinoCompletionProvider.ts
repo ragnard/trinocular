@@ -160,9 +160,21 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
    * The functions that can be called where the caret is. Only two shapes are
    * asked about: a bare name, which the cluster resolves against the built-ins
    * and the session path, and a fully qualified `catalog.schema.name`, which is
-   * where a connector's stored functions live. A single part before the dot is
-   * left alone on purpose — in an expression it is nearly always a table alias,
-   * and `t.` must not send `SHOW FUNCTIONS FROM t` on every keystroke.
+   * where a connector's own functions live.
+   *
+   * A single part before the dot is never asked about. In an expression it is
+   * nearly always a table alias, and `SHOW FUNCTIONS FROM t` is not even the
+   * question it looks like — Trino reads one part as a *schema* in the session
+   * catalog and fails with `MISSING_CATALOG_NAME` when there is none.
+   *
+   * With two parts the catalog is checked against the list and **the schema
+   * deliberately is not**. A connector keeps its table functions in a `system`
+   * schema that `SHOW SCHEMAS` does not list — `keycloak_pg.system.query` is
+   * real while `SHOW SCHEMAS FROM keycloak_pg` says only `information_schema`,
+   * `pg_catalog` and `public` — so a schema guard would refuse to complete
+   * precisely the functions worth completing. A wrong guess is cheap and quiet
+   * where `SHOW SCHEMAS FROM "t"` was neither: it is answered empty in about
+   * 60ms, cached, and never recorded as a failure.
    */
   private async getFunctionCompletions(
     parts: string[],
@@ -180,7 +192,6 @@ export class TrinoCompletionProvider implements monaco.languages.CompletionItemP
       } else if (parts.length === 2) {
         const [catalog, schema] = parts;
         if (!known(await mp.getCatalogs(), catalog)) return [];
-        if (!known(await mp.getSchemas(catalog), schema)) return [];
         functions = await mp.getSchemaFunctions(catalog, schema);
       } else {
         return [];
