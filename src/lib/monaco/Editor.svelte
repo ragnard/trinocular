@@ -720,7 +720,14 @@
       if (!model) return;
       const owner = fileOfModel.get(model);
       if (owner) {
-        owner.content = model.getValue();
+        const content = model.getValue();
+        // Monaco raises this when a model is *attached* as well as when it is
+        // edited, with the text it already had — so "the text changed" is the
+        // comparison and not the event. Which matters to more than the flag
+        // below: an attach is not an edit, and reading it as one would clear
+        // the one thing the notice above the editor exists to say.
+        if (owner.content !== content) owner.fromLink = false;
+        owner.content = content;
         // Erasing a statement collapses its tracked range, which is the end of
         // its result: dropping it also stops a query that is still running.
         const dead = owner.results.filter((result) => {

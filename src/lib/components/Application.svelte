@@ -20,8 +20,20 @@
   import Shortcuts from "./Shortcuts.svelte";
   import { isTyping, type Pane } from "$lib/shortcuts";
   import { page } from "$app/state";
+  import { Link2, TriangleAlert } from "@lucide/svelte";
 
-  let { workspace }: { workspace: Workspace } = $props();
+  interface Props {
+    workspace: Workspace;
+    /** Why a `?sql=` link opened nothing, when one did not. */
+    linkRefusal?: string | null;
+  }
+
+  let { workspace, linkRefusal = null }: Props = $props();
+
+  // Dismissed here rather than by clearing the prop: the refusal is a fact
+  // about how this page was opened, and the page does not get opened twice.
+  let refusalDismissed = $state(false);
+  let linkedFile = $derived(workspace.activeFile?.fromLink ? workspace.activeFile : null);
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
@@ -233,6 +245,24 @@
 {#snippet doc()}
   <div class="document">
     <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
+    <!-- Where the text came from, for as long as it is news. The statements
+         below are about to run as whoever followed the link, and a link is
+         something anyone can send, so the one thing worth buying here is that
+         the query gets read before it gets run. Nothing is ever run for you:
+         there is no parameter that would, by design. -->
+    {#if linkedFile}
+      <div class="notice">
+        <Link2 size={14} />
+        <span class="fill">This query was opened from a link. Read it before you run it.</span>
+        <button class="chip" onclick={() => (linkedFile!.fromLink = false)}>Dismiss</button>
+      </div>
+    {:else if linkRefusal && !refusalDismissed}
+      <div class="notice">
+        <TriangleAlert size={14} />
+        <span class="fill">{linkRefusal}</span>
+        <button class="chip" onclick={() => (refusalDismissed = true)}>Dismiss</button>
+      </div>
+    {/if}
     <div class="document-body">
       <SplitPane type="vertical" panes={[editor, results]} bind:layout={documentLayout} />
     </div>
@@ -329,5 +359,27 @@
   .document-body {
     flex: 1;
     min-height: 0;
+  }
+
+  /* The same line the results pane draws its notices as, in the document. */
+  .notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-height: var(--h-rail);
+    padding: 6px 12px;
+    background: var(--s1);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg-2);
+  }
+
+  .notice :global(svg) {
+    flex: none;
+    color: var(--fg-3);
+  }
+
+  .notice .chip {
+    flex: none;
   }
 </style>

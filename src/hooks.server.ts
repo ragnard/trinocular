@@ -21,6 +21,7 @@ import { ProbeHandler } from "$lib/server/probes";
 import { AccessHandler, createAuthorizer } from "$lib/server/authz";
 import { logConnectionAuthz } from "$lib/server/connectionAuthz";
 import { logger, userId } from "$lib/server/logging";
+import { logPath } from "$lib/server/logPath";
 import { type Claims } from "$lib/server/identity";
 
 const NoAuthnHandler = (opts: { user: string; claims: Claims }): Handle => {
@@ -139,7 +140,13 @@ export const handleError: HandleServerError = ({ error, event, status, message }
   // failures, which is the same way round as the problem this hook fixes.
   const log = status >= 500 ? child.error.bind(child) : child.warn.bind(child);
   log(
-    { err: error, status, method: event.request.method, url: event.request.url, ...userId(event) },
+    {
+      err: error,
+      status,
+      method: event.request.method,
+      url: logPath(event.request.url),
+      ...userId(event)
+    },
     status >= 500 ? "unhandled server error" : "request failed"
   );
   return { message, requestId: event.locals.requestId };
