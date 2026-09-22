@@ -304,9 +304,17 @@
   }
 
   /* Names the pane a key press landed in, for the shortcuts card; a split
-     pane sizes its direct child, so the wrapper passes that on. */
+     pane sizes its direct child, so the wrapper passes that on — to the
+     children that are in the flow. A component that owns a menu renders the
+     popover beside its own root, so it is a direct child too, and a popover
+     is laid out in the top layer against the viewport: 100% of this is 100%
+     of the window, which is how the inspector's format picker and the schema
+     browser's statement menu came to cover the screen. `Menu` does size itself
+     to its contents, but that rule is a scoped class like this one and loses
+     the tie to whichever is written later — so the exclusion belongs with the
+     container doing the stretching, not with the thing being stretched. */
   .surface,
-  .surface > :global(*) {
+  .surface > :global(*:not([popover])) {
     width: 100%;
     height: 100%;
   }

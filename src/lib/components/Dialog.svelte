@@ -69,7 +69,9 @@
     background: var(--scrim);
   }
 
-  dialog:not(.fit) > :global(*) {
+  /* Again the content and not a popover the content opened: the expanded
+     inspector's picker is a child of this dialog. */
+  dialog:not(.fit) > :global(*:not([popover])) {
     height: 100%;
   }
 </style>
