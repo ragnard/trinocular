@@ -8,7 +8,6 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
 
 - Web application for querying and interacting with Trino clusters
   - Write and execute SQL statements
-  - Complete keywords, names and functions as you type
   - Browse and inspect results
   - Explore catalogs, schemas and tables
   - Multi-cluster support
