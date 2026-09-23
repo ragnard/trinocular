@@ -59,6 +59,17 @@
     return () => window.removeEventListener("pagehide", flush);
   });
 
+  // Closing a tab with a query in flight throws the query away; ask first.
+  // The listener is only there while something runs, since any `beforeunload`
+  // listener keeps Firefox from putting the page in the back/forward cache.
+  // Browsers show their own wording and ignore ours.
+  $effect(() => {
+    if (workspace.running === 0) return;
+    const confirm = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", confirm);
+    return () => window.removeEventListener("beforeunload", confirm);
+  });
+
   let connectionId = $derived(workspace.connectionId);
   let userId = $derived(page.data.userId);
   let logoutPath = $derived(page.data.logoutPath);
