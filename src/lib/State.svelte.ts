@@ -627,6 +627,13 @@ export class Workspace {
 
   files: SqlFile[] = $state([]);
   activeFile: SqlFile | null = $state.raw(null);
+  /**
+   * Queries of this tab's that the cluster still has: running, or held at the
+   * row cap. Closing the tab abandons them, and their rows with it.
+   */
+  running: number = $derived(
+    this.files.reduce((n, file) => n + file.results.filter((r) => r.running).length, 0)
+  );
   /** The most any run brings into the browser; see `ResultCeiling`. */
   readonly ceiling: ResultCeiling;
   /** Rows a new run shows before pausing to ask, when `limitRows` is on. */
