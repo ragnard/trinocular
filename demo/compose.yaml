@@ -11,6 +11,7 @@ name: trinocular-demo
 services:
   trinocular:
     image: ghcr.io/ragnard/trinocular:latest
+    pull_policy: always
     ports:
       - "3000:3000"
     environment:
