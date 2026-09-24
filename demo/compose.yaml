@@ -74,4 +74,4 @@ configs:
       node-scheduler.include-coordinator=true
       discovery.uri=http://localhost:8080
       catalog.management=$${ENV:CATALOG_MANAGEMENT}
-      query.info-url-template=http://localhost:${TRINO_UI_PORT:-3001}/ui/query.html?$${QUERY_ID}
+      query.info-url-template=http://localhost:${TRINO_UI_PORT:-3001}/ui#/queries/$${QUERY_ID}
