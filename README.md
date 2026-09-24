@@ -251,6 +251,12 @@ never written to the server's log. Keep the query under a few kilobytes: the who
 the request line, which the server caps at 16KB, and a link over that is refused rather than
 opened half.
 
+## Open source policy
+
+Trinocular is open source under the Apache License 2.0: use it, run it, fork it and change it
+under the terms of the [LICENSE](LICENSE). It is not currently accepting contributions; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for what that means and how to report bugs.
+
 ## License
 
 Apache License 2.0; see [LICENSE](LICENSE). Third-party material and its licenses are listed in
