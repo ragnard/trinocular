@@ -37,6 +37,9 @@ and `jmx` catalogs, so there is something to run straight away:
 SELECT * FROM tpch.tiny.nation
 ```
 
+Trino's own web UI, where a statement's `Details` link goes, is on
+[http://localhost:3001](http://localhost:3001) (`TRINO_UI_PORT` moves it).
+
 
 ### Existing Trino instance
 
