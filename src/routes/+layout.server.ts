@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from "./$types";
 import { visibleConnections } from "$lib/server/connectionAuthz";
-import { config, logoutPath } from "$lib/server/config";
+import { config, loginPath, logoutPath } from "$lib/server/config";
 
 // The authn/authz gate used to live here, as a redirect for a missing userId.
 // It is `AccessHandler` in hooks.server.ts now: a layout only guards what
@@ -22,6 +22,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     fileStorage: config.files.store.kind === "browser" ? "browser" : "server",
     // The most a run may bring into the browser; enforced there, by `Result`.
     results: config.results,
+    // Where the browser goes when a request answers 401 (`signedOut`): the
+    // gate's own login path, which under OIDC is the trigger under
+    // `paths.prefix` and not the password form's route.
+    loginPath,
     // Where the account menu's — and the forbidden page's — `Sign out` posts.
     logoutPath
   };

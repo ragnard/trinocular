@@ -6,7 +6,9 @@
  * version it expects in `If-Match` (or `If-None-Match: *` for a document it is
  * creating), and a 412 comes back with what the server holds instead. A 413
  * is the size cap and is refused rather than retried; anything else that
- * fails is a rejection, which the caller retries.
+ * fails is thrown as the Trino client's `HttpError`, so that a 401 — the
+ * session is gone — reads the same from here as from the proxy and is met the
+ * same way (`signedOut`), and the rest is a rejection the caller retries.
  *
  * Other tabs of this browser hear about a write straight away over a
  * `BroadcastChannel`, which stands in for the `storage` event the local store
@@ -16,6 +18,8 @@
  */
 
 import { loadWorkspace, removeLocalFile } from "./fileStorage";
+import { signedOut } from "./signedOut";
+import { HttpError } from "./trino";
 import {
   orderFiles,
   toStoredFile,
@@ -125,7 +129,7 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
 
   async #listing(): Promise<{ files: FileRecord[]; ui: StoredUi | null }> {
     const response = await fetch(API, { headers: { accept: "application/json" } });
-    if (!response.ok) throw new Error(`workspace listing failed: ${response.status}`);
+    if (!response.ok) throw await HttpError.from(response);
     return toListing(await response.json());
   }
 
@@ -158,7 +162,7 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
       const { error } = (await response.json().catch(() => ({}))) as { error?: string };
       return { status: "refused", reason: error ?? `rejected with ${response.status}` };
     }
-    if (!response.ok) throw new Error(`save failed: ${response.status}`);
+    if (!response.ok) throw await HttpError.from(response);
 
     const { version } = (await response.json()) as { version: string };
     this.#known.set(file.id, version);
@@ -173,9 +177,7 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
         method: "DELETE",
         keepalive: opts?.keepalive === true
       });
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`remove failed: ${response.status}`);
-      }
+      if (!response.ok && response.status !== 404) throw await HttpError.from(response);
       this.#known.delete(fileId);
       this.#post({ type: "removed", fileId });
     } finally {
@@ -190,7 +192,7 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
       body: JSON.stringify(ui),
       keepalive: opts?.keepalive === true
     });
-    if (!response.ok) throw new Error(`save failed: ${response.status}`);
+    if (!response.ok) throw await HttpError.from(response);
     this.#knownUi = JSON.stringify(ui);
     this.#post({ type: "ui", ui });
   }
@@ -228,9 +230,12 @@ export class RemoteWorkspaceStore implements WorkspaceStore {
 
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
-      this.#refresh(watcher).catch(() => {
-        // Nothing to do: the next refresh asks again, and a save that fails
-        // reports itself.
+      this.#refresh(watcher).catch((e) => {
+        // A session that expired overnight is met here, on the tab becoming
+        // visible, before anything is typed into a document that could not be
+        // saved. Anything else: the next refresh asks again, and a save that
+        // fails reports itself.
+        signedOut(e);
       });
     };
     document.addEventListener("visibilitychange", refresh);
