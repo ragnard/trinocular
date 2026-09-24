@@ -254,15 +254,8 @@ opened half.
 ## Open source policy
 
 Trinocular is open source under the Apache License 2.0: use it, run it, fork it and change it
-under the terms of the [LICENSE](LICENSE).
-
-It is not currently accepting contributions. Pull requests will be closed without review — not
-because they are unwelcome, but because this is a single-maintainer project and reviewing,
-merging and then owning outside changes is more than it can take on for now.
-
-Bugs and feature requests are welcome as [GitHub issues](https://github.com/ragnard/trinocular/issues).
-Security problems are the exception: report them privately, as [SECURITY.md](SECURITY.md) describes,
-and not in a public issue.
+under the terms of the [LICENSE](LICENSE). It is not currently accepting contributions; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for what that means and how to report bugs.
 
 ## License
 
