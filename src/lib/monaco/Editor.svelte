@@ -118,6 +118,16 @@
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
 
   /**
+   * Hands the editor focus back, caret where it was. Through monaco rather
+   * than by refocusing an element remembered from before: the element that
+   * takes its keystrokes is replaced when the document changes, so one
+   * remembered across a switch of file is no longer in the page.
+   */
+  export function focus() {
+    editor?.focus();
+  }
+
+  /**
    * Puts `text` into the document at the caret, replacing a selection if there
    * is one, and set off by a blank line from any text on the caret's line: a
    * statement dropped mid-line would run into whatever was there. What is

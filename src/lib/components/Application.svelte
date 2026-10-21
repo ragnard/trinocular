@@ -254,7 +254,7 @@
 
 {#snippet doc()}
   <div class="document">
-    <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
+    <DocumentHeader {workspace} onfocuseditor={() => editorRef?.focus()} />
     <!-- A `?sql=` link that opened nothing says so: the alternative is an
          empty editor that reads as a link that worked. -->
     {#if linkRefusal && !refusalDismissed}

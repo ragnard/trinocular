@@ -47,11 +47,13 @@ export type LinkedQuery =
   | { ok: false; reason: string };
 
 /**
- * A name fit to draw: one line, no control characters, and bounded. It is
- * rendered as text by svelte wherever it appears, so this is not an escape —
- * it is what keeps a newline or a kilobyte of runes out of the file switcher.
+ * A name fit to draw: one line, no control characters, and bounded, or null
+ * when nothing is left. It is rendered as text by svelte wherever it appears,
+ * so this is not an escape — it is what keeps a newline or a kilobyte of
+ * runes out of a tab. Every way a file gets a name goes through it: a link,
+ * the file switcher, and a rename (`Workspace.createFile`, `renameFile`).
  */
-const cleanName = (raw: string): string | null => {
+export const cleanName = (raw: string): string | null => {
   const flat = raw.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").trim();
   return flat ? flat.slice(0, MAX_NAME_LENGTH) : null;
 };

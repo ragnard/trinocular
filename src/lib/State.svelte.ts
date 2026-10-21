@@ -12,6 +12,7 @@ import { underPath } from "$lib/viewFormats";
 import type { FileRecord, StoredFile } from "$lib/workspaceRecord";
 import type { LoadedWorkspace, WorkspaceStore } from "$lib/workspaceStore";
 import { WorkspaceSaver } from "$lib/workspaceSaver";
+import { cleanName } from "$lib/openLink";
 
 const MAX_RESULTS_PER_FILE = 10;
 
@@ -826,8 +827,20 @@ export class Workspace {
     this.activeFile = this.files.find((f) => f.id === stored.activeFileId) ?? this.files[0];
   }
 
+  /** What an empty workspace starts with, so there is always a tab. */
   #scratchFile(): SqlFile {
-    return new SqlFile(crypto.randomUUID(), "scratch.sql");
+    return new SqlFile(crypto.randomUUID(), this.#nextName());
+  }
+
+  /**
+   * The first `query-N` no file is called. No extension: every document is
+   * SQL, so `.sql` on every tab said nothing and took room from the name.
+   */
+  #nextName(): string {
+    const names = new Set(this.files.map((f) => f.name));
+    let n = 1;
+    while (names.has(`query-${n}`)) n++;
+    return `query-${n}`;
   }
 
   #record(file: SqlFile): StoredFile {
@@ -864,17 +877,18 @@ export class Workspace {
 
   openFile(file: SqlFile) {
     this.activeFile = file;
-    // Which document you are in is part of the workspace now that the file
-    // list is a switcher rather than something on screen to re-pick.
+    // Which document you are in is part of the workspace: the tab a reload
+    // comes back to.
     this.persist();
   }
 
+  /** A new file at the end, opened. `name` is what somebody typed or a link
+   *  carried; when it has nothing drawable in it the file is `query-N`. */
   createFile(opts: NewFile = {}) {
-    const names = new Set(this.files.map((f) => f.name));
-    let n = 1;
-    while (names.has(`query-${n}.sql`)) n++;
-    const file = new SqlFile(crypto.randomUUID(), opts.name || `query-${n}.sql`, opts.content);
-    this.files.unshift(file);
+    const name = cleanName(opts.name ?? "") ?? this.#nextName();
+    const file = new SqlFile(crypto.randomUUID(), name, opts.content);
+    // At the end, where a new tab opens.
+    this.files.push(file);
     this.activeFile = file;
     this.persist();
     return file;
@@ -897,16 +911,28 @@ export class Workspace {
     // The file's results go with it — stop anything still running.
     for (const result of file.results) result.discard();
     if (this.files.length === 0) this.files.push(this.#scratchFile());
+    // The tab that slid into its place, or the one before it at the end:
+    // closing a tab never throws you back to the first one.
     if (this.activeFile === file) {
-      this.activeFile = this.files[0];
+      this.activeFile = this.files[Math.min(index, this.files.length - 1)];
     }
     this.persist();
   }
 
+  /** Puts `file` at `index` in the tab order. */
+  moveFile(file: SqlFile, index: number) {
+    const from = this.files.indexOf(file);
+    if (from === -1 || from === index) return;
+    this.files.splice(from, 1);
+    this.files.splice(Math.max(0, Math.min(index, this.files.length)), 0, file);
+    this.persist();
+  }
+
+  /** A name with nothing drawable in it leaves the file as it was. */
   renameFile(file: SqlFile, name: string) {
-    const trimmed = name.trim();
-    if (trimmed) {
-      file.name = trimmed;
+    const clean = cleanName(name);
+    if (clean && clean !== file.name) {
+      file.name = clean;
       this.persist();
     }
   }
