@@ -47,10 +47,18 @@
     });
   });
 
-  /** The "New file" row sits one past the matches and is always reachable. */
+  /** What a new file from here would be called: what was typed, or nothing,
+   *  in which case the workspace picks `query-N`. */
+  let newName = $derived(query.trim());
+
+  /**
+   * The "New file" row sits one past the matches and is always reachable.
+   * It takes the typed text as its name: typing a name that matched nothing
+   * and pressing Enter is asking for a file of that name.
+   */
   function choose(at: number) {
     if (at === matches.length) {
-      workspace.createFile();
+      workspace.createFile({ name: newName });
     } else {
       const file = matches[at];
       if (!file) return;
@@ -123,7 +131,11 @@
         onmouseenter={() => (index = matches.length)}
       >
         <Plus size={14} />
-        <span class="name">New file</span>
+        {#if newName}
+          <span class="name">New file <span class="typed">{newName}</span></span>
+        {:else}
+          <span class="name">New file</span>
+        {/if}
       </button>
     </div>
 
@@ -220,6 +232,11 @@
     margin-top: 4px;
     border-top: 1px solid var(--line);
     color: var(--fg-2);
+  }
+
+  /* The name the new file will get, in the colour a file's name has. */
+  .typed {
+    color: var(--fg);
   }
 
   .name {

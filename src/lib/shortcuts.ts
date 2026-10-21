@@ -80,6 +80,14 @@ export const SHORTCUTS: ShortcutSection[] = [
     ]
   },
   {
+    title: "File tabs",
+    items: [
+      { keys: ["←→"], label: "Previous / next file" },
+      { keys: ["F2"], label: "Rename (or double-click)" },
+      { keys: ["↵", "Esc"], label: "Keep / undo the new name" }
+    ]
+  },
+  {
     title: "Pane dividers",
     items: [
       { keys: ["↑↓←→"], label: "Resize a focused divider" },
