@@ -71,6 +71,36 @@ export const linkedQuery = (params: URLSearchParams): LinkedQuery | null => {
   return { ok: true, sql, name: cleanName(params.get(NAME_PARAM) ?? "") };
 };
 
+/**
+ * The longest link this app will write, measured as the login redirect carries
+ * it: the path and query encoded a second time, inside `returnTo`. The whole
+ * link has to fit on a request line, and 8KB is the line the common reverse
+ * proxies allow — and half of the 16KB Node gives a request's headers, which
+ * leaves room for the `Referer` that repeats it and for the cookie. Refused
+ * rather than truncated, like the cap above and for the same reason.
+ */
+export const MAX_LINK_LENGTH = 8000;
+
+export type QueryLink = { ok: true; url: string } | { ok: false; reason: string };
+
+/**
+ * The link that opens `sql` in the app served at `base` — `linkedQuery` read
+ * the other way. It carries no `name`: what is linked is a fragment, and the
+ * name of the document it was cut from is neither its name nor the reader's
+ * business.
+ */
+export const queryLink = (sql: string, base: URL): QueryLink => {
+  const text = sql.trim();
+  if (!text) return { ok: false, reason: "There is no SQL here to link to." };
+  const url = new URL(base);
+  url.search = new URLSearchParams({ [SQL_PARAM]: text }).toString();
+  url.hash = "";
+  if (encodeURIComponent(url.pathname + url.search).length > MAX_LINK_LENGTH) {
+    return { ok: false, reason: "This SQL is too long to put in a link." };
+  }
+  return { ok: true, url: url.href };
+};
+
 /** The same URL with the link's parameters taken off, so that a reload does
  *  not open the query a second time and the SQL does not sit in the address
  *  bar and the session history for the rest of the day. */
