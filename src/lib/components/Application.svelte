@@ -19,6 +19,8 @@
   import SchemaBrowser from "./SchemaBrowser.svelte";
   import Shortcuts from "./Shortcuts.svelte";
   import { isTyping, type Pane } from "$lib/shortcuts";
+  import { queryLink } from "$lib/openLink";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import { TriangleAlert } from "@lucide/svelte";
 
@@ -30,9 +32,11 @@
 
   let { workspace, linkRefusal = null }: Props = $props();
 
-  // Dismissed here rather than by clearing the prop: the refusal is a fact
-  // about how this page was opened, and the page does not get opened twice.
-  let refusalDismissed = $state(false);
+  // The one line above the editor, for links in both directions: a `?sql=` link
+  // that opened nothing, and a fragment that would not go into one. Seeded from
+  // the prop and then this component's own — the refusal is a fact about how
+  // the page was opened, and the page does not get opened twice.
+  let linkNotice: string | null = $state(untrack(() => linkRefusal));
 
   let selection: Selection | null = $state(null);
   let switcherOpen = $state(false);
@@ -166,6 +170,26 @@
     shortcutsOpen = true;
   }
 
+  // A link to a piece of the document (`openLink.ts`). The link says what the
+  // SQL is and not where it ran: whoever follows it runs it, or does not, on
+  // the connection their own workspace is pointed at.
+  async function copyLink(sql: string): Promise<boolean> {
+    const link = queryLink(sql, new URL(resolve("/"), window.location.origin));
+    if (!link.ok) {
+      linkNotice = link.reason;
+      return false;
+    }
+    try {
+      // Undefined, and so a throw, where the page is not a secure context.
+      await navigator.clipboard.writeText(link.url);
+    } catch (e) {
+      linkNotice = `Could not copy the link: ${e instanceof Error ? e.message : String(e)}`;
+      return false;
+    }
+    linkNotice = null;
+    return true;
+  }
+
   let saveTimer: ReturnType<typeof setTimeout>;
   function handleEditorChange() {
     clearTimeout(saveTimer);
@@ -230,6 +254,7 @@
         workspace.run(sql, startLine, anchorId, replacesId)}
       onshowresult={(result) => workspace.showResult(result)}
       oncancelresult={(result) => void result.cancel()}
+      oncopylink={copyLink}
       onchange={handleEditorChange}
       onquickopen={() => (switcherOpen = true)}
       onshortcuts={openShortcuts}
@@ -256,12 +281,13 @@
   <div class="document">
     <DocumentHeader {workspace} onquickopen={() => (switcherOpen = true)} />
     <!-- A `?sql=` link that opened nothing says so: the alternative is an
-         empty editor that reads as a link that worked. -->
-    {#if linkRefusal && !refusalDismissed}
+         empty editor that reads as a link that worked. So does a fragment
+         that could not be linked to. -->
+    {#if linkNotice}
       <div class="notice">
         <TriangleAlert size={14} />
-        <span class="fill">{linkRefusal}</span>
-        <button class="chip" onclick={() => (refusalDismissed = true)}>Dismiss</button>
+        <span class="fill">{linkNotice}</span>
+        <button class="chip" onclick={() => (linkNotice = null)}>Dismiss</button>
       </div>
     {/if}
     <div class="document-body">

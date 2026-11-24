@@ -47,6 +47,7 @@
   import {
     CircleAlert,
     ExternalLink,
+    Link,
     LoaderCircle,
     Pause,
     Play,
@@ -91,6 +92,8 @@
     ) => void;
     onshowresult?: (result: Result) => void;
     oncancelresult?: (result: Result) => void;
+    /** Puts a link to `sql` on the clipboard; whether it got there. */
+    oncopylink?: (sql: string) => Promise<boolean>;
     onchange?: (content: string) => void;
     /** Cmd/Ctrl+P, forwarded from inside the editor where it is swallowed. */
     onquickopen?: () => void;
@@ -108,6 +111,7 @@
     onexecutesql,
     onshowresult,
     oncancelresult,
+    oncopylink,
     onchange,
     onquickopen,
     onshortcuts,
@@ -419,6 +423,9 @@
     status: ToolbarButton;
     details: ToolbarButton;
     cancel: ToolbarButton;
+    link: ToolbarButton;
+    /** Puts the link button's label back after it has said `Copied`. */
+    linkTimer?: ReturnType<typeof setTimeout>;
     widget: monaco.editor.IContentWidget;
     /** The zone object monaco holds: mutate it, then ask for a re-layout. */
     zone: monaco.editor.IViewZone;
@@ -427,6 +434,10 @@
     statement: Statement | null;
     result: Result | null;
   }
+
+  const COPY_LINK = "Copy link";
+  /** How long the link button says it has copied. */
+  const COPIED_MS = 1500;
 
   let toolbars: StatementToolbar[] = [];
   let toolbarModel: monaco.editor.ITextModel | undefined;
@@ -474,7 +485,10 @@
     details.el.title = "Open this query in the Trino UI";
     const cancel = button("cancel", X, "Cancel");
     cancel.el.title = "Cancel this query";
-    node.append(run.el, status.el, details.el, cancel.el);
+    // Last, so that the word changing under a press moves nothing beside it.
+    const link = button("link", Link, COPY_LINK);
+    link.el.title = "Copy a link that opens this statement as a new file";
+    node.append(run.el, status.el, details.el, cancel.el, link.el);
 
     const zone: monaco.editor.IViewZone = {
       afterLineNumber: 0,
@@ -490,6 +504,7 @@
       status,
       details,
       cancel,
+      link,
       widget: null!,
       zone,
       zoneId: "",
@@ -512,6 +527,9 @@
     });
     cancel.el.addEventListener("click", () => {
       if (toolbar.result) oncancelresult?.(toolbar.result);
+    });
+    link.el.addEventListener("click", () => {
+      if (toolbar.statement) void copyLink(toolbar.statement.text, toolbar);
     });
 
     toolbar.widget = {
@@ -550,9 +568,8 @@
         accessor.removeZone(toolbar.zoneId);
         editor?.removeContentWidget(toolbar.widget);
         // Each icon is a mounted component tree of its own.
-        for (const button of [toolbar.run, toolbar.status, toolbar.details, toolbar.cancel]) {
-          clearIcon(button.slot);
-        }
+        const { run, status, details, cancel, link } = toolbar;
+        for (const button of [run, status, details, cancel, link]) clearIcon(button.slot);
       }
     });
   }
@@ -691,6 +708,29 @@
     runRange(model, range, statement.text.trim(), range.startLineNumber);
   }
 
+  async function copyLink(sql: string, toolbar?: StatementToolbar) {
+    if (!(await oncopylink?.(sql)) || !toolbar) return;
+    toolbar.link.label.textContent = "Copied";
+    clearTimeout(toolbar.linkTimer);
+    toolbar.linkTimer = setTimeout(() => (toolbar.link.label.textContent = COPY_LINK), COPIED_MS);
+  }
+
+  /** The link for what `runStatement` would run: the selection, or the
+   *  statement at the caret. The strip over it is what says it was copied. */
+  function copyLinkAtCaret(
+    model: monaco.editor.ITextModel,
+    editor: monaco.editor.IStandaloneCodeEditor
+  ) {
+    const selection = editor.getSelection();
+    if (!selection) return;
+    const statement = statementAtOffset(model, model.getOffsetAt(selection.getStartPosition()));
+    const sql = selection.isEmpty() ? statement?.text : model.getValueInRange(selection);
+    // Not matched on the statement: one sharing a line has no strip of its own.
+    const line = statement && statementRange(model, statement).startLineNumber;
+    const toolbar = toolbars.find((t) => t.line === line);
+    void copyLink(sql ?? "", toolbar);
+  }
+
   onMount(() => {
     const registration = register(monaco, { metadataProvider });
     parseService = registration.parseService;
@@ -767,6 +807,17 @@
       run: () => {
         const model = editor?.getModel();
         if (model && editor) runStatement(model, editor);
+      }
+    });
+
+    editor.addAction({
+      id: "trino.copyLink",
+      label: "Copy Link to Selection or Statement",
+      contextMenuGroupId: "9_cutcopypaste",
+      contextMenuOrder: 10,
+      run: () => {
+        const model = editor?.getModel();
+        if (model && editor) copyLinkAtCaret(model, editor);
       }
     });
 

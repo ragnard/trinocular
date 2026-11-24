@@ -11,7 +11,7 @@ A web-based SQL query IDE for the [Trino](https://trino.io) distributed query en
   - Browse and inspect results
   - Explore catalogs, schemas and tables
   - Multi-cluster support
-  - Open a query sent by link, as a new file
+  - Link to a query, and open one sent by link as a new file
 - Strong multi-user support
   - Authenticate using OIDC, or a list of users and passwords in the config
   - Authorize access to both the app and individual connections with rules over user claims
@@ -248,6 +248,10 @@ https://trinocular.example/?sql=SELECT%20*%20FROM%20tpch.tiny.nation&name=nation
 Following the link opens the SQL as a **new file** and stops there. Nothing runs: there is no
 parameter that would run it, and the file is always a new one rather than the one already open.
 Running it is the reader's, one statement at a time, as for anything else they might be sent.
+
+`Copy link` above a statement writes such a link for it; the editor's context menu does the same
+for the selection. Trinocular refuses to write a link that would be too long to
+survive the login redirect, which is past roughly five kilobytes of SQL.
 
 Someone not signed in is sent to log in and arrives at the query afterwards. The query string is
 never written to the server's log. Keep the query under a few kilobytes: the whole URL travels in
