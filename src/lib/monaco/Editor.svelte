@@ -435,7 +435,7 @@
     result: Result | null;
   }
 
-  const COPY_LINK = "Copy link";
+  const LINK_LABEL = "Link";
   /** How long the link button says it has copied. */
   const COPIED_MS = 1500;
 
@@ -486,7 +486,7 @@
     const cancel = button("cancel", X, "Cancel");
     cancel.el.title = "Cancel this query";
     // Last, so that the word changing under a press moves nothing beside it.
-    const link = button("link", Link, COPY_LINK);
+    const link = button("link", Link, LINK_LABEL);
     link.el.title = "Copy a link that opens this statement as a new file";
     node.append(run.el, status.el, details.el, cancel.el, link.el);
 
@@ -712,7 +712,7 @@
     if (!(await oncopylink?.(sql)) || !toolbar) return;
     toolbar.link.label.textContent = "Copied";
     clearTimeout(toolbar.linkTimer);
-    toolbar.linkTimer = setTimeout(() => (toolbar.link.label.textContent = COPY_LINK), COPIED_MS);
+    toolbar.linkTimer = setTimeout(() => (toolbar.link.label.textContent = LINK_LABEL), COPIED_MS);
   }
 
   /** The link for what `runStatement` would run: the selection, or the

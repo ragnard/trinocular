@@ -249,7 +249,7 @@ Following the link opens the SQL as a **new file** and stops there. Nothing runs
 parameter that would run it, and the file is always a new one rather than the one already open.
 Running it is the reader's, one statement at a time, as for anything else they might be sent.
 
-`Copy link` above a statement writes such a link for it; the editor's context menu does the same
+`Link` above a statement writes such a link for it; the editor's context menu does the same
 for the selection. Trinocular refuses to write a link that would be too long to
 survive the login redirect, which is past roughly five kilobytes of SQL.
 
